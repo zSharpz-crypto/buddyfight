@@ -123,5 +123,5 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [ ] bot loop offerGodclockAwaken("plr") may run when activeSide !== "opp"
 - [ ] flags cannot be flipped face down by opponent effects: no mechanic exists
 - [ ] Other 'If your flag is X ... instead' cards, not checked/fixed (different shapes): #5706, #5969, #6458 (handled r42 repeat), #6563
-- [ ] tests/godclock_awaken.js 'owner can choose hand copy over field' fails (pre-existing before this fix)
+- [x] tests/godclock_awaken.js 'owner can choose hand copy over field' was flaky (~7% of runs, not a code regression: same at every commit 0e4a2af..HEAD): the shuffled test deck is full of #6065, and the turn-start draw after the flip could draw one into hand while Wind Kronos pulled the dropped copy into soul. Test now removes 6065 from the deck (0/60 failures).
 

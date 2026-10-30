@@ -8,6 +8,7 @@ const setup = (revN, hand, field) => {
   run(`{battle.start('hotseat', generateFlagDeck(5957,'T',6065,false), generateFlagDeck(447,'O',571,false)); battle.renderBattle=function(){}; ABX.autoPlay=true; ABX.fast=true; ABX.hooks.pickCards=(o)=>[0];
    const g=battle.plr.godclock; [0,1,3].forEach((i,k)=>{ g.quadrants[i].reversed = k<${revN}; }); g.reversalCount=${revN};
    battle.plr.hand=battle.plr.hand.filter(id=>!(CARD_MAP.get(id).name||'').toLowerCase().includes('time ruler')); ['left','center','right'].forEach(p=>battle.plr.monsters[p]=null);
+   battle.plr.deck=battle.plr.deck.filter(id=>id!==6065);   // the shuffled deck is full of 6065: a turn-start draw of one made 'hand copy over field' flaky (~7%)
    ${hand ? "battle.plr.hand.push(6065);" : ""}
    ${field ? "battle.plr.monsters.center={card:CARD_MAP.get(6065),rested:false,attacksLeft:1,soul:[46],tempPower:0,tempDef:0,tempCrit:0};" : ""}
    battle.activeSide='opp'; battle.phase='main';}`);
