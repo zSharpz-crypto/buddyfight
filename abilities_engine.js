@@ -402,7 +402,7 @@
       case "lifeVs": return c.cmp === "le" ? f.life <= e.life : f.life > e.life;
       case "gauge": return cmpN((c.who === "you" ? f : e).gauge.length, c);
       case "hand": return cmpN((c.who === "you" ? f : e).hand.length, c);
-      case "flagIs": { const fc = flagCard(f); const n = lc(fc ? fc.name : ""); return c.names.some(x => n === x || n.includes(x)); }
+      case "flagIs": { const fc = (f.godclock && f.godclock.awakened && f.item && f.item.isEndrulerFlag && f.item.card) || flagCard(f); const n = lc(fc ? fc.name : ""); return c.names.some(x => n === x || n.includes(x)); }
       case "flagWorld": return f.world === c.world || (flagCard(f) && (flagCard(f).worlds || []).includes(c.world)) || !!(f.abxFlagWorlds && f.abxFlagWorlds.turn === B.turnCount && f.abxFlagWorlds.worlds.some(w => lc(w) === lc(c.world)));
       case "reversal": return getFighterReversalCount(f) >= c.n;
       // "another ..." in a condition never counts the card itself

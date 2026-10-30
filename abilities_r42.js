@@ -77,6 +77,19 @@
     // #6458 Deily: "If your flag is Lost World, choose and use three times instead" = repeat the modal choice, not a leftover step
     [6458, /choose and use one of the following three/i, () => ({ kind: "modal", steps: [], once: "turn", repeatLW: 3 })],
 
+    // #6010 Teylor Luna: "destroy up to one card ... If your flag is Endruler, put up to one card on the bottom of the deck instead"
+    [6010, /endruler dragon.{0,40}put up to one card/i, (ab, card) => {
+      const d = (ab.steps || []).find(x => x.op === "destroy");
+      const pb = ABX.parseAbilityLine("When this card attacks, put up to one card from your opponent's field on the bottom of your opponent's deck", card);
+      const mv = pb && (pb.steps || []).find(x => x.op === "move");
+      if (!d || !mv) return null;
+      const endr = { t: "flagIs", names: ["perfected deity of eon, the endruler dragon"] };
+      const rev = d.cond || { t: "reversal", n: 1, cmp: "ge" };
+      d.cond = { t: "and", list: [rev, { t: "not", c: endr }] };
+      mv.cond = { t: "and", list: [rev, endr] };
+      return { kind: ab.kind, steps: [d, mv], trigger: ab.trigger, conds: ab.conds };
+    }],
+
     /* ---- wave 1 ---- */
     [6138, /if a «?fire»? is on your field/i, () => ({
       kind: "spell", once: "turn", steps: [

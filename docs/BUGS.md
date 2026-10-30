@@ -114,3 +114,12 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [x] Clock-III drop-zone soul costs #5999/#6010
 - [x] Engine-path Horary Domination (Clock-I/II/III #5958-#5960): op r40HoraryDomination delegates to game.js initiateClockFlipInteractive (shared once/turn, quadrants[].reversed, hand-card choice, Clock-II ends battle, Clock-III full Call Cost); acts gain an ab.canUse hook in ABX.canUseAct. Test: tests/horary_domination.js
 - [ ] Eternal Eon should stop opponent card abilities, not just Counters
+- [x] Teylor Luna #6010: with the awakened Endruler flag the 'If your flag is Endruler ... bottom of deck instead' swap now works (condition flagIs reads the awakened Endruler flag item; r42 override gates destroy vs bottom-deck). Test: tests/teylor_luna_endruler.js
+- [ ] Asmodai #1445 prevent-leaving-the-field option not offered against bottom-deck (suspected)
+- [ ] Godclock online extra-turn does not offer remote owner the awaken
+- [ ] awaken can still apply after match ended while prompt open
+- [ ] bot loop offerGodclockAwaken("plr") may run when activeSide !== "opp"
+- [ ] flags cannot be flipped face down by opponent effects: no mechanic exists
+- [ ] Other 'If your flag is X ... instead' cards, not checked/fixed (different shapes): #5706, #5969, #6458 (handled r42 repeat), #6563
+- [ ] tests/godclock_awaken.js 'owner can choose hand copy over field' fails (pre-existing before this fix)
+
