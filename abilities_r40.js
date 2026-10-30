@@ -461,24 +461,9 @@
     check: () => true
   };
 
+  // Single implementation lives in game.js (battle.offerGodclockAwaken); #5957's trigger is a no-op rule here, this op never acts.
   OPS.r40EndrulerReversal5957 = {
-    async run(s, ctx) {
-      const f = ctx.f;
-      const revCnt = Math.max(f.reversalCount || 0, typeof getFighterReversalCount === "function" ? getFighterReversalCount(f) : 0);
-      if (revCnt < 3) return false;
-      const hIdx = f.hand.findIndex(id => { const c = cardOf(id); return c && nameHas(c, "Time Ruler"); });
-      const fMon = fieldUnits(f, false).find(r => r.card && nameHas(r.card, "Time Ruler"));
-      if (hIdx >= 0) f.drop.push(f.hand.splice(hIdx, 1)[0]);
-      else if (fMon) B.destroyMonster(ctx.side, fMon.pos);
-      else return false;
-      f.reversalUsed = true;
-      f.reversalCount = (f.reversalCount || 0) + 1;
-      if (f.godclock) f.godclock.reversalCount = (f.godclock.reversalCount || 0) + 1;
-      const endCard = cardOf(5957) || ctx.card;
-      f.item = { card: endCard, rested: false, attacksLeft: 3, soul: [], isEndrulerFlag: true };
-      fresh();
-      return true;
-    },
+    async run() { return false; }, // neutralized: use battle.offerGodclockAwaken (game.js)
     check: () => true
   };
 
@@ -711,7 +696,7 @@
     [5760, /"belost"|at the end of your opponent's turn, choose one of your flags/i, () => ({ kind: "triggered", trigger: { event: "turnEnd", who: "opp" }, once: "game", conds: [], steps: [C("r40Belost")] })],
     [5517, /"double buddy call"|when this card enters the field by a buddy call/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [C("r40DoubleBuddyCall5517")] })],
     [5957, /put one "clock-i", "clock-ii" & "clock-iii" with this card/i, () => ({ kind: "rule", steps: [] })],
-    [5957, /at the end of your opponent's turn, if three of your flags are in \[reversal\]/i, () => ({ kind: "triggered", trigger: { event: "turnEnd", who: "opp" }, conds: [], steps: [C("r40EndrulerReversal5957")] })],
+    [5957, /at the end of your opponent's turn, if three of your flags are in \[reversal\]/i, () => ({ kind: "rule", steps: [] })],
     [5445, /put this card face down into your buddy zone/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [C("r40StructuredExec", { text: "Put the top card of your deck into your gauge, you gain 1 life, and draw a card. Then, put this card face down into your buddy zone." })] })],
     [5446, /put this card face down into your buddy zone/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [C("r40StructuredExec", { text: "Put the top card of your deck into your hand, and put the top two cards of your deck into your gauge. Then, put this card face down into your buddy zone." })] })],
     [5643, /if two or more face down cards are in your buddy zone/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [C("r40StructuredExec", { text: "Draw two cards." })] })],

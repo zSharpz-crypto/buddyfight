@@ -4818,21 +4818,11 @@ const battle = {
       }
 
       if (idx === 2 && !f.godclock.awakened) {
-        const clocksFlipped = [0, 1, 3].every(i => f.godclock.quadrants[i].reversed);
-        const trFound = this.findTimeRulerMonsterForGodclockReversal(f);
-        const btnG = document.createElement("button");
-        btnG.className = "primary-cta-btn full-width";
-        btnG.style.padding = "7px 10px";
-        btnG.style.fontSize = "11.5px";
-        btnG.disabled = !clocksFlipped || !trFound;
-        btnG.textContent = clocksFlipped
-          ? (trFound ? `👑 Drop "${trFound.card.name}" (${trFound.source.toUpperCase()}) & Flip Godclock (#5957 ➔ #5961)!` : `🔒 Needs a "Time Ruler" monster on your field or in hand`)
-          : `🔒 Flip Clock-I, Clock-II & Clock-III first (${[0, 1, 3].filter(i => f.godclock.quadrants[i].reversed).length}/3 Flipped)`;
-        btnG.onclick = () => {
-          this.closeGodclockModal();
-          this.awakenEndrulerDragon("plr");
-        };
-        div.appendChild(btnG);
+        // #5957 flips only at the end of the OPPONENT's turn (see offerGodclockAwaken), never from this modal.
+        const note = document.createElement("div");
+        note.style.cssText = "font-size:11px;color:#fbbf24;margin-top:4px;";
+        note.textContent = `⏳ At the end of your opponent's turn, with 3 flags in [Reversal], you may drop a "Time Ruler" monster to flip this (${[0, 1, 3].filter(i => f.godclock.quadrants[i].reversed).length}/3 flipped).`;
+        div.appendChild(note);
       }
 
       row.appendChild(div);
@@ -5124,32 +5114,67 @@ const battle = {
     this.checkWinCondition();
   },
 
-  awakenEndrulerDragon(side) {
+  // All "Time Ruler" monsters on the owner's field/hand that can pay Godclock #5957's cost.
+  godclockTimeRulerCandidates(f) {
+    const out = [];
+    for (const pos of MONSTER_POSITIONS) {
+      const m = f.monsters[pos];
+      if (m && m.card && (m.card.name || "").toLowerCase().includes("time ruler")) out.push({ source: "field", pos, card: m.card });
+    }
+    f.hand.forEach((id, handIdx) => {
+      const c = CARD_MAP.get(id);
+      if (c && c.type === "Monster" && (c.name || "").toLowerCase().includes("time ruler")) out.push({ source: "hand", handIdx, card: c });
+    });
+    return out;
+  },
+
+  godclockAwakenEligible(f) {
+    return !!(f && f.godclock && !f.godclock.awakened && [0, 1, 3].every(i => f.godclock.quadrants[i].reversed) && this.godclockTimeRulerCandidates(f).length);
+  },
+
+  // "At the end of your opponent's turn, if three of your flags are in [Reversal], you MAY put a Time Ruler monster
+  // from your field or hand into the drop zone. If you do, [Reversal] this card." Owner chooses (bot auto-accepts).
+  async offerGodclockAwaken(side) {
     const f = this.getFighter(side);
-    if (!f.godclock || f.godclock.awakened) return;
-
-    const clocksFlipped = [0, 1, 3].every(i => f.godclock.quadrants[i].reversed);
-    if (!clocksFlipped && !f.isBot) {
-      alert("You must flip Clock-I (#5958), Clock-II (#5959), and Clock-III (#5960) in [Reversal] before flipping Godclock (#5957)!");
-      return;
+    if (!this.godclockAwakenEligible(f)) return false;
+    const cands = this.godclockTimeRulerCandidates(f);
+    let pick = cands[0];
+    if (!f.isBot) {
+      const idxs = await ABX.ui.pickCards({
+        title: "Godclock: [Reversal] Endruler Dragon?",
+        subtitle: `End of the opponent's turn: you may put a "Time Ruler" monster into the drop zone to flip Godclock. Choose none to decline.`,
+        cards: cands.map(c => ({ card: c.card, badge: c.source === "field" ? "Field" : "Hand" })),
+        min: 0, max: 1
+      });
+      if (!idxs || !idxs.length) return false;
+      pick = cands[idxs[0]];
     }
+    return this.awakenEndrulerDragon(side, { fromTrigger: true, pick });
+  },
 
-    // Cost: put a monster with "Time Ruler" in its card name from your field or hand into the Drop Zone
-    const trFound = this.findTimeRulerMonsterForGodclockReversal(f);
-    if (!trFound) {
-      if (!f.isBot) alert(`Godclock's [Reversal] costs a monster with "Time Ruler" in its card name from your field or hand. You don't have one right now.`);
-      return;
+  awakenEndrulerDragon(side, opts) {
+    const f = this.getFighter(side);
+    if (!f.godclock || f.godclock.awakened) return false;
+    if (!opts || !opts.fromTrigger) return false; // only legal as the end-of-opponent's-turn trigger
+    if (!this.godclockAwakenEligible(f)) return false;
+
+    // Cost: put the chosen "Time Ruler" monster (field -> drop with its soul, not destroyed; or hand) into the Drop Zone
+    let trFound = opts.pick;
+    if (trFound && trFound.source === "field") {
+      const m = f.monsters[trFound.pos];
+      if (!m || m.card.id !== trFound.card.id) trFound = null;
+    } else if (trFound && trFound.source === "hand") {
+      const hi = f.hand.indexOf(trFound.card.id);
+      if (hi < 0) trFound = null; else trFound.handIdx = hi;
     }
-    if (trFound) {
-      if (trFound.source === "field") {
-        const m = f.monsters[trFound.pos];
-        if (m.soul) f.drop.push(...m.soul);
-        f.drop.push(m.card.id);
-        f.monsters[trFound.pos] = null;
-      } else if (trFound.source === "hand") {
-        const cid = f.hand.splice(trFound.handIdx, 1)[0];
-        f.drop.push(cid);
-      }
+    if (!trFound) trFound = this.godclockTimeRulerCandidates(f)[0];
+    if (trFound.source === "field") {
+      const m = f.monsters[trFound.pos];
+      if (m.soul) f.drop.push(...m.soul);
+      f.drop.push(m.card.id);
+      f.monsters[trFound.pos] = null;
+    } else {
+      f.drop.push(f.hand.splice(trFound.handIdx, 1)[0]);
     }
 
     // The Endruler Dragon takes the Flag/Item slot, so any equipped item goes to the Drop Zone.
@@ -5189,6 +5214,7 @@ const battle = {
     this.showCutin("OVERGOD REVERSAL!", "Perfected Deity of Eon, The Endruler Dragon (12000/4/12000)!", endrulerCard.img);
     this.setPrompt("👑 All 4 Godclock Cards Merged into Perfected Deity of Eon, The Endruler Dragon (12000 Pow / 4 Crit / 12000 Def / [Triple Attack] / \"Eternal Eon\")! Click the Flag to open its Skill Banner!");
     this.renderBattle();
+    return true;
   },
 
   activateOvergodZeroFromHand(side, handIdx) {
@@ -5435,7 +5461,8 @@ const battle = {
 
     // The friend ended their turn: run our own Start Phase (reset + draw), which then syncs back.
     if (msg.beginTurn && this.activeSide === "plr") {
-      this.startTurn("plr");
+      // The friend's turn just ended: my Godclock #5957 may flip first (end of the opponent's turn).
+      Promise.resolve(this.offerGodclockAwaken("plr")).catch(() => {}).then(() => { if (this.activeSide === "plr" && !this.matchOver) this.startTurn("plr"); });
     }
   },
 
@@ -5643,6 +5670,19 @@ const battle = {
 
   endTurn() {
     if (this.activeSide === "opp" && (this.opp.isBot || this.mode === "online_p2p")) return;
+    if (this._endingTurn) return;
+    // End of THIS player's turn = end of the opponent's turn for the other side's Godclock #5957.
+    // Online: the remote owner is handled on their own device (see receive beginTurn).
+    const owner = this.activeSide === "plr" ? "opp" : "plr";
+    if (this.mode !== "online_p2p" && this.godclockAwakenEligible(this.getFighter(owner))) {
+      this._endingTurn = true;
+      Promise.resolve(this.offerGodclockAwaken(owner)).catch(() => {}).then(() => { this._endingTurn = false; this._endTurnCore(); });
+      return;
+    }
+    this._endTurnCore();
+  },
+
+  _endTurnCore() {
     const endingSide = this.activeSide;
     this.pendingAction = null;
     this.linkAttackers = [];
@@ -9081,9 +9121,6 @@ const battle = {
       if (nextQuadIdx !== undefined && !bot.godclock.horaryDominationUsedThisTurn && bot.hand.length > 0) {
         this.initiateClockFlipInteractive("opp", nextQuadIdx, false);
       }
-      if ([0, 1, 3].every(i => bot.godclock.quadrants[i].reversed) && this.findTimeRulerMonsterForGodclockReversal(bot)) {
-        this.awakenEndrulerDragon("opp");
-      }
     }
 
     const afterChargeStep = () => {
@@ -9169,11 +9206,8 @@ const battle = {
           }
           if (this.activeSide !== "opp" || step >= attackers.length) {
             this.oppContinueCallback = null;
-            // Check end-of-opponent's-turn Godclock #5957 awakening for Player!
-            if (this.plr.godclock && !this.plr.godclock.awakened && [0, 1, 3].every(i => this.plr.godclock.quadrants[i].reversed) && this.findTimeRulerMonsterForGodclockReversal(this.plr)) {
-              this.awakenEndrulerDragon("plr");
-            }
-            setTimeout(() => this.botPriority("the opponent's turn is ending", () => {
+            // End of the bot's turn: the player's Godclock #5957 may flip (player is asked).
+            Promise.resolve(this.offerGodclockAwaken("plr")).catch(() => {}).then(() => { if (stillThisMatch()) setTimeout(() => this.botPriority("the opponent's turn is ending", () => {
               if (stillThisMatch() && this.activeSide === "opp") {
                 if (this.imTurnEnd) this.imTurnEnd("opp");
                 if (window.ABX && ABX.fireTurnEvent) ABX.fireTurnEvent("turnEnd");
@@ -9182,7 +9216,7 @@ const battle = {
                 if (window.ABX && ABX.takeExtraTurn && ABX.takeExtraTurn("opp")) { this.startTurn("opp"); return; }
                 this.startTurn("plr");
               }
-            }), 600);
+            }), 600); });
             return;
           }
 

@@ -105,3 +105,12 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
   - #3822: "link attacks of this card cannot be nullified" parsed as a restrict on nothing; now a link-only unnullifiable mark. #4112: "from your deck face down" used face-down as a deck filter (matched nothing); now it is the manner of the move (any move from deck/hand/drop). #4179: calling an impact monster from the deck by paying its cost never worked (call op only knew type "Monster"); new `r41CallImpactPay` (gauge/life costs only; impacts whose cost needs a choice are not offered).
   - Checked OK: #4071 Overkill:REBOOT (calls from drop, life becomes 10 only at 3 or less), #3915/#4092/#5357 and the r37 Overkills (3728/6512/4115).
   - Not verified in a real attack: #4086 (trigger "when a Duel Golem attacks, destroy a card + 1 damage"), #5341 REB00T (nullify + end turn), #3934 call-from-soul.
+
+## Godclock (#5957-#5961, #6202)
+- [x] #5957 Endruler Dragon [Reversal]: now only at the end of the OPPONENT's turn (hotseat/bot/online), optional prompt, owner picks the Time Ruler, field one goes to drop with soul (not destroyed). Dead ABX op/trigger neutralized. Test: tests/godclock_awaken.js
+- [ ] Overgod "0" #6202 act mapped to wrong op (r40EndrulerReversal5957, now a no-op)
+- [ ] Drum "SD" #4129 x3 vs limit 1
+- [ ] Keeper of Time #5955 double fire (#5956/#6010 suspected)
+- [ ] Clock-III drop-zone soul costs #5999/#6010
+- [ ] Engine-path Horary Domination not linked to godclock state / once-per-turn
+- [ ] Eternal Eon should stop opponent card abilities, not just Counters
