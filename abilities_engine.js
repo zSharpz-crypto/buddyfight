@@ -1295,7 +1295,12 @@
   function extraParts(card) {
     const out = [];
     abilitiesOf(card, a => a.kind === "cost").forEach(a => (a.parts || []).forEach(p => {
-      if (p.soulFrom || p.discard || p.destroy) { out.push(p); return; }
+      if (p.soulFrom || p.discard || p.destroy) {
+        // parser reads "Put up to two «X» from your drop zone into its soul" as n=1: fix the count here (e.g. #6010)
+        const um = p.soulFrom && /^put up to (one|two|three|four|\d+)\b/i.exec(p.text || "");
+        if (um) { p.soulFrom.n = { one: 1, two: 2, three: 3, four: 4 }[um[1].toLowerCase()] || parseInt(um[1], 10) || 1; p.soulFrom.upTo = true; }
+        out.push(p); return;
+      }
       if (p.allHandToSoul) { out.push(p); return; }
       const txt = String(p.text || "");
       const mChooseSoul = txt.match(/^choose a card from your hand,\s*deck,?\s*or drop zone/i);
@@ -1353,6 +1358,7 @@
     return extraParts(card).every(p => {
       if (p.allHandToSoul) return true;   // "if you have one or more hand cards": nothing to pay with an empty hand
       if (p.chooseSoulFromAny) return partCands(p, side, card, exclHandIdx).length >= 1;
+      if (p.soulFrom && p.soulFrom.upTo) return true;   // "up to N": zero is fine
       return partCands(p, side, card, exclHandIdx).length >= ((p.soulFrom || p.discard || p.destroy).n || 1);
     });
   };
@@ -1382,7 +1388,7 @@
       const ctx = { side, f, e: F(otherSide(side)), card, unit, bind: {}, auto: true };
       let cands = partCands(part, side, card, -1).filter(r => !(unit && r.unit === unit));
       const np = { qty: { n }, raw: spec.np ? spec.np.raw : "a card" };
-      const chosen = await pick(cands, np, ctx, { intent: "cost", title: `${card.name} — pay the Cost`, subtitle: part.text, min: Math.min(n, cands.length), max: n });
+      const chosen = await pick(cands, np, ctx, { intent: "cost", title: `${card.name} — pay the Cost`, subtitle: part.text, min: spec.upTo ? 0 : Math.min(n, cands.length), max: n });
       for (const r of chosen) {
         if (part.destroy) { const pos = core.posOfUnit(f, r.unit); if (pos) B.destroyMonster(side, pos); continue; }
         const id = detach(r); if (id == null) continue;

@@ -4728,9 +4728,15 @@ const battle = {
       const isTD = (c.attrs || []).some(a => normalizeSearchToken(a) === "timedragon");
       if (!isTD) return;
       const cost = parseCardCost(c.cost, c.skill, fighter, c);
-      if (fighter.gauge.length >= cost.gauge) {
-        res.push({ card: c, dropIdx, cost });
+      if (fighter.gauge.length < cost.gauge || fighter.life <= cost.life) return;
+      // the called card leaves the drop zone first, so it can't be its own soul/cost payment
+      let extrasOk = true;
+      if (window.ABX && ABX.canPayExtras && ABX.hasExtras && ABX.hasExtras(c)) {
+        const side = fighter === this.opp ? "opp" : "plr";
+        fighter.drop.splice(dropIdx, 1);
+        try { extrasOk = ABX.canPayExtras(side, c, -1); } finally { fighter.drop.splice(dropIdx, 0, cid); }
       }
+      if (extrasOk) res.push({ card: c, dropIdx, cost });
     });
     return res;
   },
@@ -5030,24 +5036,12 @@ const battle = {
       if (callPreview && (!targetZone || !fitsSize)) {
         this.setPrompt(`⏳ Clock-III flipped, but "${callPreview.name}" couldn't be called (${!targetZone ? "no open Monster Zone" : "over your size limit"}).`);
       } else if (dropIdxToCall !== -1 && f.drop[dropIdxToCall]) {
-        const callCid = f.drop.splice(dropIdxToCall, 1)[0];
-        const callCard = CARD_MAP.get(callCid);
-        const cost = parseCardCost(callCard.cost, callCard.skill, f, callCard);
-        for (let i = 0; i < cost.gauge && f.gauge.length > 0; i++) f.drop.push(f.gauge.pop());
-        const soulArr = [];
-        for (let i = 0; i < Math.max(cost.soul, callCard.sg ? 1 : 0) && f.deck.length > 0; i++) {
-          soulArr.push(f.deck.shift());
-        }
-        f.monsters[targetZone] = {
-          card: callCard,
-          rested: false,
-          attacksLeft: callCard.atk_max || 1,
-          soul: soulArr,
-          tempPower: 0,
-          tempDef: 0,
-          tempCrit: 0,
-          actUsed: false
-        };
+        // Same path as a normal hand call: pays gauge/life/deck soul + ABX extras (drop-zone soul, discard...) and fires enter triggers.
+        f.hand.push(f.drop.splice(dropIdxToCall, 1)[0]);
+        const callCard = CARD_MAP.get(f.hand[f.hand.length - 1]);
+        this.completeMonsterCall(side, targetZone, f.hand.length - 1, false);
+        const stuck = f.hand.lastIndexOf(callCard.id);   // call refused (e.g. once-per-turn limit): back to the drop zone
+        if (stuck >= 0 && !MONSTER_POSITIONS.some(z => f.monsters[z] && f.monsters[z].card === callCard)) f.drop.push(f.hand.splice(stuck, 1)[0]);
         this.setPrompt(`⏳ Clock-III (#5960 ➔ #5964) [Reversal]: Called "${callCard.name}" from your Drop Zone to ${targetZone.toUpperCase()}!`);
       }
       this.renderBattle();
@@ -7650,7 +7644,7 @@ const battle = {
       }
     }
 
-    const soulCount = this.abxFreeCall ? 0 : Math.max(cost.soul, c.sg ? 1 : 0);
+    const soulCount = this.abxFreeCall ? 0 : Math.max(cost.soul, c.sg && !/\[Call Cost\][^\n]*soul/i.test(c.skill || "") ? 1 : 0);   // a [Call Cost] that names its own soul replaces the Soulguard default
     const soulArr = [];
     for (let i = 0; i < soulCount; i++) {
       if (f.deck.length > 0) soulArr.push(f.deck.shift());
