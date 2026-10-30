@@ -25,6 +25,8 @@
   const handSoulCost = (card) => !!card && HAND_SOUL_COST.test(card.skill || "");
   const heP = ABX.hasExtras, cpeP = ABX.canPayExtras, peP = ABX.payExtras;
   ABX.hasExtras = function (card) { return handSoulCost(card) || heP.apply(this, arguments); };
+  const hseP = ABX.hasSoulExtras;
+  ABX.hasSoulExtras = function (card) { return handSoulCost(card) || (hseP ? hseP.apply(this, arguments) : false); };
   ABX.canPayExtras = function (side, card) { return handSoulCost(card) || cpeP.apply(this, arguments); };   // an empty hand is fine
   ABX.payExtras = async function (side, card, unit) {
     if (!handSoulCost(card)) return peP.apply(this, arguments);

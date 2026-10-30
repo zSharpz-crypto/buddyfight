@@ -1364,6 +1364,8 @@
     });
   };
   ABX.hasExtras = (card) => extraParts(card).length > 0;
+  // true when the extra [Call Cost] parts put cards into the soul (so the [Soulguard] default soul is replaced); discard/destroy-only extras do not count
+  ABX.hasSoulExtras = (card) => extraParts(card).some(p => p.soulFrom || p.allHandToSoul || p.chooseSoulFromAny) || !!ABX.onTopCost(card);
   // unit may be null (card not on the field yet is fine for discard); soul parts need the new unit or [Set] spell host
   ABX.payExtras = async function (side, card, unit) {
     const f = F(side);

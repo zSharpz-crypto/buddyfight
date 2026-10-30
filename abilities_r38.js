@@ -662,6 +662,10 @@
       return _origHE.apply(this, arguments);
     };
   }
+  if (ABX.hasSoulExtras) {
+    const _origHSE = ABX.hasSoulExtras;
+    ABX.hasSoulExtras = function (card) { return (card && card.id === 6255) || _origHSE.apply(this, arguments); };   // #6255 moves an Ace's soul into this card
+  }
   if (ABX.payExtras) {
     const _origPE = ABX.payExtras;
     ABX.payExtras = function (side, card, newUnit) {

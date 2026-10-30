@@ -1012,14 +1012,27 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
   const costLineMatch = combined.match(/\[(Call Cost|Cast Cost|Equip Cost)\]\s*([^\n]+)/i);
   if (costLineMatch) {
     const line = costLineMatch[2];
+    // the card's `cost` field is sometimes cut at the first "[" ("[Call Cost] [Put one [Nanashi]"): read the soul wording from the full skill-text line
+    const sm = (skillStr || "").match(/\[(Call Cost|Cast Cost|Equip Cost)\]\s*([^\n]+)/i);
+    const soulLine = sm && sm[2].length > line.length && sm[2].startsWith(line) ? sm[2] : line;
     const gMatch = line.match(/Pay\s+(\d+)\s+gauge/i);
     if (gMatch) gauge = parseInt(gMatch[1], 10);
     const lMatch = line.match(/Pay\s+(\d+)\s+life/i);
     if (lMatch) life = parseInt(lMatch[1], 10);
-    const sMatch = line.match(/Put\s+(?:the\s+)?top\s+(?:(one|two|three|\d+)\s+)?cards?\s+of\s+your\s+deck\s+into\s+(?:this\s+(?:card|monster)'s\s+|its\s+)?soul/i);
+    const sMatch = soulLine.match(/Put\s+(?:the\s+)?top\s+(?:(one|two|three|\d+)\s+)?cards?\s+of\s+your\s+deck\s+into\s+(?:this\s+(?:card|monster)'s\s+|its\s+)?soul/i);
     if (sMatch) {
       const word = (sMatch[1] || "1").toLowerCase();
       soul = word === "two" ? 2 : word === "three" ? 3 : parseInt(word, 10) || 1;
+    } else {
+      // other deck-soul wordings: "to this monster's soul", "you deck" typo, "top card from your deck", "two cards from the top of your deck", "card`s", "into the soul of this card"
+      const NUMW = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+      const dm = soulLine.match(/Put\s+(?:the\s+)?top\s+(?:(one|two|three|four|five|six|\d+)\s+)?cards?\s+(?:of|from)\s+(?:your|you)\s+deck\s+(?:face\s*down\s+)?(?:in)?to\s+(?:this\s+(?:card|monster)\S?s\s+soul|its\s+soul|the\s+soul\s+of\s+this\s+(?:card|monster))/i)
+        || soulLine.match(/Put\s+(?:the\s+)?(?:(one|two|three|four|five|six|\d+)\s+)cards?\s+from\s+the\s+top\s+of\s+your\s+deck\s+(?:face\s*down\s+)?(?:in)?to\s+(?:this\s+(?:card|monster)\S?s\s+soul|its\s+soul|the\s+soul\s+of\s+this\s+(?:card|monster))/i)
+        || soulLine.match(/\band\s+the\s+top\s+(?:(one|two|three|four|five|six|\d+)\s+)?cards?\s+(?:of|from)\s+your\s+deck\s+(?:in)?to\s+(?:this\s+(?:card|monster)\S?s\s+soul|its\s+soul)/i);   // "put a card from your hand and the top card of your deck into ... soul"
+      if (dm) {
+        const w = (dm[1] || "1").toLowerCase();
+        soul = NUMW[w] || parseInt(w, 10) || 1;
+      }
     }
   }
 
@@ -7644,7 +7657,7 @@ const battle = {
       }
     }
 
-    const soulCount = this.abxFreeCall ? 0 : Math.max(cost.soul, c.sg && !/\[Call Cost\][^\n]*soul/i.test(c.skill || "") ? 1 : 0);   // a [Call Cost] that names its own soul replaces the Soulguard default
+    const soulCount = this.abxFreeCall ? 0 : Math.max(cost.soul, c.sg && !(window.ABX && ABX.hasSoulExtras && ABX.hasSoulExtras(c)) ? 1 : 0);   // a [Call Cost] that really pays its own soul (parsed deck soul, or ABX extras with a soul part) replaces the Soulguard default
     const soulArr = [];
     for (let i = 0; i < soulCount; i++) {
       if (f.deck.length > 0) soulArr.push(f.deck.shift());
