@@ -138,11 +138,30 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
   ok(env.run(`battle.plr.subFlags.every(sf => sf.reversalUsed === true)`), "#5958 Clock-I, #5959 Clock-II, and #5960 Clock-III execute 'Horary Domination' and flip into [Reversal]");
 
   env.run(`{
-    ABX.OPS.r40EndrulerReversal5957.run({}, { side: "plr", f: battle.plr, e: battle.opp, card: CARD_MAP.get(5957) });
+    // awaken via the real game.js path: end of the OPPONENT's turn, owner picks the Time Ruler from hand
+    const timeRulerId = battle.plr.hand[0];
+    ABX.fast = true; ABX.hooks.pickCards = (o) => [0];
+    battle.renderBattle = function () {};
+    // (engine-path Horary Domination does not yet set godclock.quadrants -- tracked in docs/BUGS.md -- so mirror it here)
+    [0, 1, 3].forEach(i => { battle.plr.godclock.quadrants[i].reversed = true; });
+    battle.plr.godclock.reversalCount = 3;
+    battle.plr.hand = [timeRulerId, 6202, 46, 46, 46];
+    battle.activeSide = "opp"; battle.phase = "main";
+    battle.endTurn();
+  }`);
+  await wait(300);
+  env.run(`{
+    battle.activeSide = "plr"; battle.phase = "main";
+    ABX.runHandUse("plr", battle.plr.hand.indexOf(6202), ABX.handUseActs(CARD_MAP.get(6202))[0], () => {});
+  }`);
+  await wait(200);
+  env.run(`{
+    battle.plr.hand.push(6202); // second copy pays Eternal Eon's cost
     battle.opp.monsters.center = { card: CARD_MAP.get(46), rested: false, attacksLeft: 1, soul: [] };
     ABX.OPS.r40OvergodEternalEon6202.run({}, { side: "plr", f: battle.plr, e: battle.opp, card: CARD_MAP.get(6202) });
   }`);
   await wait(200);
+  ok(env.run(`battle.plr.godclock.awakened === true && battle.plr.godclock.overgodActive === true && battle.plr.flagId === 6202`), "#5957 awakens at end of opp turn (game.js path) and #6202 Overgod '0' hand [Act] puts it on the flags");
   ok(env.run(`Boolean(battle.plr.item && battle.plr.item.isEndrulerFlag) && battle.opp.monsters.center.defenseZeroTurn === true && battle.opp.abxTimeStoppedTurn === battle.turnCount`), "#5957 Endruler Dragon [Reversal] equips the flag and #6202 Overgod '0' 'Eternal Eon' reduces opponent defense to 0 and stops opponent's time");
 
   console.log("\n=== 5. #694 Checkmate, #5445/#5643 IDOLM@STER Face-Down Buddy Zone, #5649 Token Caller & #6098 16-Hit Impact ===");

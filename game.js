@@ -4733,24 +4733,6 @@ const battle = {
     return res;
   },
 
-  findTimeRulerMonsterForGodclockReversal(fighter) {
-    // Check field first
-    for (const pos of MONSTER_POSITIONS) {
-      const m = fighter.monsters[pos];
-      if (m && m.card && (m.card.name || "").toLowerCase().includes("time ruler")) {
-        return { source: "field", pos, card: m.card };
-      }
-    }
-    // Check hand next
-    for (let i = 0; i < fighter.hand.length; i++) {
-      const c = CARD_MAP.get(fighter.hand[i]);
-      if (c && c.type === "Monster" && (c.name || "").toLowerCase().includes("time ruler")) {
-        return { source: "hand", handIdx: i, card: c };
-      }
-    }
-    return null;
-  },
-
   openGodclockModal() {
     const f = this.plr;
     if (!f.godclock) return;

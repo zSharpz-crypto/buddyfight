@@ -467,6 +467,22 @@
     check: () => true
   };
 
+  // #6202 hand [Act]: delegates to game.js battle.activateOvergodZeroFromHand (needs Endruler awakened; no cost).
+  OPS.r40OvergodZero = {
+    async run(s, ctx) {
+      const b = (typeof battle !== "undefined") ? battle : null;
+      const f = ctx.f;
+      if (!b || !f || !f.godclock || f.godclock.overgodActive) return false;
+      const idx = f.hand.indexOf(6202);
+      if (idx < 0) return false;
+      // not awakened: human gets game.js's explanatory alert, bots/autoplay just fail silently
+      if (!f.godclock.awakened && (f.isBot || (typeof ABX !== "undefined" && ABX.autoPlay))) return false;
+      b.activateOvergodZeroFromHand(ctx.side, idx);
+      return f.godclock.overgodActive === true;
+    },
+    check: () => true
+  };
+
   OPS.r40OvergodEternalEon6202 = {
     async run(s, ctx) {
       const f = ctx.f, e = ctx.e, es = otherSide(ctx.side);
@@ -704,7 +720,7 @@
     [5959, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [C("r40HoraryDomination", { clockId: 5959 })] })],
     [5960, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [C("r40HoraryDomination", { clockId: 5960 })] })],
     [6202, /you cannot choose this card as your flag/i, () => ({ kind: "rule", steps: [] })],
-    [6202, /you may \[reversal\] your "perfected deity of eon/i, () => ({ kind: "act", tags: ["act"], conds: [], steps: [C("r40EndrulerReversal5957")] })],
+    [6202, /you may \[reversal\] your "perfected deity of eon/i, () => ({ kind: "act", tags: ["act"], conds: [], steps: [C("r40OvergodZero")] })],
     [6202, /"eternal eon"/i, () => ({ kind: "act", tags: ["act"], conds: [], steps: [C("r40OvergodEternalEon6202")] })],
     [5649, /put the top card of your deck face down on the field as a/i, () => ({ kind: "act", tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [C("r40CallTopDeckToken", { name: "That Girl", size: 0, power: 10000, defense: 1000, crit: 3, attrs: ["That Girl"] })] })],
     [5852, /destroy a character on your opponent's field.*put up to one card from the top of your deck face down/i, () => ({ kind: "act", tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [C("r40CallTopDeckToken", { destroyOppFirst: true, name: "Western Yokai Token", size: 0, power: 6000, defense: 2000, crit: 2, attrs: ["Western Yokai"], gainLife: 2 })] })],
