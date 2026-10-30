@@ -2072,11 +2072,13 @@ function generateFlagDeck(flagId, customTitle, preferredBuddyId, includeLostWorl
 
   const cards = [];
   const counts = {};
+  // Respect the legality rule's per-card copy limit (e.g. off-world Omni Lords = 1)
+  const legalMax = (card) => { const r = checkCardLegalityForFlag(card, flagCard, false, buddyCard ? buddyCard.id : null); return r.allowed ? (r.maxCopies || 4) : 0; };
   function addCopies(card, qty, maxLim = 4) {
     if (!card) return;
     for (let i = 0; i < qty; i++) {
       if (cards.length >= DECK_SIZE) return;
-      if ((counts[card.id] || 0) >= maxLim) return;
+      if ((counts[card.id] || 0) >= Math.min(maxLim, legalMax(card))) return;
       cards.push(card.id);
       counts[card.id] = (counts[card.id] || 0) + 1;
     }
