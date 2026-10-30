@@ -5207,6 +5207,7 @@ const battle = {
       alert("Overgod, \"0\" Requirement: You must first flip all 4 Godclock cards into \"Perfected Deity of Eon, The Endruler Dragon\" before using Overgod, \"0\" from your hand!");
       return;
     }
+    if (f.godclock.overgodActive) return;
     if (handIdx < 0 || handIdx >= f.hand.length) return;
 
     const cid = f.hand.splice(handIdx, 1)[0];

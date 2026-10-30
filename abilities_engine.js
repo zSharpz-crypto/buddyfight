@@ -1612,6 +1612,10 @@
     if (!card) return { ok: false, reason: "That card is no longer in your hand." };
     const ctx = handCtx(side, card, handIdx, ab);
     if (onceUsed(f, card, ab, null)) return { ok: false, reason: "Already used this turn." };
+    if (ab.steps && ab.steps[0] && ab.steps[0].op === "r40OvergodZero") {
+      if (f.godclock && f.godclock.overgodActive) return { ok: false, reason: "Overgod, \"0\" is already active." };
+      if (!f.godclock || !f.godclock.awakened) return { ok: false, reason: "Flip all 4 Godclock cards into the Endruler first." };
+    }
     if (!(ab.conds || []).every(c => evalCond(c, ctx))) return { ok: false, reason: "Its condition isn't met right now." };
     for (const st of ab.steps) {
       if (st.gate) break;

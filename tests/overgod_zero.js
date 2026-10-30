@@ -23,5 +23,11 @@ const act = () => run(`ABX.runHandUse('plr', battle.plr.hand.indexOf(6202), ABX.
   run(`battle.plr.hand.push(6202)`); const c1 = total();
   act(); await settle();
   ck("second use blocked once active", J(`battle.plr.hand.includes(6202)`) && total() === c1);
+  run(`battle.plr.hand.push(6202)`); const c2 = total(), rc2 = J(`battle.plr.godclock.reversalCount`), n2 = J(`battle.plr.hand.filter(x=>x===6202).length`);
+  run(`battle.activateOvergodZeroFromHand('plr', battle.plr.hand.indexOf(6202))`); run(`battle.activateOvergodZeroFromHand('plr', battle.plr.hand.indexOf(6202))`);
+  ck("direct call while active: no consume, reversalCount same", total() === c2 && J(`battle.plr.godclock.reversalCount`) === rc2 && J(`battle.plr.hand.filter(x=>x===6202).length`) === n2);
+  ck("canUseHandAct not ok while active", J(`ABX.canUseHandAct('plr', battle.plr.hand.indexOf(6202), ABX.handUseActs(CARD_MAP.get(6202))[0]).ok`) === false);
+  run(`{const g=battle.plr.godclock; g.overgodActive=false; g.awakened=false;}`);
+  ck("canUseHandAct not ok before awakening", J(`ABX.canUseHandAct('plr', battle.plr.hand.indexOf(6202), ABX.handUseActs(CARD_MAP.get(6202))[0]).ok`) === false);
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
