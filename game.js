@@ -8699,17 +8699,7 @@ const battle = {
         combinedPower += 2000;
       }
 
-      // Check on-attack triggers (e.g. Time Ruler Dragon #5955/#5956/#6010/#6204 putting opponent monster on bottom of deck!)
-      const uSkill = (unit.card.skill || "").toLowerCase();
-      if (uSkill.includes("when this card attacks") && (uSkill.includes("bottom of their deck") || uSkill.includes("bottom of your opponent"))) {
-        const oppPositions = ["left", "right", "center"].filter(p => p !== targetPos && defFighter.monsters[p]);
-        if (oppPositions.length > 0) {
-          const m = defFighter.monsters[oppPositions[0]];
-          if (m.soul) defFighter.drop.push(...m.soul);
-          defFighter.deck.push(m.card.id);
-          defFighter.monsters[oppPositions[0]] = null;
-        }
-      }
+      // "When this card attacks" bottom-deck effects (Time Ruler Dragons) are ABX triggers; no hard-coded copy here.
 
       unit.attacksLeft -= 1;
       if (unit.attacksLeft <= 0) {

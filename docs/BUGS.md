@@ -110,7 +110,7 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [x] #5957 Endruler Dragon [Reversal]: now only at the end of the OPPONENT's turn (hotseat/bot/online), optional prompt, owner picks the Time Ruler, field one goes to drop with soul (not destroyed). Dead ABX op/trigger neutralized. Test: tests/godclock_awaken.js
 - [x] Overgod "0" #6202 hand [Act]: own op r40OvergodZero delegates to battle.activateOvergodZeroFromHand (only after Endruler awakening). Test: tests/overgod_zero.js
 - [x] Drum "SD" #4129 x3 vs limit 1: generateFlagDeck addCopies now caps at checkCardLegalityForFlag maxCopies. Test: tests/deck_copy_limits.js
-- [ ] Keeper of Time #5955 double fire (#5956/#6010 suspected)
+- [x] Keeper of Time #5955 double fire: removed the hard-coded on-attack bottom-deck block in game.js executeAttackResolution (it also ignored "up to one" and fired for #6010 without [Reversal]); the ABX trigger is the single path (player picks, may decline). #5956 had the same double fire (fixed); #6010 was also hit (fixed, now only via its ABX text). #6065 unaffected. Test: tests/time_ruler_attack.js
 - [ ] Clock-III drop-zone soul costs #5999/#6010
 - [ ] Engine-path Horary Domination not linked to godclock state / once-per-turn
 - [ ] Eternal Eon should stop opponent card abilities, not just Counters
