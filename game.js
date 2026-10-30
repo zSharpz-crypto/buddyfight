@@ -4742,6 +4742,14 @@ const battle = {
       if (!isTD) return;
       const cost = parseCardCost(c.cost, c.skill, fighter, c);
       if (fighter.gauge.length < cost.gauge || fighter.life <= cost.life) return;
+      // a refused call must not be offered: "once per turn/game" already used, no open monster zone, or the size does not fit
+      const callLimit = this.getCallLimit(c);
+      if (callLimit) {
+        const used = (fighter.callLimitUsed || {})[c.name];
+        if (callLimit === "game" ? used != null : used === this.turnCount) return;
+      }
+      if (!["center", "left", "right"].some(z => !fighter.monsters[z])) return;
+      if (this.getCurrentSizeUsed(fighter) + getEffectiveCardSize(fighter, c) > (fighter.maxSize || 3)) return;
       // the called card leaves the drop zone first, so it can't be its own soul/cost payment
       let extrasOk = true;
       if (window.ABX && ABX.canPayExtras && ABX.hasExtras && ABX.hasExtras(c)) {
@@ -5055,7 +5063,10 @@ const battle = {
         this.completeMonsterCall(side, targetZone, f.hand.length - 1, false);
         const stuck = f.hand.lastIndexOf(callCard.id);   // call refused (e.g. once-per-turn limit): back to the drop zone
         if (stuck >= 0 && !MONSTER_POSITIONS.some(z => f.monsters[z] && f.monsters[z].card === callCard)) f.drop.push(f.hand.splice(stuck, 1)[0]);
-        this.setPrompt(`⏳ Clock-III (#5960 ➔ #5964) [Reversal]: Called "${callCard.name}" from your Drop Zone to ${targetZone.toUpperCase()}!`);
+        const landed = MONSTER_POSITIONS.some(z => f.monsters[z] && f.monsters[z].card === callCard);
+        this.setPrompt(landed
+          ? `⏳ Clock-III (#5960 ➔ #5964) [Reversal]: Called "${callCard.name}" from your Drop Zone to ${targetZone.toUpperCase()}!`
+          : `⏳ Clock-III (#5960 ➔ #5964) [Reversal]: "${callCard.name}" couldn't be called (call refused) and stays in your Drop Zone.`);
       }
       this.renderBattle();
       if (fromDefenseModal) this.resumePendingAttackAfterClock(false);
