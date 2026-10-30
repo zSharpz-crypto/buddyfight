@@ -876,6 +876,7 @@
     if (ABX.syncFrontNullify) ABX.syncFrontNullify();
     if (unit && unit.abxNullified === B.turnCount) return { ok: false, reason: "Abilities are nullified this turn" };
     if (onceUsed(f, card, ab, unit)) return { ok: false, reason: "Already used this turn" };
+    if (ab.canUse) { const r = ab.canUse(side, ctx); if (r && !r.ok) return r; }
     if (!(ab.conds || []).every(c => evalCond(c, ctx))) return { ok: false, reason: "Timing / condition not met" };
     // a leading mandatory cost must be payable
     const steps = ab.kind === "modal" ? [] : ab.steps;

@@ -130,21 +130,21 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     ABX.autoPlay = true;
     const timeRuler = ALL_CARDS.find(c => c.type === "Monster" && /time ruler/i.test(c.name || "")) || Object.assign({}, CARD_MAP.get(46), { name: "Time Ruler Dragon" });
     battle.plr.hand = [timeRuler.id, 6202, 46, 46, 46];
-    ABX.useAct("plr", CARD_MAP.get(5958), null);
-    ABX.useAct("plr", CARD_MAP.get(5959), null);
-    ABX.useAct("plr", CARD_MAP.get(5960), null);
+    battle.renderBattle = function () {}; battle.plr.drop = [5955];   // a Time Dragon for Clock-III to call
+    battle.plr.gauge = [46, 46, 46]; battle.activeSide = "plr"; battle.phase = "main";
   }`);
-  await wait(300);
-  ok(env.run(`battle.plr.subFlags.every(sf => sf.reversalUsed === true)`), "#5958 Clock-I, #5959 Clock-II, and #5960 Clock-III execute 'Horary Domination' and flip into [Reversal]");
+  // Horary Domination is once per turn across all three clocks: use one per (simulated) turn through the real ABX acts
+  for (const id of [5958, 5959, 5960]) {
+    env.run(`{ battle.plr.godclock.horaryDominationUsedThisTurn = false; ABX.useAct("plr", CARD_MAP.get(${id}), null); }`);
+    await wait(300);
+  }
+  ok(env.run(`battle.plr.godclock.quadrants.filter(q => q.reversed).length === 3 && battle.plr.godclock.reversalCount === 3 && battle.plr.subFlags.every(sf => sf.reversed === true)`), "#5958 Clock-I, #5959 Clock-II, and #5960 Clock-III execute 'Horary Domination' through the real path and flip into [Reversal]");
 
   env.run(`{
     // awaken via the real game.js path: end of the OPPONENT's turn, owner picks the Time Ruler from hand
     const timeRulerId = battle.plr.hand[0];
     ABX.fast = true; ABX.hooks.pickCards = (o) => [0];
     battle.renderBattle = function () {};
-    // (engine-path Horary Domination does not yet set godclock.quadrants -- tracked in docs/BUGS.md -- so mirror it here)
-    [0, 1, 3].forEach(i => { battle.plr.godclock.quadrants[i].reversed = true; });
-    battle.plr.godclock.reversalCount = 3;
     battle.plr.hand = [timeRulerId, 6202, 46, 46, 46];
     battle.activeSide = "opp"; battle.phase = "main";
     battle.endTurn();

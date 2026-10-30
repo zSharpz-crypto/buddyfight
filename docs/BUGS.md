@@ -112,5 +112,5 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [x] Drum "SD" #4129 x3 vs limit 1: generateFlagDeck addCopies now caps at checkCardLegalityForFlag maxCopies. Test: tests/deck_copy_limits.js
 - [x] Keeper of Time #5955 double fire: removed the hard-coded on-attack bottom-deck block in game.js executeAttackResolution (it also ignored "up to one" and fired for #6010 without [Reversal]); the ABX trigger is the single path (player picks, may decline). #5956 had the same double fire (fixed); #6010 was also hit (fixed, now only via its ABX text). #6065 unaffected. Test: tests/time_ruler_attack.js
 - [x] Clock-III drop-zone soul costs #5999/#6010
-- [ ] Engine-path Horary Domination not linked to godclock state / once-per-turn
+- [x] Engine-path Horary Domination (Clock-I/II/III #5958-#5960): op r40HoraryDomination delegates to game.js initiateClockFlipInteractive (shared once/turn, quadrants[].reversed, hand-card choice, Clock-II ends battle, Clock-III full Call Cost); acts gain an ab.canUse hook in ABX.canUseAct. Test: tests/horary_domination.js
 - [ ] Eternal Eon should stop opponent card abilities, not just Counters

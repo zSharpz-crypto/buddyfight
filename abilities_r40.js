@@ -426,37 +426,29 @@
   };
 
   // #5957 Perfected Deity of Eon, The Endruler Dragon & #5958 Clock-I / #5959 Clock-II / #5960 Clock-III ("Horary Domination") & #6202 Overgod "0"
+  // Delegates to game.js (initiateClockFlipInteractive / executeClockFlipWithHandCard): quadrant state, shared once/turn, hand-card choice, Clock-II battle end, Clock-III call.
+  const HD_QUAD = { 5958: 0, 5959: 1, 5960: 3 };
+  function horaryCheck(side, clockId) {
+    const b = (typeof battle !== "undefined") ? battle : null, f = b && b.getFighter(side);
+    if (!b || !f || !f.godclock) return { ok: false, reason: "No Godclock" };
+    const q = f.godclock.quadrants[HD_QUAD[clockId]];
+    if (!q || q.reversed) return { ok: false, reason: "Already in [Reversal]" };
+    const r = b.canUseHoraryDominationNow(side);
+    if (!r.ok) return r;
+    if (HD_QUAD[clockId] === 3 && b.getDropZoneTimeDragonMonsters(f).length === 0) return { ok: false, reason: "No payable «Time Dragon» in Drop Zone" };
+    return { ok: true };
+  }
   OPS.r40HoraryDomination = {
     async run(s, ctx) {
-      const f = ctx.f;
-      if (f.hand.length < 1) return false;
-      f.deck.push(f.hand.pop());
-      f.reversalCount = (f.reversalCount || 0) + 1;
-      if (f.godclock) f.godclock.reversalCount = (f.godclock.reversalCount || 0) + 1;
-      if (Array.isArray(f.subFlags)) {
-        const sf = f.subFlags.find(x => x.id === s.clockId);
-        if (sf) { sf.reversalUsed = true; sf.flipped = true; }
-      }
-      if (s.clockId === 5958) {
-        const top3 = f.deck.splice(0, 3);
-        if (top3.length > 0) {
-          f.hand.push(top3.shift());
-          f.drop.push(...top3);
-        }
-      } else if (s.clockId === 5959) {
-        if (f.deck.length > 0) f.hand.push(f.deck.shift());
-        if (ABX.battleCtx && ABX.battleCtx.active) ABX.battleCtx.nullified = true;
-      } else if (s.clockId === 5960) {
-        const idx = f.drop.findIndex(id => { const c = cardOf(id); return c && c.type === "Monster" && hasAttr(c, "Time Dragon"); });
-        const openPos = ["left", "center", "right"].find(p => !f.monsters[p]);
-        if (idx >= 0 && openPos) {
-          const cid = f.drop.splice(idx, 1)[0];
-          const tc = cardOf(cid);
-          f.monsters[openPos] = { card: tc, rested: false, attacksLeft: tc.atk_max || 1, soul: [], tempPower: 0, tempDef: 0, tempCrit: 0 };
-        }
-      }
-      fresh();
-      return true;
+      const b = (typeof battle !== "undefined") ? battle : null, f = ctx.f, qi = HD_QUAD[s.clockId];
+      if (!horaryCheck(ctx.side, s.clockId).ok) return false;
+      const fromDef = !!(b.pendingDefenseContext && b.pendingDefenseContext.defSide === ctx.side);
+      const auto = !!(ABX.autoPlay && !f.isBot);   // autoplay: no popups, same path the bots use
+      if (auto) f.isBot = true;
+      try { b.initiateClockFlipInteractive(ctx.side, qi, fromDef); } finally { if (auto) f.isBot = false; }
+      // engine-path defense without game.js's defense modal: Clock-II ends the battle
+      if (qi === 1 && f.godclock.quadrants[1].reversed && !b.pendingDefenseContext && ABX.battleCtx && ABX.battleCtx.active) ABX.battleCtx.nullified = true;
+      return f.godclock.quadrants[qi].reversed === true;
     },
     check: () => true
   };
@@ -716,9 +708,9 @@
     [5445, /put this card face down into your buddy zone/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [C("r40StructuredExec", { text: "Put the top card of your deck into your gauge, you gain 1 life, and draw a card. Then, put this card face down into your buddy zone." })] })],
     [5446, /put this card face down into your buddy zone/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [C("r40StructuredExec", { text: "Put the top card of your deck into your hand, and put the top two cards of your deck into your gauge. Then, put this card face down into your buddy zone." })] })],
     [5643, /if two or more face down cards are in your buddy zone/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [C("r40StructuredExec", { text: "Draw two cards." })] })],
-    [5958, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [C("r40HoraryDomination", { clockId: 5958 })] })],
-    [5959, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [C("r40HoraryDomination", { clockId: 5959 })] })],
-    [5960, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [C("r40HoraryDomination", { clockId: 5960 })] })],
+    [5958, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, conds: [], canUse: (side) => horaryCheck(side, 5958), steps: [C("r40HoraryDomination", { clockId: 5958 })] })],
+    [5959, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, conds: [], canUse: (side) => horaryCheck(side, 5959), steps: [C("r40HoraryDomination", { clockId: 5959 })] })],
+    [5960, /"horary domination"|reversal/i, () => ({ kind: "act", name: null, tags: ["counter", "act"], counter: true, conds: [], canUse: (side) => horaryCheck(side, 5960), steps: [C("r40HoraryDomination", { clockId: 5960 })] })],
     [6202, /you cannot choose this card as your flag/i, () => ({ kind: "rule", steps: [] })],
     [6202, /you may \[reversal\] your "perfected deity of eon/i, () => ({ kind: "act", tags: ["act"], conds: [], steps: [C("r40OvergodZero")] })],
     [6202, /"eternal eon"/i, () => ({ kind: "act", tags: ["act"], conds: [], steps: [C("r40OvergodEternalEon6202")] })],
@@ -780,6 +772,7 @@
           ab.parsed = true;
           if (o.name !== undefined) ab.name = o.name;
           if (o.once) ab.once = o.once;
+          if (o.canUse) ab.canUse = o.canUse;
           if (o.counter) ab.counter = true;
           if (o.tags) ab.tags = o.tags;
           if (o.trigger) ab.trigger = o.trigger;
