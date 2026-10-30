@@ -772,6 +772,7 @@
           ab.parsed = true;
           if (o.name !== undefined) ab.name = o.name;
           if (o.once) ab.once = o.once;
+          else if (o.canUse) delete ab.once;   // canUse owns the gate (e.g. shared game.js once-per-turn flag)
           if (o.canUse) ab.canUse = o.canUse;
           if (o.counter) ab.counter = true;
           if (o.tags) ab.tags = o.tags;

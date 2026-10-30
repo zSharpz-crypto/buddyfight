@@ -4723,6 +4723,7 @@ const battle = {
     if (f.godclock.horaryDominationUsedThisTurn) {
       return { ok: false, reason: "Already used \"Horary Domination\" once this turn!" };
     }
+    if (f.timeStoppedThisTurn || f.timeStoppedThisBattle) return { ok: false, reason: "Time is stopped (Eternal Eon)!" };
     // Allowed on your own turn (Main or Attack Phase) OR during opponent's Attack Phase!
     if (this.activeSide !== side && this.phase !== "attack" && !this.pendingDefenseContext) {
       return { ok: false, reason: "On opponent's turn, can only use during Attack Phase!" };
@@ -5011,6 +5012,7 @@ const battle = {
         f.hand.push(top3.shift());
         f.drop.push(...top3);
         this.renderBattle();
+        if (fromDefenseModal) this.resumePendingAttackAfterClock(false);
         return;
       }
       this.openCustomCardChoiceModal({

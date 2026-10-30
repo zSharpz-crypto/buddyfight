@@ -20,7 +20,7 @@ const setup = () => {
   setup(); let c0 = total(); const deck0 = J(`battle.plr.deck.length`), top = J(`battle.plr.deck.slice(0,3)`);
   ck("can use Clock-I initially", can(5958));
   await act(5958); await pickHand(2);   // choose hand[2] = 48
-  ck("chosen hand card (48) went to deck bottom", J(`battle.plr.deck[battle.plr.deck.length-1]`) === 48 && !J(`battle.plr.hand.includes(48)`) || J(`battle.plr.deck.includes(48)`));
+  ck("chosen hand card (48) went to deck bottom, others stayed in hand", J(`battle.plr.deck[battle.plr.deck.length-1]`) === 48 && JSON.stringify(J(`battle.plr.hand`)) === "[46,47,49]", J(`battle.plr.hand`));
   await pickFirst();
   ck("Clock-I flipped, used-this-turn set, reversalCount 1", quad(0) === true && J(`battle.plr.godclock.horaryDominationUsedThisTurn`) === true && J(`battle.plr.godclock.reversalCount`) === 1);
   ck("Clock-I took 1 of top 3 into hand, dropped 2", J(`battle.plr.hand.length`) === 4 && J(`battle.plr.drop.length`) === 2 && J(`battle.plr.hand.includes(${top[0]})`) , J(`battle.plr.hand`));
@@ -68,5 +68,23 @@ const setup = () => {
   ck("all three clocks flipped by ABX acts", quad(0) && quad(1) && quad(3) && J(`battle.plr.godclock.reversalCount`) === 3, J(`battle.plr.godclock.quadrants.map(q=>q.reversed)`));
   run(`{ABX.autoPlay=true; if(!battle.plr.hand.includes(6065)) battle.plr.hand.push(6065); battle.activeSide='opp'; battle.phase='main'; battle.endTurn();}`); await settle();
   ck("opponent end-turn awakens Godclock after real clock flips", J(`battle.plr.godclock.awakened`) === true && J(`battle.plr.item && battle.plr.item.card.id`) === 5961);
+  // --- follow-ups: once gate, Eternal Eon, bot Clock-I resume ---
+  const canR = (id) => J(`ABX.canUseAct('plr', CARD_MAP.get(${id}), ABX.actAbilities(CARD_MAP.get(${id}))[0], null)`);
+  const defense = () => run(`{battle.activeSide='opp'; battle.phase='attack'; battle.opp.monsters.center={card:CARD_MAP.get(46),rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0}; battle.pendingDefenseContext={attSide:'opp',attackerZones:['center'],targetPos:'fighter',defSide:'plr'};}`);
+  for (const id of [5958, 5959, 5960]) {
+    setup(); run(`battle.plr.drop=[5955]; battle.plr.gauge=[46,46,46];`);
+    await act(id); run(`battle.activeChoice=null`); await settle();   // cancel the popup
+    ck("cancel " + id + ": ABX act still usable", canR(id).ok === true, canR(id));
+    await act(id); await pickHand(0); if (id !== 5959) await pickFirst();
+    ck("used " + id + ": blocked", canR(id).ok === false && J(`battle.plr.godclock.horaryDominationUsedThisTurn`) === true);
+    run(`battle.plr.godclock.horaryDominationUsedThisTurn=false`);
+    run(`{battle.plr.drop=[5955];battle.plr.callLimitUsed={};['left','center','right'].forEach(p=>battle.plr.monsters[p]=null);battle.plr.gauge=[46,46,46];battle.plr.godclock.quadrants[0].reversed=false;battle.plr.godclock.quadrants[1].reversed=false;battle.plr.godclock.quadrants[3].reversed=false;}`);
+    ck("next turn " + id + " usable again", canR(id).ok === true, canR(id));
+  }
+  setup(); defense(); run(`battle.plr.timeStoppedThisBattle=true`); ck("Eternal Eon (battle): engine blocked", canR(5959).ok === false, canR(5959));
+  setup(); defense(); run(`battle.plr.timeStoppedThisTurn=true`); ck("Eternal Eon (turn): engine blocked", canR(5959).ok === false, canR(5959));
+  setup(); defense(); ck("defense without time stop: ok", canR(5959).ok === true);
+  setup(); defense(); run(`battle.plr.isBot=true`); run(`battle.initiateClockFlipInteractive('plr',0,true)`); await settle();
+  ck("bot Clock-I in defense: flipped and pendingDefenseContext cleared", quad(0) === true && J(`battle.pendingDefenseContext`) === null, J(`battle.pendingDefenseContext`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
