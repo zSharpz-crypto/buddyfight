@@ -1231,4 +1231,94 @@
     } catch (e) { /* ignore */ }
     return prevApplyDamage2.call(this, side, n, src);
   };
+
+  /* ---- [r42] [Transform] group: #2513 #3257 #6561 #6226 #4527 (protections), impact-only calls, #4224 #6208 (no [Counter]),
+   *      #5199 (win with 6 souls), #2160 #4499 ("when you [Transform] into a Caardian card"), #4496 ---- */
+  const trUnits = (fighter) => equippedItems(fighter).filter(u => (u.card.tr || u.isTransformed) && u.abxNullified !== B.turnCount);
+  const trIs = (fighter, id) => trUnits(fighter).find(u => u.card.id === id);
+  const onField = (fighter, id) => core.fieldUnits(fighter, true).some(x => x.unit && x.unit.card.id === id && x.unit.abxNullified !== B.turnCount) || (fighter.setSpells || []).some(c => c && c.id === id);
+  const isImpactC = (c) => { try { return !!(c && core.matchFilter(c, { types: ["impactMonster"] }, null, {})); } catch (e) { return false; } };
+  const IMPACT_FREE = [2513, 3257, 6561];
+  core.impactMultiCall = (fighter) => IMPACT_FREE.some(id => trIs(fighter, id));
+  core.transformCallBlock = (fighter, card) => {
+    if (!card || card.type !== "Monster" || isImpactC(card)) return null;
+    const u = IMPACT_FREE.map(id => trIs(fighter, id)).find(Boolean);
+    return u ? `"${u.card.name}": you cannot call monsters other than impact monsters` : null;
+  };
+  const isGalaxy = (c) => (c.attrs || []).some(a => /^galaxy ?exalt$/i.test(a));
+  const prevProt42 = core.isProtected;
+  core.isProtected = function (unit, side, kind, ctx) {
+    if (prevProt42.apply(this, arguments)) return true;
+    try {
+      if (!unit || !unit.card) return false;
+      const f = F(side), byOpp = !ctx || !ctx.side || ctx.side !== side;
+      const D = ["destroyed", "returned", "returned to hand"].includes(kind), R = kind === "rest" || kind === "rested", N = kind === "nullified";
+      if (kind === "souls dropped" && byOpp && isGalaxy(unit.card) && core.fieldUnits(f, true).some(x => x.unit && x.unit.card.id === 4496 && x.unit.abxNullified !== B.turnCount)) return true;   // #4496
+      if (!D && !R && !N) return false;
+      const me = trUnits(f).includes(unit);
+      if (me && IMPACT_FREE.includes(unit.card.id) && D) return true;                       // cannot be destroyed, nor returned to hand
+      if (me && unit.card.id === 6561 && (R || (N && byOpp))) return true;
+      if (me && unit.card.id === 4527 && R && byOpp) return true;
+      if (me && byOpp && (D || N) && trIs(f, 6226)) return true;                              // #6226: all cards you transformed into
+      if (byOpp && D && /gemclone/i.test(unit.card.name || "") && isImpactC(unit.card) && trIs(f, 3257) &&
+        core.fieldUnits(f, true).some(x => x.unit === unit)) return true;                    // #3257: Gemclone impact monsters
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  const prevNC = ABX.noCounterThisBattle;
+  ABX.noCounterThisBattle = function (attSide, units, targetPos) {
+    if (prevNC && prevNC.apply(this, arguments)) return true;
+    try {
+      if (targetPos === "fighter") return false;
+      const f = F(attSide), us = (units || []).map(x => (x && x.unit) || x).filter(Boolean);
+      const sh = us.some(u => (u.card.attrs || []).some(a => /^super ?hero$/i.test(a)));
+      const sw = us.some(u => (u.card.attrs || []).some(a => /^super ?warrior$/i.test(a)));
+      if (sh && trIs(f, 4224)) return true;
+      if ((sh || sw) && (trIs(f, 6208) || core.fieldUnits(f, true).some(x => x.unit && /gemclone/i.test(x.unit.card.name || "") && x.unit.abxNullified !== B.turnCount))) return true;
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  // #4496: the gauge cost in the [Call Cost] and [Transform] cost of your «Galaxy Exalt» is reduced by 1
+  if (typeof root.parseCardCost === "function") {
+    const pccPrev = root.parseCardCost;
+    root.parseCardCost = function (costStr, skill, fighter, card) {
+      const r = pccPrev.apply(this, arguments);
+      try {
+        if (r && fighter && card && r.gauge > 0 && isGalaxy(card) && (card.type === "Monster" || card.tr) &&
+          core.fieldUnits(fighter, true).some(x => x.unit && x.unit.card.id === 4496 && x.unit.abxNullified !== B.turnCount)) return Object.assign({}, r, { gauge: r.gauge - 1 });
+      } catch (e) { /* ignore */ }
+      return r;
+    };
+  }
+  // #5199 Perfect Crime: six or more souls in the card you transformed into -> you win
+  const crimeCheck = () => {
+    if (B.matchOver) return;
+    ["plr", "opp"].forEach(side => { const u = trIs(F(side), 5199); if (u && (u.soul || []).length >= 6 && !B.matchOver) OPS.winGame.run({}, { side, card: u.card }); });
+  };
+  const prevScan = core.scanSouls;
+  core.scanSouls = async function () { const r = await prevScan.apply(this, arguments); try { crimeCheck(); } catch (e) { /* ignore */ } return r; };
+  // "when you [Transform] into ..." : fire event transformInto from the equip path
+  Object.assign(ABX.TRIG_OK, { transformInto: 1 });
+  const prevFE = ABX.fireEquipped;
+  if (prevFE) ABX.fireEquipped = function (side, card, unit) {
+    const p = prevFE.apply(this, arguments);
+    try { if (card && card.tr) ABX.queue(() => fireNew(side, "transformInto", (t, src) => !t.nameRe || new RegExp(t.nameRe, "i").test(card.name || ""), fieldSources(side).concat([{ card, unit, host: null }]).filter((x, i, a) => a.findIndex(y => y.card === x.card && y.unit === x.unit) === i))); } catch (e) { /* ignore */ }
+    return p;
+  };
+  OV42.push([2160, /when you \[transform\] into a card with .caardian/i, () => ({ kind: "triggered", trigger: { event: "transformInto", nameRe: "caardian" }, once: true, steps: [{ op: "r42TopToGauge" }] })]);
+  OPS.r42TopToGauge = { run(s, ctx) { const f = ctx.f; if (!f.deck.length) return false; f.gauge.push(f.deck.shift()); return true; } };
+  OV42.push([4499, /when you \[transform\] into a card with .caardian/i, () => ({ kind: "triggered", trigger: { event: "transformInto", nameRe: "caardian" }, steps: [{ op: "r42Caardian4499" }] })]);
+  OPS.r42Caardian4499 = { run(s, ctx) { const f = ctx.f; if (f.deck.length) { f.r42Soul4499 = (f.r42Soul4499 || 0) + 1; f.deck.shift(); } f.life = (f.life || 0) + 1; return true; } };
+  const prevSB3 = ABX.staticBonus;
+  ABX.staticBonus = function (fighter, unit) {
+    const sb = prevSB3.apply(this, arguments);
+    try {
+      if (!unit || !unit.card || !sb || unit.abxNullified === B.turnCount) return sb;
+      const isTr = trUnits(fighter).includes(unit);
+      if (isTr && unit.card.id === 4527) sb.pen = true;
+      if (isTr && /caardian/i.test(unit.card.name || "") && onField(fighter, 2160)) { sb.power += 1000; sb.pen = true; }
+      if (/caardian/i.test(unit.card.name || "") && onField(fighter, 4499) && core.fieldUnits(fighter, true).some(x => x.unit === unit)) { const n = fighter.r42Soul4499 || 0; sb.pen = true; sb.power += 2000 * n; sb.defense += 2000 * n; sb.crit += n; }
+    } catch (e) { /* ignore */ }
+    return sb;
+  };
 })(typeof window !== "undefined" ? window : globalThis);

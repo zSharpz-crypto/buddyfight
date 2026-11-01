@@ -503,7 +503,7 @@
       if (!opts.byEffect) {
         if (!opts.ignorePhase && this.phase !== "final") reasons.push("Impact Monsters can only be called during your Final Phase");
         if (this.turnCount === 1) reasons.push("Impact cards can't be used on Turn 1");
-        if (f.impactCalledThisTurn) reasons.push("You may only call one Impact Monster per turn");
+        if (f.impactCalledThisTurn && !(window.ABX && ABX.core && ABX.core.impactMultiCall && ABX.core.impactMultiCall(f))) reasons.push("You may only call one Impact Monster per turn");
         if (d.call.onlyByEffect) reasons.push("This card can only be called by another card's ability");
       }
       const ctx = { f, enemy, unit: null, card };
