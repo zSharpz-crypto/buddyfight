@@ -1547,7 +1547,7 @@ function evaluateCardConditions(card, fighter, enemy, isAbilityCall = false) {
   // "[Call Cost] [When a <World> monster is put from your field into the drop zone, pay N gauge]": it can only be called at that timing, not from your hand during the main phase
   if (!isAbilityCall && window.ABX && ABX.timingCallInfo && card.type === "Monster") {
     const tci = ABX.timingCallInfo(card);
-    if (tci) reasons.push(`"${card.name}" can only be called when a <${tci.world}> monster is put from your field into the drop zone (it is offered to you then).`);
+    if (tci) reasons.push(tci.msg || `"${card.name}" can only be called when a <${tci.world}> monster is put from your field into the drop zone (it is offered to you then).`);
   }
 
   // "The Chaos Upgrade" needs "Infinity the Chaos" face down under the flag (it must be unlocked in the deck first)
@@ -1627,6 +1627,14 @@ function evaluateCardConditions(card, fighter, enemy, isAbilityCall = false) {
     if (fighter.drop.length < reqDrop) {
       reasons.push(`Requires ${reqDrop}+ cards in Drop Zone (Current: ${fighter.drop.length})`);
     }
+  }
+
+  // "You may only cast this card if there are three or more monsters on your field" (#3441 Soul Reset ...)
+  const monCountMatch = castSent.match(/only cast this card if (?:there are |you have )(two|three|four|five|\d+) or more monsters on your field/i);
+  if (monCountMatch) {
+    const reqMon = { two: 2, three: 3, four: 4, five: 5 }[monCountMatch[1].toLowerCase()] || parseInt(monCountMatch[1], 10) || 3;
+    const haveMon = MONSTER_POSITIONS.filter(p => fighter.monsters[p]).length;
+    if (haveMon < reqMon) reasons.push(`Requires ${reqMon}+ monsters on your field (Current: ${haveMon})`);
   }
 
   const needsCenterOpen = /(?:do not have|no|don't have) (?:a )?monsters? (?:in|on) (?:the|your) center|have no monsters on your center/.test(castOrCallSent);

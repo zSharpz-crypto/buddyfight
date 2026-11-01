@@ -184,3 +184,7 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - #5760 / #4569 Lost World ("Belost"): was usable on your own turn and without the card in hand, and always paid the 2 gauge; now only at the end of the OPPONENT's turn, with the card in hand, with a yes/no. tests/round40.js expected "draws 2" which is not on the card; fixed to 30 cards.
 - #2019 / #867 Azi Dahaka: when destroyed with no "Aqulta Gwaneff" in hand or deck it gave you a free copy of #2020 (test fallback left in the real code): removed. "Attacks all your opponent's monsters and your opponent instead" is now played by the battle engine (game.js executeAttackResolution, flag abxAttackAllOpp; also #6526's item, #5277 and the other attackAllOpp statics when armed); "when it deals damage, destroy all items" now happens on damage, not when the attack is declared.
 - #4997 Sentence of Curse and #6363 Curse Count: match their card text.
+
+## Opus review claims (verified 2026-11-02)
+- [x] 3441 (cast needs N+ monsters), 3737, 4019, 3850-3852 (3851 attacking filter fixed), 3409/3195/3373/3741/3369/3915/4050/4092, 5357, 5710, 4091, 4114 (OR tribe filter), 3464 — all covered by `tests/opus_claims1.js` / existing tests.
+- [x] #3650 Proto Chaos Machina + other conditional call costs: already enforced via `ABX.destroyCallInfo` / `timingCallInfo` (`tests/destroy_calls.js`). #1448 Burn Nova (life would become 0 on opp's turn) now implemented too.

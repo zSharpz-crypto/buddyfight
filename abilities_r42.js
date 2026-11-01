@@ -461,6 +461,34 @@
       return prevEAR.call(this, attSide, attackerZones, targetPos, attackNullified);
     };
   }
+  // #1448 Fourth Omni Fire Lord, Burn Nova: "[Call Cost] [When your life would become 0 during your opponent's turn, pay 3 gauge, your life becomes 1, and for this turn, you cannot be dealt damage]"
+  // It is called from the hand at that moment only (like the "on destroyed" call costs), not in the main phase.
+  {
+    const tciPrev1448 = ABX.timingCallInfo;
+    ABX.timingCallInfo = (card) => (card && card.id === 1448) ? { world: "life would become 0", lifeTiming: true, msg: `"${card.name}" can only be called when your life would become 0 during your opponent's turn (it is offered to you then).` } : tciPrev1448(card);
+    const lzPrev = ABX.lifeZeroSave;
+    ABX.lifeZeroSave = function (side) {
+      const r = lzPrev.apply(this, arguments); if (r) return r;
+      try {
+        const f = F(side), card = core.cardOf(1448);
+        if (!f || !card || f.life > 0 || B.matchOver || B.activeSide === side) return false;       // only during your opponent's turn
+        const hi = f.hand.indexOf(1448), pos = ["center", "left", "right"].find(p => !f.monsters[p]);
+        if (hi < 0 || f.gauge.length < 3 || !pos || (typeof getEffectiveCardSize === "function" && B.getCurrentSizeUsed && B.getCurrentSizeUsed(f) + getEffectiveCardSize(f, card) > (f.maxSize || 3))) return false;
+        const auto = ABX.autoPlay || f.isBot;
+        let yes = auto; if (!auto) { try { yes = typeof root.confirm === "function" ? !!root.confirm(`${card.name}: your life would become 0. Pay 3 gauge and call it? (your life becomes 1 and you cannot be dealt damage this turn)`) : true; } catch (e) { yes = true; } }
+        if (!yes) return false;
+        for (let i = 0; i < 3; i++) f.drop.push(f.gauge.pop());
+        f.hand.splice(hi, 1);
+        const unit = { card, rested: false, attacksLeft: card.atk_max || 1, soul: [], tempPower: 0, tempDef: 0, tempCrit: 0 };
+        f.monsters[pos] = unit;
+        f.life = 1;
+        if (OPS.shield && OPS.shield.run) OPS.shield.run({ op: "shield", mode: "turn", toZero: true }, { side, f, e: F(otherSide(side)), card, unit, bind: { chosen: [] } });
+        if (ABX.fireEnter) ABX.fireEnter(side, card, unit);
+        fresh();
+        return true;
+      } catch (e) { if (ABX.debug) console.error(e); return false; }
+    };
+  }
   // #1541 Darkness Final Mission Card "World End" ([Set] impact): "When your Demon Lord on your field attacks, put the top card of your deck face down into this card's soul."
   // It used to parse as a one-shot on cast; now it is an attack trigger of the set card (fires from the set zone, see ABX.fireAttack otherAttack).
   // #6356 Last Symphony -Epilogue- ([Set] impact): "At the start of each player's turn, if your opponent's life is 4 or more, and three or more different «Dark Burial» are [Set] on your field,
@@ -686,12 +714,14 @@
           f.namesExact = ex; if (rest.length) f.names = rest; else delete f.names;
         }));
       }
-      if (!OV42.some(o => o[0] === card.id) && ![5422, 5748, 5759].includes(card.id) && !/\[(?:overturn|overkill|overthrow)\]\s*\[/i.test(card.skill || "")) return r;
+      if (!OV42.some(o => o[0] === card.id) && ![5422, 5748, 5759, 4114].includes(card.id) && !/\[(?:overturn|overkill|overthrow)\]\s*\[/i.test(card.skill || "")) return r;
       const extra = [];
       r.abilities.forEach(ab => {
         const raw = String(ab.cleaned || ab.raw || "");
         const full = String(ab.raw || "");
         // plain filter patches: only the filter of the existing steps changes
+        // #4114: "originally size 3 «Skull Warrior» or «Hundred Demons» monster": the OR was glued into ONE token and never matched
+        if (card.id === 4114 && Array.isArray(ab.steps)) walk(ab.steps, x => { if (x.filter && Array.isArray(x.filter.tokens) && x.filter.tokens.some(t => /skull warrior hundred demons/i.test(t))) { delete x.filter.tokens; x.filter.tribes = ["Skull Warrior", "Hundred Demons"]; } });
         if (card.id === 5422 && Array.isArray(ab.steps)) walk(ab.steps, x => { if (x.filter && x.filter.uniqueBy === "cardName") { x.filter.tribesAll = ["Dragod", "Legend Dragon"]; } });
         if ((card.id === 5748 || card.id === 5759) && Array.isArray(ab.steps)) walk(ab.steps, x => { if (x.t === "count" && x.np && x.np.filter && x.np.filter.tribes && x.np.filter.tribes.includes("Dragod")) x.np.filter.distinct = true; if (x.filter && x.filter.uniqueBy && x.filter.tribes) { x.filter.distinct = true; } });
         for (const [id, re, build] of OV42) {

@@ -238,7 +238,7 @@
     if (f.soulName && unit) { if (!(unit.soul || []).some(id => lc((cardOf(id) || {}).name).includes(f.soulName))) return false; }
     if (f.rested && unit && !unit.rested) return false;
     if (f.faceDown || f.faceUp) return false;
-    if (f.attacking) { const bc = ABX.battleCtx; if (!bc || !ref || !ref.unit || !(bc.attUnits || []).includes(ref.unit)) return false; }
+    if (f.attacking) { const bc = (ABX.battleCtx && ABX.battleCtx.active) ? ABX.battleCtx : (ABX.curBattle && ABX.curBattle.turn === B.turnCount ? ABX.curBattle : null); if (!bc || !ref || !ref.unit || !(bc.attUnits || []).includes(ref.unit)) return false; }
     if (f.frontOf) { const me = ctx && ctx.unit; const mp = me ? posOfUnit(F(ctx.side), me) : null; if (!mp || !ref || ref.pos !== mp || ref.side === ctx.side) return false; }
     if (f.attacked) { if (!(unit && unit.abxAttacked === B.turnCount)) return false; }
     if (f.statCmp && f.statCmp.length) {

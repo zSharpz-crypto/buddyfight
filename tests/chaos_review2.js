@@ -105,11 +105,10 @@ const settle = async () => { for (let i = 0; i < 40; i++) { env.flush(); await n
   run(`clear(); battle.plr.monsters.center=mku(3594); battle.plr.monsters.left=mku(46); battle.plr.item=mku(3409);`);
   act(3594, "center"); await settle();
   ok(J(`battle.plr.monsters.center.tempCrit`) === 2 && J(`battle.plr.monsters.left.tempCrit`) === 2 && J(`battle.plr.item.tempCrit`) === 2, "#3594 Overkill: critical+2 for every card on your field (incl. item)");
-  // #3595: the chosen monster cannot be destroyed this turn
-  run(`clear(); battle.plr.monsters.center=mku(3595); globalThis.__r=0;`);
-  act(3595, "center"); await settle();
+  // #3595: "[Pay 1 gauge when monsters on your field would be destroyed]": it saves the monster that would be destroyed (it is a replacement window now, tests/overturn_r42.js)
+  run(`clear(); battle.plr.monsters.center=mku(3595); battle.plr.gauge=[46,46,46]; globalThis.__r=0;`);
   await effDestroy();
-  ok(J(`!!battle.plr.monsters.center`) === true, "#3595 Overkill: the chosen monster survives destruction this turn");
+  ok(J(`!!battle.plr.monsters.center`) === true, "#3595 Overkill: the monster that would be destroyed survives (and cannot be destroyed again this turn)");
   // #3643: destroy a monster or item, then damage equal to its critical
   run(`clear(); battle.plr.monsters.center=mku(3643); battle.opp.monsters.center=mku(46); battle.opp.monsters.center.tempCrit=0; globalThis.__crit=ABX.core.statOf ? 0 : 0; globalThis.__l=battle.opp.life;`);
   act(3643, "center"); await settle();
