@@ -115,7 +115,7 @@
   ABX.stepExecutable = stepExecutable;
 
   const TRIG_OK = {
-    enter: t => t.self, attack: t => t.self && !(t.target && t.target.junk), dealsDamage: t => t.self || !!t.np, damaged: () => true, attackDestroys: t => t.self, attackOutcome: t => t.self, attacked: t => t.self, link: t => t.self, discardedFromHand: t => t.self, otherAttack: t => !!t.np, oppAttack: () => true, battleEnd: () => true,
+    enter: t => t.self, attack: t => t.self && !(t.target && t.target.junk), dealsDamage: t => t.self || !!t.np, damaged: () => true, attackDestroys: t => t.self, attackOutcome: t => t.self, attacked: t => t.self, link: t => t.self, discardedFromHand: t => t.self, otherAttack: t => !!t.np, oppAttack: () => true, battleEnd: () => true, flagReversal: () => true,
     turnStart: () => true, turnEnd: () => true, phaseStart: t => ["start", "draw", "main", "attack", "final", "turn"].includes(t.phase),
     otherEnter: t => !!t.np, otherDestroyed: t => !!t.np && !t.np.self, youCast: () => true, oppCast: () => true, leave: t => t.self && !t.byOpp,
     lifeGain: () => true, equipped: t => t.self, soulEmpty: t => t.self, hostAttack: t => !t.np || !t.np.junk, hostDealsDamage: t => !t.np || !t.np.junk, hostDestroys: t => !t.np || !t.np.junk, stoodByEffect: t => t.self,
@@ -1069,6 +1069,10 @@
         await fireTriggers((t, src, side) => t.event === "attackDestroys" && t.self && side === attSide && us.has(src.unit), { name: "attackDestroys" });
       }
     });
+  };
+  // one of `side`'s flags was just [Reversal]-ed ("When your flag [Reversal], ...")
+  ABX.fireFlagReversal = function (side) {
+    return ABX.queue(() => fireTriggers((t, src, s) => t.event === "flagReversal" && s === side, { name: "flagReversal" })).catch(() => {});
   };
   ABX.fireDamaged = function (side) {
     return ABX.queue(() => fireTriggers((t, src, s) => t.event === "damaged" && (t.who === "opp" ? s !== side : s === side), { name: "damaged" }));

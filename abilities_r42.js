@@ -372,6 +372,35 @@
     { op: "r40StructuredExec", text: "you may discard as many cards as you like from your hand." },
     { op: "destroy", gate: "ifYouDo", np: Object.assign(np({ types: [] }, "field", null, "opp"), { qty: { n: 1, upTo: true, all: false, any: false, each: false, fromLast: true } }) }
   ] })]);
+  // #6141 Omega "Preverse": when your flag [Reversal], look at top 3; one -> gauge, one -> hand; drop the rest or put them into a field monster's soul. Once per turn.
+  OPS.r42Preverse = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const top = f.deck.splice(0, 3);   // top of deck = index 0
+      if (!top.length) return false;
+      const nm = id => (B.getCardById ? (B.getCardById(id) || {}).name : "") || ("#" + id);
+      const pick = async (title, ids) => {
+        if (!ids.length) return -1;
+        if (ABX.autoPlay || f.isBot || ids.length === 1) return 0;
+        const i = await ABX.ui.pickCards({ title, subtitle: "Choose 1.", cards: ids.map(id => ({ card: { id, name: nm(id) }, badge: "" })), min: 1, max: 1 });
+        return (i && i.length) ? i[0] : 0;
+      };
+      let rest = top.slice();
+      let i = await pick(`${ctx.card.name} — put one into your gauge`, rest);
+      if (i >= 0) { (f.gauge = f.gauge || []).push(rest.splice(i, 1)[0]); }
+      i = await pick(`${ctx.card.name} — put one into your hand`, rest);
+      if (i >= 0) { f.hand.push(rest.splice(i, 1)[0]); }
+      const hosts = Object.values(f.monsters || {}).filter(Boolean);
+      if (rest.length && hosts.length && !ABX.autoPlay && !f.isBot) {
+        const j = await ABX.ui.pickOption({ title: `${ctx.card.name} — the rest`, subtitle: "Drop them, or put them into the soul of a monster on your field.", options: ["Drop", "Put into soul"] });
+        if (j === 1) { const h = hosts[0]; for (const id of rest) (h.soul = h.soul || []).push(id); rest = []; }
+      }
+      for (const id of rest) f.drop.push(id);
+      fresh();
+      return true;
+    }, check: () => true
+  };
+  OV42.push([6141, /look at the top three cards/i, () => ({ kind: "triggered", trigger: { event: "flagReversal" }, once: "turn", conds: [], steps: [{ op: "r42Preverse" }] })]);
   OV42.push([6526, /when this card is destroyed, put this card into the soul/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true, destroyedOnly: true }, conds: [], steps: [{ op: "r42AziRebDestroy" }] })]);
   // #3902 Shining Dragoner, Jackknife [Overturn]: "[Put a soul from this card into the drop zone if your opponent would use a card other than from effects during their turn]
   // Nullify the card your opponent used!!" - was a dead static. Now a response-window ability (same window as other "when your opponent casts" nullifiers).

@@ -5146,6 +5146,8 @@ const battle = {
   },
 
   triggerOnFlagReversalFieldAbilities(side) {
+    // the ability engine owns "When your flag [Reversal], ..." (#6050 #6063 #6141): only the old text guess below when it is off
+    if (window.ABX && ABX.fireFlagReversal && ABX.enabled !== false) { ABX.fireFlagReversal(side); return; }
     const f = this.getFighter(side);
     const enemy = this.getEnemy(side);
     const oppSide = side === "plr" ? "opp" : "plr";
