@@ -1978,6 +1978,7 @@
   };
   core.castBlock = function (fighter, card) {
     try {
+      if (card && card.type === "Spell" && fighter && fieldHas(fighter, 1458)) return `"${(core.cardOf(1458) || {}).name || "Cheerful Magician"}" prevents you from casting spells`;   // #1458: while on your field you cannot cast spells
       if (card && card.type === "Impact" && !isImpactC(card) && [B.plr, B.opp].some(fx => fx && fieldHas(fx, 6260))) return `"Babbyblu" prevents casting impacts from the hand`;   // #6260
     } catch (e) { /* ignore */ }
     return null;
@@ -1991,6 +1992,7 @@
       if (alone && u.abxNullified !== B.turnCount) {
         if ((u.card.id === 3530 || u.card.id === 6243)) return true;
         if (u.card.id === 3946 && monsList(f).filter(m => hasTribe(m.card, "Hero")).length >= 4) return true;
+        if (u.card.id === 2359 && (F("plr").drop.length >= 30 || F("opp").drop.length >= 30)) return true;   // #2359: attacking alone, 30+ cards in either drop zone
       }
       if (targetPos === "center" && us.some(m => /yuka nakano/i.test(m.card.name || "")) && fieldHas(f, 5468)) return true;
       if (targetPos !== "fighter" && us.some(m => m.card.id === 5870 && new Set((m.soul || []).map(core.cardOf).filter(c => c && hasTribe(c, "AssistWeapon")).map(c => c.name)).size >= 4)) return true;
@@ -2083,6 +2085,43 @@
   TG(6422, "when your «galaxy exalt» enters the field", { event: "unitEnters", owner: "you", np: NPT("a «Galaxy Exalt»") }, "put the top two cards of your deck into your gauge, and draw a card", { once: "turn", also: [{ event: "transformInto", nameRe: "galaxy exalt" }] });
   TG(2746, "during your turn, when a «hero» monster enters your field", { event: "unitEnters", owner: "you", turn: "you", np: NPT("a «Hero»") }, "put the top card of your deck into your gauge and put the top card of your deck into your drop zone", { once: "turn", also: [{ event: "itemEquipped", owner: "you", turn: "you", np: NPT("a «Hero»") }] });
   TG(3673, "when a soul is put into your «black dragon»", { event: "soulInto", np: Object.assign(np({ tribes: ["Black Dragon"] }, null, null, "you"), { zone: null, raw: "your «Black Dragon»" }) }, "put the top card of your deck into your gauge, and draw a card", { once: "turn" });
+
+  /* ---- wrong-trigger wave E, batch 2: #3650 #3905 #1144 #2868 + statics #1755 #1674 #403 ---- */
+  const XCe = ABX.extraCond = ABX.extraCond || {};
+  XCe.xAmbush = (c, ctx) => !!(ctx && ctx.unit && (ctx.unit.calledByAmbush === true || ctx.unit.enteredByAmbush === true));
+  XCe.xWeaponWithSoul = (c, ctx) => { const it = ctx.f && ctx.f.item; return !!(it && it.card && attrHas(it.card, /^weapon$/i) && (it.soul || []).length >= 1); };
+  ["xAmbush", "xWeaponWithSoul"].forEach(t => ABX.COND_OK.add(t));
+  OV42.push([2868, /enters the field by \[ambush\]/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [{ t: "xAmbush" }], steps: [{ op: "draw", who: "you", n: 1, src: "draw a card" }] })]);
+  TG(3650, "if this card enters the field during your opponent's turn", { event: "enter", self: true }, "you may call a size 3 or less «Chaos» monster from your drop zone to your center without paying its [Call Cost]", { conds: [{ t: "turn", who: "opp" }] });
+  TG(3905, "when this attacking card destroys your opponent's monster or deals damage", { event: "attackDestroys", self: true }, "put a card from your opponent's gauge into the drop zone. Then, if there are no cards in your opponent's gauge, deal 2 damage to your opponent", { also: [{ event: "dealsDamage", self: true }] });
+  TG(1144, "when this link attacks with another", { event: "link", self: true, with: NPT("another «Superhero»") }, "choose a card in the link attack, and [Stand] it", { once: "turn" });
+  // statics that were parsed as on-enter junk
+  const boostSelf = (mods) => ({ op: "boost", np: { raw: "this card", qty: { n: 1, upTo: false, all: false, any: false, each: false }, ref: null, self: true, filter: {}, zone: null, excludeSelf: false, topN: null, soulOf: null, selfTail: "" }, mods: Object.assign({ power: 0, defense: 0, critical: 0, kws: [] }, mods), each: null });
+  OV42.push([1755, /your life is 6 or more, this card gets critical-1/i, () => ({ kind: "static", trigger: null, conds: [{ t: "life", who: "you", n: 6, cmp: "ge" }], steps: [boostSelf({ critical: -1 })] })]);
+  OV42.push([1674, /your life is 5 or less, and you are equipped with a weapon/i, () => ({ kind: "static", trigger: null, conds: [{ t: "life", who: "you", n: 5, cmp: "le" }, { t: "xWeaponWithSoul" }], steps: [boostSelf({ kws: ["double attack"] })] })]);
+  OV42.push([2359, /attacking alone, if there are thirty or more cards/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);   // enforced in ABX.noCounterThisBattle
+  OV42.push([1458, /you cannot cast spells/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);   // enforced in core.castBlock
+  // #403 Death Curse: every monster that attacks this card is destroyed at the end of the turn
+  OV42.push([403, /monsters that attack this card is destroyed/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+  const faMarked = ABX.fireAttack;
+  ABX.fireAttack = function (attSide, units, defSide, targetPos) {
+    try {
+      const df = F(defSide), tgt = ["left", "center", "right"].includes(targetPos) ? df.monsters[targetPos] : null;
+      if (tgt && tgt.card && tgt.card.id === 403 && tgt.abxNullified !== B.turnCount) (units || []).forEach(x => { const u = (x && x.unit) || x; if (u && u.card && u.card.type !== "Item") u.abxDoomed = B.turnCount; });
+    } catch (e) { /* ignore */ }
+    return faMarked.apply(this, arguments);
+  };
+  const fteDoom = ABX.fireTurnEvent;
+  ABX.fireTurnEvent = function (kind) {
+    const r = fteDoom.apply(this, arguments);
+    if (kind === "turnEnd") {
+      const turn = B.turnCount;
+      Promise.resolve(r).then(() => {
+        ["plr", "opp"].forEach(sd => ["left", "center", "right"].forEach(pos => { const u = F(sd).monsters[pos]; if (u && u.abxDoomed === turn) B.destroyMonster(sd, pos); }));
+      }).catch(() => {});
+    }
+    return r;
+  };
 
   ABX.fire42 = fire42;
   OPS.r42GaugeTo2 = { run(s, ctx) { const e = ctx.e; let n = 0; while (e.gauge.length > 2) { e.drop.push(e.gauge.pop()); n++; } return n > 0; } };

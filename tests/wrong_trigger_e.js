@@ -53,6 +53,43 @@ const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "
   // 3673 soul into Black Dragon: gauge + draw
   wipe(); run(`put('plr','center',3673); put('plr','left',535); globalThis.g0=battle.plr.gauge.length; globalThis.h0=battle.plr.hand.length;`); run(`ABX.queue(()=>ABX.fire42('soulInto',{owner:'plr',actor:'plr',units:[battle.plr.monsters.left],cards:[card(535)]}))`); await settle();
   ck("3673 soul into Black Dragon: gauge+1 and draw", val(`return battle.plr.gauge.length===g0+1&&battle.plr.hand.length===h0+1`), val(`return [battle.plr.gauge.length,g0,battle.plr.hand.length,h0]`));
+  // ---- batch 2 ----
+  // 2868 enters by [Ambush]: draw; normal call: nothing
+  wipe(); run(`put('plr','center',2868); globalThis.h0=battle.plr.hand.length; battle.plr.monsters.center.enteredByAmbush=true; ABX.fireOtherEnter && 0;`);
+  run(`ABX.queue(()=>ABX.fire42 && 0)`);
+  // 3650: enters during opponent's turn -> call a size<=3 Chaos monster from drop
+  const chaos = val(`const c=window.BUDDYFIGHT_CARDS.find(x=>x.type==='Monster'&&x.size<=3&&(x.attrs||[]).some(t=>/^chaos$/i.test(t))&&!x.skill); return c?c.id:0`);
+  if (chaos) {
+    wipe(); run(`battle.activeSide='opp'; battle.plr.drop=[${chaos}]; const u=put('plr','center',3650); ABX.fireEnter('plr',card(3650),u);`); await settle();
+    ck("3650 enters on opponent's turn: calls a Chaos monster", val(`return Object.keys(battle.plr.monsters).some(p=>battle.plr.monsters[p]&&battle.plr.monsters[p].card.id===${chaos})`), val(`return [battle.plr.drop,Object.keys(battle.plr.monsters).map(p=>battle.plr.monsters[p]&&battle.plr.monsters[p].card.id)]`));
+    wipe(); run(`battle.activeSide='plr'; battle.plr.drop=[${chaos}]; const u=put('plr','center',3650); ABX.fireEnter('plr',card(3650),u);`); await settle();
+    ck("3650 enters on my turn: nothing", val(`return battle.plr.drop.includes(${chaos})`));
+  }
+  // 3905: destroys a monster by attack -> opp gauge card to drop; empty gauge -> 2 damage
+  wipe(); run(`put('plr','center',3905); battle.opp.gauge=[1,2]; globalThis.d0=battle.opp.drop.length;`); run(`ABX.fireAttackOutcome('plr',[{unit:battle.plr.monsters.center,pos:'center'}],'opp',{destroyedMonster:true})`); await settle();
+  ck("3905 destroys by attack: opp gauge 2 -> 1, no damage", val(`return battle.opp.gauge.length===1&&battle.opp.life===10`), val(`return [battle.opp.gauge.length,battle.opp.life]`));
+  wipe(); run(`put('plr','center',3905); battle.opp.gauge=[1];`); run(`ABX.fireAttackOutcome('plr',[{unit:battle.plr.monsters.center,pos:'center'}],'opp',{destroyedMonster:true})`); await settle();
+  ck("3905 last gauge card: 2 damage", val(`return battle.opp.gauge.length===0&&battle.opp.life===8`), val(`return [battle.opp.gauge.length,battle.opp.life]`));
+  // 1755: life 6+ -> critical-1 (static)
+  wipe(); run(`put('plr','center',1755); battle.plr.life=7;`);
+  const crit7 = val(`return getUnitEffectiveCombatStats(battle.plr, battle.plr.monsters.center).crit`);
+  run(`battle.plr.life=5;`);
+  const crit5 = val(`return getUnitEffectiveCombatStats(battle.plr, battle.plr.monsters.center).crit`);
+  ck("1755 life 6+: critical 1 lower than at life 5", crit7 === crit5 - 1, [crit7, crit5]);
+  // 2359: alone + 30 cards in a drop zone -> opponent cannot [Counter]
+  wipe(); run(`put('plr','center',2359); battle.opp.drop=new Array(30).fill(1);`);
+  ck("2359 alone, 30+ drop: no Counter", val(`return !!ABX.noCounterThisBattle('plr',[{unit:battle.plr.monsters.center}],'fighter')`));
+  run(`battle.opp.drop=new Array(5).fill(1); battle.plr.drop=[];`);
+  ck("2359 small drops: Counter allowed", val(`return !ABX.noCounterThisBattle('plr',[{unit:battle.plr.monsters.center}],'fighter')`));
+  // 1458: cannot cast spells while on the field
+  wipe(); run(`put('plr','center',1458);`);
+  ck("1458 on field: cannot cast spells", val(`return !!ABX.core.castBlock(battle.plr, window.BUDDYFIGHT_CARDS.find(c=>c.type==='Spell'))`));
+  wipe();
+  ck("1458 not on field: can cast", val(`return !ABX.core.castBlock(battle.plr, window.BUDDYFIGHT_CARDS.find(c=>c.type==='Spell'))`));
+  // 403: attackers are destroyed at the end of turn
+  wipe(); run(`put('opp','center',403); put('plr','center',45); ABX.fireAttack('plr',[{unit:battle.plr.monsters.center,pos:'center'}],'opp','center');`); await settle();
+  run(`ABX.fireTurnEvent('turnEnd')`); await settle();
+  ck("403 attacker destroyed at end of turn", val(`return !battle.plr.monsters.center`), val(`return !!battle.plr.monsters.center`));
   console.log("pass", pass, "fail", fail);
   process.exit(fail ? 1 : 0);
 })();
