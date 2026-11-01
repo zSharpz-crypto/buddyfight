@@ -526,7 +526,7 @@
   OPS.dropSoul = {
     async run(s, ctx) {
       let hosts;
-      if (s.hostNP && s.hostNP.self) hosts = ctx.unit ? [{ unit: ctx.unit, side: ctx.side }] : [];
+      if (s.hostNP && s.hostNP.self) hosts = ctx.unit ? [{ unit: ctx.unit, side: ctx.side }] : (ctx.card && Array.isArray(ctx.card.soul) && (ctx.f.setSpells || []).includes(ctx.card) ? [{ unit: ctx.card, side: ctx.side }] : []);   // a [Set] spell keeps its own soul
       else if (s.hostNP && s.hostNP.ref) hosts = (ctx.bind.chosen || []).filter(r => r.unit);
       else if (s.hostNP) { const c = refsFor(s.hostNP, ctx, { owner: "any", area: "field" }).filter(r => r.unit && (r.unit.soul || []).length); hosts = s.hostNP.qty.all ? c : await pick(c, s.hostNP, ctx, { intent: "harm", title: `${ctx.card.name} — choose a card to drop souls from` }); }
       else hosts = [];
@@ -535,7 +535,9 @@
         const u = h.unit, f = F(h.side);
         if (!u || !(u.soul || []).length) continue;
         const cnt = Math.min(s.n || 1, u.soul.length);
-        for (let i = 0; i < cnt; i++) { f.drop.push(u.soul.pop()); n++; }
+        // "put a soul from this card into your gauge / hand" (the parser keeps the destination in selfTail / src); default: drop zone
+        const dest = /\binto (?:your |his or her )?gauge\b/i.test((s.hostNP && s.hostNP.selfTail) || s.src || "") ? "gauge" : /\binto (?:your |his or her )?hand\b/i.test((s.hostNP && s.hostNP.selfTail) || s.src || "") ? "hand" : "drop";
+        for (let i = 0; i < cnt; i++) { f[dest].push(u.soul.pop()); n++; }
       }
       fresh(); return n > 0;
     },

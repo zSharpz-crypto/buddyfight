@@ -932,6 +932,7 @@
           if (o.conds !== undefined) ab.conds = o.conds;
           // #5757: the same effect also happens when it is dropped from the hand
           if (card.id === 5757 && o.kind === "triggered") { const c2 = clone(ab); c2.trigger = { event: "discardedFromHand", self: true }; extra.push(c2); }
+          if (o.also && o.kind === "triggered") o.also.forEach(trg => { const c3 = clone(ab); c3.trigger = trg; extra.push(c3); });   // same effect on another event
           break;
         }
         // [Overturn] / [Overkill] / [Overthrow] [<activation cost / timing>]: the printed cost must be paid when the ability is used
@@ -1621,7 +1622,7 @@
   const TG = (id, snippet, trigger, effect, opts) => OV42.push([id, new RegExp(esc(snippet), "i"), (ab) => {
     const p2 = ABX.parseSentenceSteps(effect, {});
     if (!p2 || (p2.unparsed && p2.unparsed.length) || !p2.steps.length) return null;
-    return { kind: "triggered", trigger, conds: (opts && opts.conds) || [], once: opts && opts.once, steps: p2.steps };
+    return { kind: "triggered", trigger, conds: (opts && opts.conds) || [], once: opts && opts.once, steps: ((opts && opts.pre) || []).concat(p2.steps), also: opts && opts.also };
   }]);
   const msDiff = (a, b) => { const m = new Map(); a.forEach(x => m.set(x, (m.get(x) || 0) + 1)); b.forEach(x => m.set(x, (m.get(x) || 0) - 1)); const out = []; m.forEach((v, k) => { for (let j = 0; j < v; j++) out.push(k); }); return out; };
   const inter = (a, b) => { const m = new Map(); b.forEach(x => m.set(x, (m.get(x) || 0) + 1)); const out = []; a.forEach(x => { const v = m.get(x) || 0; if (v > 0) { out.push(x); m.set(x, v - 1); } }); return out; };
@@ -2069,6 +2070,20 @@
   };
 
   /* ---- [r42] wave D: draw / hand / gauge / enter-by-effect triggers (#3491 #5194 #5840 #5656 #5657 #5771 #6354 #6499) ---- */
+  /* ---- wrong-trigger wave E, batch 1: leave-to-drop, phase starts, enter/transform/soul events (tests/wrong_trigger_e.js) ---- */
+  const LEAVE_SELF = { event: "leave", self: true };
+  TG(1644, "when this card is put from your field or deck into your drop zone", LEAVE_SELF, "put the top card of your deck into your gauge");
+  TG(2531, "when this card if put into the drop zone from your field", LEAVE_SELF, "destroy a size 2 or less monster on your opponent's field", { conds: [{ t: "turn", who: "you" }], pre: [{ op: "pay", life: 1, cost: true, src: "pay 1 life" }] });
+  TG(2546, "when this card is from the field into your drop zone", LEAVE_SELF, "if you do not have an \"Ozon-Z\" on your field, call this card from your drop zone without paying its [Call Cost]");
+  TG(3890, "when this card is put from the field or hand into your drop zone", LEAVE_SELF, "if you have a «Wydar Sarkal» on your field, destroy a spell on your opponent's field", { also: [{ event: "discardedFromHand", self: true }] });
+  TG(4275, "when this card is put from the field or hand into the drop zone", LEAVE_SELF, "put the top card of your deck into your gauge. Then, if you have a size 3 or greater monster on your field, draw a card", { once: "turn", also: [{ event: "discardedFromHand", self: true }] });
+  TG(2210, "at the beginning of an attack phase", { event: "phaseStart", who: "any", phase: "attack" }, "put a soul from this card into your gauge");
+  TG(2427, "at the beginning of each fighter's turn", { event: "turnStart", who: "any" }, "you may call a monster with \"Mummy\" in its card name from your drop zone by paying its [Call Cost]");
+  TG(1352, "when your «brave machine» enters the field", { event: "unitEnters", owner: "you", np: NPT("a «Brave Machine»") }, "put the top card of your deck into your gauge", { once: "turn" });
+  TG(6422, "when your «galaxy exalt» enters the field", { event: "unitEnters", owner: "you", np: NPT("a «Galaxy Exalt»") }, "put the top two cards of your deck into your gauge, and draw a card", { once: "turn", also: [{ event: "transformInto", nameRe: "galaxy exalt" }] });
+  TG(2746, "during your turn, when a «hero» monster enters your field", { event: "unitEnters", owner: "you", turn: "you", np: NPT("a «Hero»") }, "put the top card of your deck into your gauge and put the top card of your deck into your drop zone", { once: "turn", also: [{ event: "itemEquipped", owner: "you", turn: "you", np: NPT("a «Hero»") }] });
+  TG(3673, "when a soul is put into your «black dragon»", { event: "soulInto", np: Object.assign(np({ tribes: ["Black Dragon"] }, null, null, "you"), { zone: null, raw: "your «Black Dragon»" }) }, "put the top card of your deck into your gauge, and draw a card", { once: "turn" });
+
   ABX.fire42 = fire42;
   OPS.r42GaugeTo2 = { run(s, ctx) { const e = ctx.e; let n = 0; while (e.gauge.length > 2) { e.drop.push(e.gauge.pop()); n++; } return n > 0; } };
   TG(3491, "when a monster enters your field from the drop zone", { event: "enterFromDrop", owner: "you" }, "draw a card", { once: "turn" });

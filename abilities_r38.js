@@ -353,7 +353,9 @@
 
   // Also hook `OPS.dropSoul` and `core.sendUnitTo` so any soul card sent from a field card's soul to drop checks `isFaceDown`!
   if (OPS.dropSoul) {
+    const dsBase38 = OPS.dropSoul.run;
     OPS.dropSoul.run = async function (s, ctx) {
+      if (s && s.hostNP && !s.from) return dsBase38.apply(this, arguments);   // "put a soul from this card / the chosen card ...": the host is hostNP (the base op handles it, incl. the destination)
       const pool = core.refsFor(s.from || { zone: "field", side: "opp", type: "any" }, ctx).filter(r => r.unit && (r.unit.soul || []).length && !core.isProtected(r.unit, r.side, "souls dropped", ctx));   // "souls cannot be dropped" (r20) must survive this override
       if (!pool.length) return false;
       const picked = s.all ? pool : await core.pick(pool, s.from, ctx, { intent: "harm", title: `${ctx.card.name} — drop soul` });
