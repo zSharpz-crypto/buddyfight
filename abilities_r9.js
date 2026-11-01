@@ -1344,6 +1344,8 @@
     // the whole "you may ..." part is one question
     const opt = ab.steps.filter(x => x.optional);
     if (opt.length) {
+      const costSteps = ab.steps.filter(x => x.optional || x.cost);   // every cost part must be payable before asking (#1445: discard two + pay 1 gauge)
+      if (!costSteps.every(x => (x.op !== "discard" || x.all || f.hand.length >= (x.n || 1)))) return ctx;
       if (!opt.every(x => (x.op !== "pay" || ((x.gauge || 0) <= f.gauge.length && !(x.life && f.life <= x.life))) && (x.op !== "mill" || f.deck.length >= (x.n || 1)))) return ctx;
       if (!askYes(side, card, `${extra && extra.question || "Use this ability"}? (${opt.map(describe).join(", ")})`)) return ctx;
     }

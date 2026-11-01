@@ -205,6 +205,8 @@
       if ((r.k === "unit" || r.k === "item") && r.side !== ctx.side) {
         const kind = dest.area === "hand" ? "returned to hand" : "put into the drop zone";
         if (isProtected(r.unit, r.side, kind, ctx)) continue;
+        // "If this card would leave the field, ... prevent it" (#1445 Asmodai): opponent effects that put a monster into the hand / deck / drop zone get the same replacement window as destroying it
+        if (r.k === "unit" && r.unit && !r.pending && ABX.wouldLeaveSave && ABX.wouldLeaveSave(r.side, r.pos, r.unit, false)) continue;
       }
       const id = r.pending ? r.id : detach(r);
       r.pending = false;

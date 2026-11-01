@@ -1541,6 +1541,18 @@ function evaluateCardConditions(card, fighter, enemy, isAbilityCall = false) {
   const reasons = [];
   const revCnt = getFighterReversalCount(fighter);
 
+  // #5969 Lebla Maurice in the buddy zone with the "Magic World" flag: you cannot call monsters other than «Drago Phantom Thief»
+  if (fighter && fighter.buddyId === 5969 && card.type === "Monster" && !fighter.flagFaceDown) {
+    const lfc = CARD_MAP.get(Number(fighter.flagId));
+    if (lfc && /^magic world\b/i.test(lfc.name || "") && !(card.attrs || []).some(t => /^drago ?phantom ?thief$/i.test(t))) reasons.push(`"Sky Castle of Drago Phantom Thief" is your buddy and your flag is "Magic World": you cannot call monsters other than «Drago Phantom Thief».`);
+  }
+
+  // #3923 "Flip your opponent's flag face down": cards written on that flag cannot be used
+  if (fighter && fighter.flagFaceDown && card.type !== "Flag") {
+    const ffc = CARD_MAP.get(Number(fighter.flagId));
+    if (ffc && checkCardLegalityForFlag(card, ffc, false).allowed) reasons.push(`Your flag is face down: you cannot use "${card.name}".`);
+  }
+
   // [Equip/Call Cost] that only applies "when you have no monsters on your field" (Laevateinn #3728, #4759): cannot be used otherwise
   if (costNeedsNoMonsters(card, fighter)) reasons.push(`You can only use "${card.name}" when you have no monsters on your field.`);
 
@@ -5188,6 +5200,7 @@ const battle = {
       if (!idxs || !idxs.length) return false;
       pick = cands[idxs[0]];
     }
+    if (this.matchOver) return false;   // the match ended while the prompt was open
     return this.awakenEndrulerDragon(side, { fromTrigger: true, pick });
   },
 
@@ -5195,6 +5208,7 @@ const battle = {
     const f = this.getFighter(side);
     if (!f.godclock || f.godclock.awakened) return false;
     if (!opts || !opts.fromTrigger) return false; // only legal as the end-of-opponent's-turn trigger
+    if (this.matchOver) return false;
     if (!this.godclockAwakenEligible(f)) return false;
 
     // Cost: put the chosen "Time Ruler" monster (field -> drop with its soul, not destroyed; or hand) into the Drop Zone
@@ -5320,6 +5334,10 @@ const battle = {
     }
 
     enemy.timeStoppedThisTurn = true;
+    // "stop the time of your opponent and all of your opponent's cards": none of their card abilities work for the rest of this turn
+    enemy.abxTimeStop = this.turnCount;
+    [...MONSTER_POSITIONS, "center2"].forEach(pos => { if (enemy.monsters[pos]) enemy.monsters[pos].abxNullified = this.turnCount; });
+    if (enemy.item) enemy.item.abxNullified = this.turnCount;
     MONSTER_POSITIONS.forEach(pos => {
       if (enemy.monsters[pos]) {
         enemy.monsters[pos].defenseZeroTurn = true;
@@ -5500,6 +5518,17 @@ const battle = {
     if (this.matchOver) return;
 
     // The friend ended their turn: run our own Start Phase (reset + draw), which then syncs back.
+    if (msg.godclockOnly && msg.beginTurn) {
+      // The friend takes an EXTRA turn: only offer my Godclock flip, then give the turn straight back
+      Promise.resolve(this.offerGodclockAwaken("plr")).catch(() => {}).then(() => {
+        if (this.matchOver) return;
+        this.activeSide = "opp"; this.phase = "start";
+        this.sendOnlineStateToPeer("🔄 Extra turn: back to you", null, { resumeExtraTurn: true });
+        this.renderBattle();
+      });
+      return;
+    }
+    if (msg.resumeExtraTurn && this.activeSide === "plr" && !this.matchOver) { this.startTurn("plr"); return; }
     if (msg.beginTurn && this.activeSide === "plr") {
       // The friend's turn just ended: my Godclock #5957 may flip first (end of the opponent's turn).
       Promise.resolve(this.offerGodclockAwaken("plr")).catch(() => {}).then(() => { if (this.activeSide === "plr" && !this.matchOver) this.startTurn("plr"); });
@@ -5745,6 +5774,14 @@ const battle = {
       nextSide = this.activeSide;
       this.turnCount++;
       this.showCutin("EXTRA TURN!", `${this.getFighter(nextSide).name} takes another turn!`, null);
+      // Online: my turn just ended, so the friend's Godclock #5957 may flip first. Hand over briefly; their device offers it and then resumes my extra turn.
+      if (this.mode === "online_p2p" && endingSide === "plr" && this.godclockAwakenEligible(this.getFighter("opp"))) {
+        this.phase = "start";
+        this.setPrompt("⏳ Waiting for Online Friend's move...");
+        this.renderBattle();
+        this.sendOnlineStateToPeer("⏱️ Your opponent takes an extra turn", null, { beginTurn: true, godclockOnly: true, godclockExtraTurnOwner: endingSide });
+        return;
+      }
       this.startTurn(nextSide);
       return;
     }
@@ -9292,7 +9329,7 @@ const battle = {
           if (this.activeSide !== "opp" || step >= attackers.length) {
             this.oppContinueCallback = null;
             // End of the bot's turn: the player's Godclock #5957 may flip (player is asked).
-            Promise.resolve(this.offerGodclockAwaken("plr")).catch(() => {}).then(() => { if (stillThisMatch()) setTimeout(() => this.botPriority("the opponent's turn is ending", () => {
+            Promise.resolve(this.activeSide === "opp" && !this.matchOver ? this.offerGodclockAwaken("plr") : false).catch(() => {}).then(() => { if (stillThisMatch()) setTimeout(() => this.botPriority("the opponent's turn is ending", () => {
               if (stillThisMatch() && this.activeSide === "opp") {
                 if (this.imTurnEnd) this.imTurnEnd("opp");
                 if (window.ABX && ABX.fireTurnEvent) ABX.fireTurnEvent("turnEnd");

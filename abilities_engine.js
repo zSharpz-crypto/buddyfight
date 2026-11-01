@@ -366,7 +366,7 @@
    * ============================================================ */
   const cmpN = (v, c) => (c.cmp === "le" ? v <= c.n : c.cmp === "ge" ? v >= c.n : c.cmp === "gt" ? v > c.n : v === c.n);
 
-  function flagCard(f) { return cardOf(f.flagId) || null; }
+  function flagCard(f) { return f.flagFaceDown ? null : (cardOf(f.flagId) || null); }   // a face-down flag (#3923) has no usable text
 
   function countNP(np, ownerRel, ctx, def) {
     const ctx2 = Object.assign({}, ctx);
@@ -884,6 +884,7 @@
     const ctx = { side, f, e, card, unit, ab, bind: { chosen: [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [], hostArea: "field" };
     if (ABX.syncFrontNullify) ABX.syncFrontNullify();
     if (unit && unit.abxNullified === B.turnCount) return { ok: false, reason: "Abilities are nullified this turn" };
+    if (F(side) && F(side).abxTimeStop === B.turnCount) return { ok: false, reason: "Time is stopped (Eternal Eon)!" };
     if (onceUsed(f, card, ab, unit)) return { ok: false, reason: "Already used this turn" };
     if (ab.canUse) { const r = ab.canUse(side, ctx); if (r && !r.ok) return r; }
     if (!(ab.conds || []).every(c => evalCond(c, ctx))) return { ok: false, reason: "Timing / condition not met" };
@@ -973,6 +974,11 @@
   function sources(side) {
     if (ABX.syncFrontNullify) ABX.syncFrontNullify();
     const f = F(side), out = fieldUnits(f, true).map(x => ({ unit: x.unit, card: x.unit.card, hostArea: "field" }));
+    // cards in the soul of a field monster whose trigger works from there ("if this card is in the soul of your buddy", #6563 Buddy Sky Day)
+    fieldUnits(f, true).forEach(x => (x.unit.soul || []).forEach(e => {
+      const sc = cardOf(typeof root.getSoulCardId === "function" ? root.getSoulCardId(e) : e);
+      if (sc && abilitiesOf(sc, a => a.kind === "triggered" && /\bif this card is in the soul of your buddy\b/i.test(a.raw || "")).length) out.push({ unit: null, card: sc, hostArea: "soul", soulHost: x.unit });
+    }));
     (f.setSpells || []).forEach(c => {
       out.push({ unit: null, card: c, hostArea: "field" });
       // cards in a [Set] card's soul whose trigger works from there ("if this card is in the soul of "Secret Sword, Lethal Formation", you may cast it")

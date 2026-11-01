@@ -47,6 +47,15 @@
       rs.gate = "ifYouDo";
       return { kind: "act", steps: st };
     }],
+    // #6563 Buddy Sky Day: attack-phase start, in the soul of your buddy: destroy up to one opposing card; Lost World -> put it into the drop zone instead (one choice, not two steps)
+    [6563, /at the start of each player's attack phase/i, (ab) => {
+      const st = clone(ab.steps || []);
+      const de = st.find(x => x.op === "destroy"), mv = st.find(x => x.op === "move");
+      if (!de || !mv) return null;
+      delete de.cond; delete de.gate; delete mv.instead;
+      mv.np = clone(de.np);
+      return { kind: "triggered", trigger: ab.trigger, conds: [{ t: "xInSoulOfBuddy" }], steps: [{ op: "r42RanmaResolve", destroy: de, move: mv }] };
+    }],
     // #5706 Ranma: the drop-instead-of-destroy and the destroy are one "if you do" result (a failed cond of one must not cancel the other)
     [5706, /choose a card on your opponent's field/i, (ab) => {
       const st = clone(ab.steps || []);
@@ -281,6 +290,22 @@
 
   // Zorune: the looked-at cards go back on top of the deck (any order = the order they were in), BEFORE the following draw
   OPS.r42LookBack = { run(s, ctx) { const l = (ctx.bind.looked || []).filter(x => x && x.pending); for (let i = l.length - 1; i >= 0; i--) { F(l[i].side).deck.unshift(l[i].id); l[i].pending = false; } return true; }, check: () => true };
+
+  // #3923 Ultimate Great Spell, World Pandemic!: "Flip your opponent's flag face down. (cards written on that flag cannot be used, and all cards on that field are put into the drop zone)"
+  OV42.push([3923, /flip your opponent's flag face down/i, () => ({ kind: "spell", steps: [{ op: "r42FlagFaceDown" }] })]);
+  OPS.r42FlagFaceDown = {
+    run(s, ctx) {
+      const e = ctx.e;
+      // "your flags cannot be flipped face down by your opponent's card effects": Godclock #5957 (and its Endruler flag) and Overgod "0" #6202
+      if (!e || e.flagFaceDown || Number(e.flagId) === 5957 || (e.godclock && (e.godclock.awakened || e.godclock.overgodActive)) || (e.item && e.item.isEndrulerFlag)) { ABX.say && ABX.say(`🛡️ ${e && e.name || "The opponent"}'s flag cannot be flipped face down!`); return false; }
+      e.flagFaceDown = true;
+      ["left", "center", "center2", "right"].forEach(p => { const u = e.monsters[p]; if (u) { e.drop.push(u.card.id, ...(u.soul || [])); e.monsters[p] = null; } });
+      if (e.item) { e.drop.push(e.item.card.id, ...(e.item.soul || [])); e.item = null; }
+      ABX.say && ABX.say(`🂠 ${e.name || "The opponent"}'s flag is flipped face down! Their field goes to the drop zone.`);
+      fresh(); return true;
+    },
+    check: () => true
+  };
 
   // Ranma: Lost World -> put the chosen card into the drop zone instead of destroying it
   OPS.r42RanmaResolve = { run(s, ctx) { return core.evalCond({ t: "flagIs", names: ["lost world"] }, ctx) ? OPS.move.run(s.move, ctx) : OPS.destroy.run(s.destroy, ctx); }, check: () => true };

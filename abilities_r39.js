@@ -146,7 +146,7 @@
       const oppSide = otherSide(side);
       const oppF = F(oppSide);
       const casterF = F(side);
-      if (oppF && oppF.buddyId === 5969 && c && !c.set) {
+      if (oppF && oppF.buddyId === 5969 && c && !c.set && core.evalCond({ t: "flagIs", names: ["magic world"] }, { side: oppSide, f: oppF, e: casterF, bind: {} })) {
         _origResolveCastSpell.apply(this, arguments);
         const dIdx = casterF.drop.lastIndexOf(cid);
         if (dIdx >= 0) {

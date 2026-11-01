@@ -24,12 +24,12 @@ The test already exists. Check the test's expectation against the real card text
 ## Broken test scripts (not card bugs)
 - [x] tests/modal_partial.js: was stale (#1604 now has its own r39 implementation); test updated
 - [x] tests/would_destroy.js: finishes in under 1 s now, passes
-- [ ] tests/smoke.js, tests/smoke11.js: need `playwright` (optional)
+- [x] tests/smoke.js, tests/smoke11.js: need `playwright` (optional) — both run clean where Playwright is installed (checked 2026-11-02)
 
 ## Found by the 2026-10-29 audit (fixed)
 - [x] [Purge] keyword (9 cards: 4433 4467 4468 4469 4481 4495 4518 6219 6417) had no engine function -> added counter [Act] in abilities_r41.js, test tests/purge.js
 - [x] [Equipment Change] (20 cards) ignored its once-per-turn limit -> game.js equipCardFromHand, test tests/equip_change.js
-- [ ] Other 'limit missing' lines in tests/once_audit.js are false alarms (keyword reminder text; Double Attack = 2 attacks, call limits handled in game.js getCallLimit)
+- [x] (reviewed: keyword reminder text, Double Attack = 2 attacks, call limits live in game.js getCallLimit; nothing to change) Other 'limit missing' lines in tests/once_audit.js are false alarms (keyword reminder text; Double Attack = 2 attacks, call limits handled in game.js getCallLimit)
 - [x] "Infinity the Chaos" had no unlock: now a deck option (deck.infinityChaos, checkbox in Deck Edit for The Chaos), never in the play deck; "The Chaos Upgrade" cannot be cast without it under the flag and is no longer auto-added. Test tests/chaos_unlock.js
 - [x] Card-data typos fixed at load (game.js CARD_TEXT_TYPOS): "Guage" #3193 #4733 (cost was 0), "Destory" #3705 #3710 (cost unparsed), "oponent" x5. Test tests/chaos_costs.js
 - [x] #3728 / #4759 Laevateinn: equip only while you have no monsters (game.js costNeedsNoMonsters)
@@ -118,14 +118,14 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [x] Horary Domination follow-ups: parser/r40 left ab.once="turn" on #5958-#5960 so a cancelled popup burned the ABX act (now cleared when canUse is set; game.js flag is the only gate); engine path ignored Eternal Eon (canUseHoraryDominationNow now checks timeStoppedThisTurn/Battle); bot Clock-I in defense did not resume the attack; test 'chosen hand card' tightened (asserts deck bottom + others stay in hand). Test: tests/horary_domination.js
 - [x] (fixed 2026-11-02, extraParts fallback in abilities_engine.js; tests/dropzone_soul_cost.js) Soulguard monsters with drop/hand/field soul costs (39: #105 #152 #742 #3010 ...) do not pay those costs, get default 1 deck soul (old gap)
 - [x] (fixed: parseCardCost reads gauge/life from the full skill line) #5307 #5851 #5863 #6093 pay no gauge because their cost field is cut off
-- [ ] Eternal Eon should stop opponent card abilities, not just Counters
+- [x] (fixed: activateOvergodEternalEon nullifies the opponent's monsters/item and canUseAct blocks them via abxTimeStop; tests/eternal_eon.js) Eternal Eon should stop opponent card abilities, not just Counters
 - [x] Teylor Luna #6010: with the awakened Endruler flag the 'If your flag is Endruler ... bottom of deck instead' swap now works (condition flagIs reads the awakened Endruler flag item; r42 override gates destroy vs bottom-deck). Test: tests/teylor_luna_endruler.js
-- [ ] Asmodai #1445 prevent-leaving-the-field option not offered against bottom-deck (suspected)
-- [ ] Godclock online extra-turn does not offer remote owner the awaken
-- [ ] awaken can still apply after match ended while prompt open
-- [ ] bot loop offerGodclockAwaken("plr") may run when activeSide !== "opp"
-- [ ] flags cannot be flipped face down by opponent effects: no mechanic exists
-- [ ] Other 'If your flag is X ... instead' cards, not checked/fixed (different shapes): #5706, #5969, #6458 (handled r42 repeat), #6563
+- [x] (fixed: abilities_ops moveRefs runs ABX.wouldLeaveSave for opponent effects; runSync checks every cost part is payable first; tests/asmodai_leave.js) Asmodai #1445 prevent-leaving-the-field option not offered against bottom-deck (suspected)
+- [x] (fixed: godclockOnly/resumeExtraTurn hand-over in _endTurnCore + receiveOnlineStateFromPeer (online path is not testable headless)) Godclock online extra-turn does not offer remote owner the awaken
+- [x] (fixed: matchOver guards in offerGodclockAwaken/awakenEndrulerDragon; tests/godclock_awaken_guards.js) awaken can still apply after match ended while prompt open
+- [x] (fixed: only offered when activeSide === 'opp' and the match is running) bot loop offerGodclockAwaken("plr") may run when activeSide !== "opp"
+- [x] (mechanic added: f.flagFaceDown via OPS.r42FlagFaceDown (#3923 World Pandemic), cards of that flag unusable (evaluateCardConditions), flagCard() null, field to drop; #5957/#6202 immune; tests/flag_face_down.js) flags cannot be flipped face down by opponent effects: no mechanic exists
+- [x] (#5706 and #6458 already handled; #6563 fixed (buddy-soul trigger source + Lost World drop-instead override); #5969 now needs the Magic World flag and enforces its call restriction; tests/flag_instead_cards.js) Other 'If your flag is X ... instead' cards, not checked/fixed (different shapes): #5706, #5969, #6458 (handled r42 repeat), #6563
 - [x] tests/godclock_awaken.js 'owner can choose hand copy over field' was flaky (~7% of runs, not a code regression: same at every commit 0e4a2af..HEAD): the shuffled test deck is full of #6065, and the turn-start draw after the flip could draw one into hand while Wind Kronos pulled the dropped copy into soul. Test now removes 6065 from the deck (0/60 failures).
 
 
