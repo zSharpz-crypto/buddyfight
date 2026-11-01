@@ -46,5 +46,19 @@ const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "
   ck("1676 on field: no effect damage from opponent", val(`return battle.plr.life===10`), val(`return battle.plr.life`));
   run(`fresh(); put('plr','left',1676); ABX.core.applyDamage('plr',3,{kind:'attack'});`);
   ck("1676 still takes attack damage", val(`return battle.plr.life===7`), val(`return battle.plr.life`));
+  // item-equipped statics
+  run(`fresh(); globalThis.y=put('plr','left',3404); battle.plr.item={card:card(349),rested:false,attacksLeft:1,soul:[],itemMode:'equip'};`);
+  ck("3404 with a Sword of the King equipped: crit+2", val(`return getUnitEffectiveCombatStats(battle.plr,y).crit===(card(3404).crit||1)+2`), val(`return getUnitEffectiveCombatStats(battle.plr,y).crit`));
+  run(`fresh(); globalThis.y=put('plr','left',3404);`);
+  ck("3404 without: no bonus", val(`return getUnitEffectiveCombatStats(battle.plr,y).crit===(card(3404).crit||1)`));
+  run(`fresh(); globalThis.y=put('plr','left',3400); battle.plr.item={card:card(349),rested:false,attacksLeft:1,soul:[],itemMode:'equip'};`);
+  ck("3400 crit equals the equipped Sword of the King's (349 = 3)", val(`return getUnitEffectiveCombatStats(battle.plr,y).crit===3`), val(`return getUnitEffectiveCombatStats(battle.plr,y).crit`));
+  const kai = val(`const k=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('Kaiju')&&c.size>=2); return k?k.id:0`);
+  if (kai) {
+    run(`fresh(); put('plr','center',5879); globalThis.k=put('plr','left',${kai});`);
+    ck("5879 no item equipped: Kaiju size -4 (min 0)", val(`return size(k)===0`), val(`return size(k)`));
+    run(`battle.plr.item={card:card(349),rested:false,attacksLeft:1,soul:[],itemMode:'equip'};`);
+    ck("5879 with an item equipped: normal size", val(`return size(k)===card(${kai}).size`), val(`return size(k)`));
+  }
   console.log("pass", pass, "fail", fail);
 })();

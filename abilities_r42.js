@@ -1196,4 +1196,39 @@
     { op: "destroy", np: Object.assign(np({ types: ["item", "spell"] }, "field", null, "opp"), { raw: "an item or spell on your opponent's field" }), gate: "ifYouDo", src: "destroy an item or spell on your opponent's field" }] })]);
   OV42.push([4193, /when a card on your opponent's field is \[rest\] by card effects, if this card is in the soul of a .neodragon./i, () => ({ kind: "triggered", trigger: { event: "restedByEffect", targetOpp: true, hostNp: NEO2() }, once: "turn", conds: [], steps: [{ op: "mill", who: "you", n: 1, to: "gauge" }, { op: "damage", who: "opp", n: 1 }] })]);
   OV42.push([5471, /when a character or item on your opponent's field is \[rest\] by your card effects, deal 1 damage/i, () => ({ kind: "triggered", trigger: { event: "restedByEffect", targetOpp: true, np: Object.assign(np({ types: ["monster", "item"] }, null, null, "opp"), { zone: null, raw: "a character or item on your opponent's field" }) }, conds: [], steps: [{ op: "damage", who: "opp", n: 1, src: "deal 1 damage to your opponent" }] })]);
+  /* ---- [r42] statics tied to equipped items: #3404 #3400 (Sword of the King equipped), #5879 (no item equipped), #5345 (Thunder Sword equipped) ---- */
+  const equippedItems = (fighter) => ["item", "item2", "item3", "item4"].map(k => fighter[k]).filter(u => u && u.card);
+  const kingSwords = (fighter) => equippedItems(fighter).filter(u => /sword of the king/i.test(u.card.name || ""));
+  const ktenos = (fighter) => equippedItems(fighter).some(u => /thunder sword,\s*kt[ei]nos edge/i.test(u.card.name || "") && u.abxNullified !== B.turnCount);
+  const prevSB2 = ABX.staticBonus;
+  if (prevSB2) ABX.staticBonus = function (fighter, unit) {
+    const sb = prevSB2.apply(this, arguments);
+    try {
+      if (!unit || !unit.card || !sb || unit.abxNullified === B.turnCount) return sb;
+      if (unit.card.id === 3404 && kingSwords(fighter).length) sb.crit += 2;
+      if (unit.card.id === 3400) { const sw = kingSwords(fighter); if (sw.length) sb.crit += Math.max(...sw.map(u => u.card.crit || 0)) - (unit.card.crit || 1); }
+      // #5345: with "Thunder Sword, Ktenos Edge" equipped, all items on your field get power+10000 and [Double Attack]
+      if (unit.card.type === "Item" && ktenos(fighter) && equippedItems(fighter).some(u => u.card.id === 5345 && u.abxNullified !== B.turnCount) && equippedItems(fighter).includes(unit)) { sb.power += 10000; sb.da = true; }
+    } catch (e) { /* ignore */ }
+    return sb;
+  };
+  const prevSizeDelta2 = ABX.sizeDelta;
+  ABX.sizeDelta = function (fighter, card, unit) {
+    let d = prevSizeDelta2.apply(this, arguments);
+    try {
+      if (card && unit && (card.attrs || []).some(a => /^kaiju$/i.test(a)) && !equippedItems(fighter).length && unit.abxNullified !== B.turnCount &&
+        ["left", "center", "right", "center2"].some(p => fighter.monsters[p] === unit) &&
+        core.fieldUnits(fighter, true).some(x => x.unit && x.unit.card.id === 5879 && x.unit.abxNullified !== B.turnCount)) d -= 4;   // #5879 Alexis Kerib: "If you do not have an item equipped, all «Kaiju» characters' size on your field is reduced by 4"
+    } catch (e) { /* ignore */ }
+    return d;
+  };
+  // #5345 Tempest Shield, Draco Guard: with "Thunder Sword, Ktenos Edge" equipped, damage you take other than by your card effects is reduced by 2
+  const prevApplyDamage2 = core.applyDamage;
+  core.applyDamage = function (side, n, src) {
+    try {
+      const f = F(side);
+      if (n > 0 && !(src && (src.unreducible || src.kind === "effect")) && ktenos(f) && equippedItems(f).some(u => u.card.id === 5345 && u.abxNullified !== B.turnCount)) n = Math.max(0, n - 2);
+    } catch (e) { /* ignore */ }
+    return prevApplyDamage2.call(this, side, n, src);
+  };
 })(typeof window !== "undefined" ? window : globalThis);
