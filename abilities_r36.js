@@ -227,7 +227,7 @@
   };
   OPS.r36CenterThroughTurn = { run(s, ctx) { ctx.f.abxCenterThrough = B.turnCount; return true; }, check: () => true };
   OPS.r36CenterDA = {
-    run(s, ctx) { const u = ctx.f.monsters.center; if (!u) return false; u.tempDA = true; if ((u.attacksLeft || 0) < 2) u.attacksLeft = (u.attacksLeft || 0) + 1; fresh(); return true; },
+    run(s, ctx) { const u = ctx.f.monsters.center; if (!u) return false; u.tempDA = true; ABX.grantAttacks(u, 2); fresh(); return true; },
     check: () => true
   };
   OPS.r36ChaosDeck = {

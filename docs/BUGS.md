@@ -191,3 +191,4 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 
 ## Bot AI (2026-11-02)
 - [x] Rival now plans attacks (bot_ai.js): link attacks to break high-Defense monsters, any target (not only center), lethal first, avoids [Counterattack] walls and pointless attacks, calls its strongest monsters, uses [Act]s and useful spells. tests/bot_ai.js
+- [x] #3149 Chained Strikes Warlock, Rabukh: after it attacked and destroyed a monster, [Double Attack] set attacksLeft to 2 (3 attacks in total) and left it rested. Same pattern in the boost op and r22/r36/r39/r40/r41 grants (~50 cards: 973, 1477, 1514 ...). Now ABX.grantAttacks (abilities_ops.js) counts attacks used this turn (unit.atkUsed) -> N total, stands again. Test tests/da_on_destroy.js

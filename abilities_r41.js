@@ -322,7 +322,7 @@
       const res = await ABX.playRpsRound(ctx, { onlyOnce: false });
       if (res === "win") {
         u.tempDA = true;
-        u.attacksLeft = Math.max(2, u.attacksLeft || 1);
+        ABX.grantAttacks(u, 2);
       }
       fresh();
       return true;

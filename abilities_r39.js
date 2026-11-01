@@ -609,7 +609,7 @@
       const u = ctx.unit;
       if (!u) return false;
       u.tempDA = true;
-      u.attacksLeft = Math.max(2, u.attacksLeft || 1);
+      ABX.grantAttacks(u, 2);
       if (isAmbushUnit(u)) {
         u.tempCrit = (u.tempCrit || 0) + 1;
       }

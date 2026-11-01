@@ -411,8 +411,8 @@
           if (kws.includes("counterattack")) u.tempCA = true;
           if (kws.includes("penetrate")) u.tempPen = true;
           if (kws.includes("move")) u.tempMove = true;
-          if (kws.includes("double attack") && (u.attacksLeft || 1) < 2) { u.tempDA = true; u.attacksLeft = 2; }
-          if (kws.includes("triple attack") && (u.attacksLeft || 1) < 3) { u.tempTA = true; u.attacksLeft = 3; }
+          if (kws.includes("double attack")) { u.tempDA = true; ABX.grantAttacks(u, 2); }
+          if (kws.includes("triple attack")) { u.tempTA = true; ABX.grantAttacks(u, 3); }
           did = true;
         });
       }

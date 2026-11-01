@@ -270,8 +270,8 @@
         if (bc.ca) u.tempCA = true;
         if (bc.move) u.tempMove = true;
         if (bc.sg) u.tempSG = true;
-        if (bc.da) { u.tempDA = true; u.attacksLeft = Math.max(2, u.attacksLeft || 1); }
-        if (bc.ta) { u.tempTA = true; u.attacksLeft = Math.max(3, u.attacksLeft || 1); }
+        if (bc.da) { u.tempDA = true; ABX.grantAttacks(u, 2); }
+        if (bc.ta) { u.tempTA = true; ABX.grantAttacks(u, 3); }
       });
       if (ABX.resetCaches) ABX.resetCaches();
       fresh();

@@ -5132,7 +5132,7 @@ const battle = {
       ctx.attackerZones.forEach(zp => {
         const u = unitAt(attFighter, zp);
         if (u) {
-          u.attacksLeft -= 1;
+          u.attacksLeft -= 1; if (u.atkTurn !== this.turnCount) { u.atkTurn = this.turnCount; u.atkUsed = 0; } u.atkUsed++;
           if (u.attacksLeft <= 0) u.rested = true;
         }
       });
@@ -8811,7 +8811,7 @@ const battle = {
 
       // "When this card attacks" bottom-deck effects (Time Ruler Dragons) are ABX triggers; no hard-coded copy here.
 
-      unit.attacksLeft -= 1;
+      unit.attacksLeft -= 1; if (unit.atkTurn !== this.turnCount) { unit.atkTurn = this.turnCount; unit.atkUsed = 0; } unit.atkUsed++;
       if (unit.attacksLeft <= 0) {
         unit.rested = true;
       }

@@ -12,6 +12,17 @@
 
   const sideOf = (ctx, who) => (who === "opp" ? otherSide(ctx.side) : ctx.side);
   const fresh = () => B.renderBattle && B.renderBattle();
+  // "gets [Double/Triple/... Attack]" = N attacks in TOTAL this turn. Attacks already made this turn count, so a card that
+  // gets it in the middle of its first attack has N-1 left and stands again (was: set to N, i.e. one attack too many, and still rested).
+  ABX.grantAttacks = function (u, total) {
+    if (!u) return;
+    const used = u.atkTurn === B.turnCount ? (u.atkUsed || 0) : 0;
+    const left = Math.max(0, total - used);
+    if (left > (u.attacksLeft || 0)) {
+      if ((u.attacksLeft || 0) <= 0 && used > 0) u.rested = false;   // it was only rested because its attacks ran out
+      u.attacksLeft = left;
+    }
+  };
 
   // numeric value of an amount spec
   function amount(n, ctx) {
@@ -388,7 +399,7 @@
         r.unit.tempPower = (r.unit.tempPower || 0) + (mods.power || 0) * mult;
         r.unit.tempDef = (r.unit.tempDef || 0) + (mods.defense || 0) * mult;
         r.unit.tempCrit = (r.unit.tempCrit || 0) + (mods.critical || 0) * mult;
-        (mods.kws || []).forEach(k => { if (k === "penetrate") r.unit.tempPen = true; if (k === "counterattack") r.unit.tempCA = true; if (k === "double attack") { r.unit.tempDA = true; r.unit.attacksLeft = Math.max(r.unit.attacksLeft || 0, 2); } if (k === "triple attack") { r.unit.tempTA = true; r.unit.attacksLeft = Math.max(r.unit.attacksLeft || 0, 3); } if (k === "quadruple attack") { r.unit.tempQA = true; r.unit.attacksLeft = Math.max(r.unit.attacksLeft || 0, 4); } if (k === "hextuple attack") { r.unit.tempHA = true; r.unit.attacksLeft = Math.max(r.unit.attacksLeft || 0, 6); } if (k === "soulguard") r.unit.tempSG = true; if (k === "move") r.unit.tempMove = true; });
+        (mods.kws || []).forEach(k => { if (k === "penetrate") r.unit.tempPen = true; if (k === "counterattack") r.unit.tempCA = true; if (k === "double attack") { r.unit.tempDA = true; ABX.grantAttacks(r.unit, 2); } if (k === "triple attack") { r.unit.tempTA = true; ABX.grantAttacks(r.unit, 3); } if (k === "quadruple attack") { r.unit.tempQA = true; ABX.grantAttacks(r.unit, 4); } if (k === "hextuple attack") { r.unit.tempHA = true; ABX.grantAttacks(r.unit, 6); } if (k === "soulguard") r.unit.tempSG = true; if (k === "move") r.unit.tempMove = true; });
       });
       fresh(); return ch.length > 0;
     },
