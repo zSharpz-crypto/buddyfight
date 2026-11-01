@@ -1541,6 +1541,7 @@ function evaluateCardConditions(card, fighter, enemy, isAbilityCall = false) {
   const reasons = [];
   const revCnt = getFighterReversalCount(fighter);
 
+  if (window.ABX && ABX.core && ABX.core.castBlock) { const cb = ABX.core.castBlock(fighter, card); if (cb) reasons.push(cb); }
   if (card.type === "Monster" && window.ABX && ABX.core && ABX.core.transformCallBlock) { const tb = ABX.core.transformCallBlock(fighter, card); if (tb) reasons.push(tb); }
   // #5969 Lebla Maurice in the buddy zone with the "Magic World" flag: you cannot call monsters other than «Drago Phantom Thief»
   if (fighter && fighter.buddyId === 5969 && card.type === "Monster" && !fighter.flagFaceDown) {
@@ -8524,6 +8525,10 @@ const battle = {
       this.setPrompt("✖ That card cannot attack this turn (card effect).");
       this.renderBattle();
       return;
+    }
+    if (window.ABX && ABX.core && ABX.core.attackBlocked) {
+      const abm = ABX.core.attackBlocked(attSide, units, defSide, targetPos);
+      if (abm) { this.pendingAction = null; this.linkAttackers = []; this.setPrompt("✖ " + abm + " (card effect)."); this.renderBattle(); return; }
     }
     if (window.ABX && ABX.core && ABX.core.noAttackPosBlocked && units.some(u => ABX.core.noAttackPosBlocked(u, targetPos))) {
       this.pendingAction = null; this.linkAttackers = [];

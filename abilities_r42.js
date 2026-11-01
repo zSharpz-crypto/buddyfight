@@ -1707,4 +1707,162 @@
     } catch (e) { /* ignore */ }
     return false;
   };
+
+  /* ---- [r42] dead statics batch 2: damage rules, conditional stats, sizes, opponent restrictions, replacements ----
+   * Damage: #343 #4971 (pay gauge to reduce), #3186 #5722 #5838 (reductions), #3480 #4859 #5385 (immunities), #5875 (unreducible), #6446 (+1).
+   * Stats: #1124 #2040 #2369 #2382 #2755 #3205 #4433 #4508 #4887 #5470 #5507 #5870 #6243 #3945. Sizes: #2218 #2307 #2314 #2443 #3605 #4508 #5310 #5836 #6379.
+   * Restrictions: #1436 #2112 #3311 (opp monsters can't return/move), #335 (no link attack), #3945, #5012, #2684, #6260, no-[Counter] #3530 #3946 #5468 #5870 #6243. */
+  const fieldHas = (fighter, id) => core.fieldUnits(fighter, true).some(x => x.unit && x.unit.card.id === id && x.unit.abxNullified !== B.turnCount);
+  const fieldUnitOf = (fighter, id) => { const x = core.fieldUnits(fighter, true).find(y => y.unit && y.unit.card.id === id && y.unit.abxNullified !== B.turnCount); return x ? x.unit : null; };
+  const monsList = (fighter) => ["left", "center", "right", "center2"].map(p => fighter.monsters[p]).filter(Boolean);
+  const cardsIn = (ids) => (ids || []).map(id => core.cardOf(typeof id === "object" && id ? (id.id != null ? id.id : id.cardId) : id)).filter(Boolean);
+  const origSize = (c) => c.size || 0;
+  // ---- damage ----
+  const prevAD5 = core.applyDamage;
+  core.applyDamage = function (side, n, src) {
+    try {
+      if (n > 0 && !B.matchOver) {
+        const f = F(side), isEff = !!(src && src.kind === "effect"), esrc = isEff ? ((src && src.sourceSide) || ABX.curEffectSide || null) : null;
+        const ecard = (src && src.card) || (isEff ? ABX.curEffectCard : null) || null;
+        const foe = F(otherSide(side));
+        if (isEff && esrc === otherSide(side) && fieldHas(foe, 5875)) { src = Object.assign({}, src, { unreducible: true }); }   // #5875: damage the opponent takes by your cards cannot be reduced
+        if (isEff && esrc === otherSide(side) && ecard && hasTribe(ecard, "Excelblade") && fieldHas(foe, 6446)) n += 1;                       // #6446
+        const unred = !!(src && src.unreducible);
+        const byOppEff = isEff && esrc === otherSide(side);
+        if (isEff && fieldUnitOf(f, 3480) && posOfU(f, fieldUnitOf(f, 3480)) === "center") return 0;                           // #3480
+        if (byOppEff && ecard && ecard.type === "Monster" && (fieldHas(f, 4859) || fieldHas(f, 5385))) return 0;                // #4859 / #5385
+        if (!unred) {
+          if (byOppEff && fieldHas(f, 3186)) n -= 1;                                                                           // #3186
+          if (isEff) { const dr = fieldUnitOf(f, 5722) || [f.item, f.item2].find(it => it && it.card.id === 5722); if (dr) { const names = new Set(); monsList(f).forEach(u => { if (hasTribe(u.card, "Dragod")) names.add(u.card.name); }); n -= names.size; } }   // #5722
+          if (!(src && src.kind === "attack") && [f.item, f.item2].some(it => it && it.card.id === 5838 && it.abxNullified !== B.turnCount)) n -= 1;                  // #5838
+          if (n > 0) {
+            for (const [id, pay, cut] of [[343, 2, 2], [4971, 1, 5]]) {
+              const holder = id === 343 ? [f.item, f.item2].find(it => it && it.card.id === id && it.abxNullified !== B.turnCount) : fieldUnitOf(f, id);
+              if (!holder || f.gauge.length < pay) continue;
+              const ok = (ABX.autoPlay || side !== "plr" || typeof root.confirm !== "function") ? true : !!root.confirm(`${holder.card.name}: pay ${pay} gauge to reduce the damage by ${cut}?`);
+              if (!ok) continue;
+              for (let k = 0; k < pay; k++) f.drop.push(f.gauge.pop());
+              n -= cut; break;
+            }
+          }
+          if (n <= 0) return 0;
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return prevAD5.call(this, side, n, src);
+  };
+  // ---- stats ----
+  const prevSB5 = ABX.staticBonus;
+  const stat5 = (fighter, unit, sb) => {
+    const id = unit.card.id, side = sideOfF(fighter), foe = F(otherSide(side)), dropCards = fighter.drop.map(core.cardOf).filter(Boolean);
+    if (id === 1124) { const sum = (unit.soul || []).map(core.cardOf).filter(c => c && hasTribe(c, "Weapon")).reduce((a, c) => a + (c.crit || 1), 0); sb.crit += sum - (unit.card.crit || 1); if ((unit.soul || []).length >= 3) sb.pen = true; }
+    if (id === 2040 && monsList(fighter).some(u => hasTribe(u.card, "Neodragon") && (u.soul || []).length >= 1)) sb.power += 3000;
+    if (id === 2369) { const w = equippedItems(fighter).filter(u => hasTribe(u.card, "Weapon")).map(u => u.card.crit || 1); if (w.length) sb.crit += Math.max(...w) - (unit.card.crit || 1); }
+    if (id === 2382 && (monsList(fighter).some(u => (u.soul || []).length) || fighter.drop.length === 0)) sb.crit += 1;
+    if (id === 2755 && dropCards.every(c => c.type === "Monster" && origSize(c) <= 1)) { sb.power += 3000; sb.defense += 3000; sb.crit += 2; }
+    if (id === 4433 && (unit.soul || []).some(sid => { const c = core.cardOf(sid); return c && hasTribe(c, "Weaponry"); })) { sb.power += 3000; sb.defense += 3000; sb.crit += 1; }
+    if (id === 4887 && monsCount(fighter) === 1) { sb.power += 2000; sb.defense += 2000; sb.crit += 1; }
+    if (id === 5470 && monsCount(fighter) === 1) { sb.power += 8000; sb.crit += 3; }
+    if (id === 6243 && fighter.deck.length <= 10) sb.crit += 2;
+    if (id === 5870) { const names = new Set((unit.soul || []).map(core.cardOf).filter(c => c && hasTribe(c, "AssistWeapon")).map(c => c.name)); if (names.size >= 4) { sb.pen = true; sb.qa = true; } }
+    // sources on the same field that boost others
+    const centerU = fighter.monsters.center;
+    if (centerU === unit && fieldHas(fighter, 3205) && dropCards.filter(c => hasTribe(c, "Fairy") || hasTribe(c, "DemonLord")).length >= 7) sb.crit += 2;
+    if (onFieldU(fighter, unit)) { const k4508 = fieldHas(fighter, 4508) ? equippedItems(fighter).length : 0; if (k4508) sb.power += 2000 * k4508; }
+    // opponent-side effects on this unit: #5507 (two+ different Idol: all opponent cards power-5000, crit-2), #3945 (crit-1)
+    if (onFieldU(fighter, unit)) {
+      const o5507 = fieldUnitOf(foe, 5507);
+      if (o5507) { const names = new Set(); monsList(foe).forEach(u => { if (hasTribe(u.card, "Idol")) names.add(u.card.name); }); if (names.size >= 2) { sb.power -= 5000; sb.crit -= 2; } }
+      if (fieldUnitOf(foe, 3945) && ["left", "right"].some(p => foe.monsters[p]) && !foe.monsters.center) sb.crit -= 1;
+    }
+  };
+  ABX.staticBonus = function (fighter, unit) {
+    const sb = prevSB5.apply(this, arguments);
+    try { if (unit && unit.card && sb && unit.abxNullified !== B.turnCount) stat5(fighter, unit, sb); } catch (e) { /* ignore */ }
+    return sb;
+  };
+  // ---- sizes ----
+  const prevSD5 = ABX.sizeDelta;
+  ABX.sizeDelta = function (fighter, card, unit) {
+    let d = prevSD5.apply(this, arguments);
+    try {
+      if (!card || !unit || unit.abxNullified === B.turnCount || !["left", "center", "right", "center2"].some(p => fighter.monsters[p] === unit)) return d;
+      const pos = posOfU(fighter, unit), osz = origSize(card);
+      const src = (id) => fieldUnitOf(fighter, id);
+      if (hasTribe(card, "SkullWarrior") && osz === 1 && src(2218)) d -= 1;
+      if (osz <= 2 && hasTribe(card, "Star") && (pos === "left" || pos === "right") && src(2307) && posOfU(fighter, src(2307)) === "center") d -= osz;
+      if (osz <= 2 && hasTribe(card, "Star") && src(2314) === null && fighter.item && false) d += 0;
+      if (osz <= 2 && hasTribe(card, "Star") && equippedItems(fighter).some(u => u.card.id === 2314 && u.abxNullified !== B.turnCount) && monsList(fighter).some(u => /zodiac/i.test(u.card.name || ""))) d -= osz;
+      if (card.id === 2443 && fighter.buddyId) { const bc = core.cardOf(fighter.buddyId); if (bc && hasTribe(bc, "Star")) d -= 1; }
+      if (pos === "center" && (hasTribe(card, "SkullWarrior") || hasTribe(card, "Water")) && ["left", "right"].some(p => fighter.monsters[p] && fighter.monsters[p].card.id === 3605 && fighter.monsters[p].abxNullified !== B.turnCount)) d -= 2;
+      if (card.id === 4508 && equippedItems(fighter).length) d -= equippedItems(fighter).length;
+      if (card.id === 5310 && pos === "center" && ["left", "right"].some(p => fighter.monsters[p] && (hasTribe(fighter.monsters[p].card, "Police") || /detective/i.test((fighter.monsters[p].card.attrs || []).join(" "))))) d -= 2;
+      if (hasTribe(card, "WesternYokai") && card.id !== 5836 && !/backbeard/i.test(card.name || "") && src(5836)) d -= 1;
+      if (osz <= 2 && hasTribe(card, "Godpunk") && equippedItems(fighter).some(u => u.card.id === 6379 && u.abxNullified !== B.turnCount)) d -= 2;
+    } catch (e) { /* ignore */ }
+    return d;
+  };
+  // ---- restrictions on the opponent ----
+  const OPP_NORETURN = [1436, 2112, 3311];
+  const prevProt6 = core.isProtected;
+  core.isProtected = function (unit, side, kind, ctx) {
+    if (prevProt6.apply(this, arguments)) return true;
+    try {
+      if (!unit || !unit.card) return false;
+      const foe = F(otherSide(side));
+      if (KRET(kind) && unit.card.type === "Monster" && OPP_NORETURN.some(id => fieldHas(foe, id)) && monsList(F(side)).includes(unit)) return true;     // opponent monsters cannot return to hand
+      if (kind === "souls dropped" && false) return false;
+      if ((KD(kind) || KRET(kind)) && fieldHas(F(side), 4887) && monsCount(F(side)) === 1 && ctx && ctx.side && ctx.side !== side && onFieldU(F(side), unit)) return true;   // #4887
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  OV42.push([1436, /all monsters on your opponent's field cannot \[move\]/i, () => ({ kind: "static", conds: [], steps: [{ op: "static", kind: "oppNoMove" }] })]);
+  OV42.push([2112, /all monsters on your opponent's field cannot \[move\]/i, () => ({ kind: "static", conds: [], steps: [{ op: "static", kind: "oppNoMove" }] })]);
+  OV42.push([3311, /all monsters on your opponent's field cannot \[move\]/i, () => ({ kind: "static", conds: [], steps: [{ op: "static", kind: "oppNoMove" }] })]);
+  OV42.push([2684, /you may not call monsters to the center/i, () => ({ kind: "static", conds: [], steps: [{ op: "static", kind: "noCallPos", pos: "center" }] })]);
+  core.attackBlocked = function (attSide, units, defSide, targetPos) {
+    try {
+      const df = F(defSide);
+      const tgt = ["left", "center", "right"].includes(targetPos) ? df.monsters[targetPos] : null;
+      if (tgt && units.length > 1 && tgt.card.id === 335 && tgt.abxNullified !== B.turnCount) return `"${tgt.card.name}" cannot be link attacked`;   // #335
+      if ((targetPos === "left" || targetPos === "right") && fieldHas(df, 3945) && ["left", "right"].some(p => df.monsters[p]) && !df.monsters.center) return `"Magnetism Ninja, Magnetic Tojiro" blocks attacks on the left or right`;
+      if (units.some(u => u && u.card && u.card.id === 5461) && !core.fieldUnits(F(attSide), true).some(x => x.unit && /kirari moroboshi/i.test(x.unit.card.name || ""))) return `"${units.find(u => u.card.id === 5461).card.name}" cannot attack while [Kirari Moroboshi] is not on your field`;   // #5461
+    } catch (e) { /* ignore */ }
+    return null;
+  };
+  core.castBlock = function (fighter, card) {
+    try {
+      if (card && card.type === "Impact" && !isImpactC(card) && [B.plr, B.opp].some(fx => fx && fieldHas(fx, 6260))) return `"Babbyblu" prevents casting impacts from the hand`;   // #6260
+    } catch (e) { /* ignore */ }
+    return null;
+  };
+  // no-[Counter] battles
+  const prevNC2 = ABX.noCounterThisBattle;
+  ABX.noCounterThisBattle = function (attSide, units, targetPos) {
+    if (prevNC2 && prevNC2.apply(this, arguments)) return true;
+    try {
+      const f = F(attSide), us = (units || []).map(x => (x && x.unit) || x).filter(Boolean), alone = us.length === 1, u = us[0];
+      if (alone && u.abxNullified !== B.turnCount) {
+        if ((u.card.id === 3530 || u.card.id === 6243)) return true;
+        if (u.card.id === 3946 && monsList(f).filter(m => hasTribe(m.card, "Hero")).length >= 4) return true;
+      }
+      if (targetPos === "center" && us.some(m => /yuka nakano/i.test(m.card.name || "")) && fieldHas(f, 5468)) return true;
+      if (targetPos !== "fighter" && us.some(m => m.card.id === 5870 && new Set((m.soul || []).map(core.cardOf).filter(c => c && hasTribe(c, "AssistWeapon")).map(c => c.name)).size >= 4)) return true;
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  // #5012: your opponent cannot draw cards by monster effects
+  if (OPS.draw && OPS.draw.run) {
+    const drawPrev5 = OPS.draw.run;
+    OPS.draw.run = function (s, ctx) {
+      try { if (ctx && ctx.card && ctx.card.type === "Monster" && fieldHas(F(otherSide(s.who === "opp" ? otherSide(ctx.side) : ctx.side)), 5012) && (s.who === "opp" ? otherSide(ctx.side) : ctx.side) !== ctx.side) return false; } catch (e) { /* ignore */ }
+      return drawPrev5.apply(this, arguments);
+    };
+  }
+  // #3945: attacks on the left/right blocked by the opponent's Magnetic Tojiro (the generic attacker-side hook has no defender, so the game.js gate uses core.attackBlocked)
+  // replacements ("would leave your field, you may put this card ... that card remains")
+  OV42.push([3235, /if another .wydar sarkal. or .disaster. would leave your field/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP("a «Wydar Sarkal» or «Disaster» on your field"), byOpp: false }, conds: [], steps: SAVE_STEPS() })]);
+  OV42.push([4062, /if a card with .sword of the king. in its card name other than/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP('a card with "Sword of the King" in its card name on your field'), byOpp: false }, conds: [], steps: SAVE_STEPS() })]);
+  OV42.push([4194, /if a .toilet. would leave your field by your opponent's card effects/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP("a «Toilet» on your field"), byOpp: true }, conds: [], steps: SAVE_STEPS() })]);
+  OV42.push([5561, /if an originally size 3 .evil demonic dragon. would leave your field/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP("an originally size 3 «Evil Demonic Dragon» on your field"), byOpp: false }, conds: [], steps: SAVE_STEPS() })]);
 })(typeof window !== "undefined" ? window : globalThis);
