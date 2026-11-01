@@ -1490,17 +1490,37 @@
     return { hand: f.hand.slice(), drop: f.drop.slice(), deck: f.deck.slice(), gauge: f.gauge.length,
       field: core.fieldUnits(f, true).filter(x => x.unit).map(x => x.unit.card.id).concat((f.setSpells || []).filter(Boolean).map(c => c.id)) };
   };
+  const unitsOf = (data) => (data.units || []).filter(Boolean);
+  const anyFieldMatch = (side, filter) => core.fieldUnits(F(side), true).some(x => x.unit && x.unit.abxNullified !== B.turnCount && core.matchFilter(x.unit.card, filter || {}, { unit: x.unit, side }, { f: F(side) }));
+  function matchEv(t, src, side, data) {
+    const own = t.owner || "you", rel = data.owner ? (data.owner === side ? "you" : "opp") : null;
+    if (src.host && !t.hostIn) return false;
+    if (!src.host && t.hostIn) return false;
+    if (rel && own !== "any" && own !== rel) return false;
+    if (t.turn === "you" && B.activeSide !== side) return false;
+    if (t.turn === "opp" && B.activeSide === side) return false;
+    if (t.by === "you" && data.actor !== side) return false;
+    if (t.by === "attack" && !data.byAttack) return false;
+    if (t.by === "effect" && data.byAttack) return false;
+    if (t.by === "yourEffect" && (data.byAttack || data.actor !== side)) return false;
+    if (t.by === "oppEffect" && (data.byAttack || !data.actor || data.actor === side)) return false;
+    if (t.effect && !data.byEffect) return false;
+    if (t.np && !(t.orSelf && unitsOf(data).includes(src.unit)) && !(data.cards || []).some(c => c && core.matchFilter(c, t.np.filter || {}, null, { f: F(side) }))) return false;
+    if (t.attacker && !(data.attackers || []).some(u => u && u.card && core.matchFilter(u.card, t.attacker.filter || {}, { unit: u, side }, { f: F(side) }))) return false;
+    if (t.link && !data.link) return false;
+    if (t.alone && unitsOf(data).length !== 1) return false;
+    if (t.selfOnly && !unitsOf(data).includes(src.unit)) return false;
+    if (t.selfPos && !(src.unit && F(side).monsters[t.selfPos] === src.unit)) return false;
+    if (t.defender === "you" && !(data.defSide === side && data.defUnit)) return false;
+    if (t.hostIn && !(src.host && unitsOf(data).includes(src.host) && (!t.hostNp || core.matchFilter(src.host.card, t.hostNp.filter || {}, { unit: src.host, side }, { f: F(side) })))) return false;
+    if (t.need && !anyFieldMatch(side, t.need.filter)) return false;
+    if (t.needPos && !(F(side).monsters[t.needPos.pos] && core.matchFilter(F(side).monsters[t.needPos.pos].card, t.needPos.filter || {}, null, { f: F(side) }))) return false;
+    if (t.minDifferent) { const names = new Set(); core.fieldUnits(F(side), true).forEach(x => { if (x.unit && core.matchFilter(x.unit.card, t.minDifferent.filter, null, { f: F(side) })) names.add(x.unit.card.name); }); if (names.size < t.minDifferent.n) return false; }
+    return true;
+  }
   async function fire42(ev, data) {
     for (const side of ["plr", "opp"]) {
-      const rel = data.owner === side ? "you" : "opp";
-      await fireNew(side, ev, (t) => {
-        if ((t.owner || "you") !== "any" && (t.owner || "you") !== rel) return false;
-        if (t.by === "you" && data.actor !== side) return false;
-        if (t.turn === "you" && B.activeSide !== side) return false;
-        if (t.turn === "opp" && B.activeSide === side) return false;
-        if (t.np && !(data.cards || []).some(c => c && core.matchFilter(c, t.np.filter || {}, null, { f: F(side) }))) return false;
-        return true;
-      }, fieldSources(side));
+      await fireNew(side, ev, (t, src) => matchEv(t, src, side, data), fieldSources(side).concat(soulSources(side)));
       if (B.matchOver) return;
     }
   }
@@ -1553,4 +1573,79 @@
   // opponent gauge
   TG(1397, "when a card is put into your opponent's gauge", { event: "gaugeUp", owner: "opp" }, "deal 1 damage to your opponent", { once: "turn" });
   TG(5102, "when a card is put into your opponent's gauge by card effects", { event: "gaugeUp", owner: "opp", by: "you", turn: "you" }, "you gain 2 life, and draw a card", { once: "turn" });
+
+  /* ---- [r42] wave B: destroyed / damage taken / attacks (events cardDestroyed, damageTaken, cardAttacks) ---- */
+  Object.assign(ABX.TRIG_OK, { cardDestroyed: () => true, damageTaken: () => true, cardAttacks: () => true });
+  const prevFOD = ABX.fireOtherDestroyed;
+  ABX.fireOtherDestroyed = function (side, card, unit, pos) {
+    const r = prevFOD.apply(this, arguments);
+    try {
+      const data = { owner: side, cards: [card], units: [unit], actor: (unit && unit.abxDestroyedBy) || null, byAttack: !!B._destroyByAttack, attackers: (B._attackersNow || []).slice() };
+      ABX.queue(() => fire42("cardDestroyed", data));
+    } catch (e) { /* ignore */ }
+    return r;
+  };
+  const prevAD4 = core.applyDamage;
+  core.applyDamage = function (side, n, src) {
+    const dealt = prevAD4.apply(this, arguments);
+    try {
+      if (dealt > 0) {
+        const byEffect = !!(src && src.kind === "effect");
+        const data = { owner: side, cards: [], byEffect, actor: byEffect ? ((src && src.sourceSide) || ABX.curEffectSide || null) : null, amount: dealt };
+        ABX.queue(() => fire42("damageTaken", data));
+      }
+    } catch (e) { /* ignore */ }
+    return dealt;
+  };
+  const prevFA = ABX.fireAttack;
+  ABX.fireAttack = function (attSide, units, defSide, targetPos) {
+    const r = prevFA.apply(this, arguments);
+    try {
+      const us = (units || []).map(x => (x && x.unit) || x).filter(Boolean);
+      const data = { owner: attSide, units: us, attackers: us, cards: us.map(u => u.card), link: us.length > 1, defSide, defUnit: ["left", "center", "right"].includes(targetPos) ? F(defSide).monsters[targetPos] : null, actor: attSide };
+      ABX.queue(() => fire42("cardAttacks", data));
+    } catch (e) { /* ignore */ }
+    return r;
+  };
+  OPS.r42DamageOwnCrit = { run(s, ctx) {
+    const u = ctx.unit; if (!u) return false;
+    const st = root.getUnitEffectiveCombatStats ? root.getUnitEffectiveCombatStats(ctx.f, u) : { crit: u.card.crit || 1 };
+    const dealt = core.applyDamage(otherSide(ctx.side), st.crit || 1, { kind: "effect", sourceSide: ctx.side, card: ctx.card });
+    try { B.checkWinCondition(); } catch (e) { /* ignore */ }
+    return dealt > 0;
+  } };
+  const NPT = (t) => ({ get filter() { return ABX.parseNP(t).filter; } });
+  // destroyed
+  TG(213, "when an opponent's monster is destroyed by an attack of your adventurer", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT("an Adventurer") }, "put the top card of your deck into this card's soul");
+  TG(215, "when your adventurer is destroyed by an attack", { event: "cardDestroyed", owner: "you", by: "attack", np: NPT("an Adventurer") }, "put up to two Adventurer from your drop zone into your hand. Then, put this card into the drop zone");
+  TG(756, "when a monster with", { event: "cardDestroyed", owner: "you", by: "effect", np: NPT('a monster with "Purgatory Knights" in its card name') }, "put the top card of your deck into your gauge");
+  TG(1305, "during your turn, when your opponent's monster is destroyed", { event: "cardDestroyed", owner: "opp", turn: "you" }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(1420, "when your card destroys your opponent's monster", { event: "cardDestroyed", owner: "opp", by: "you" }, "put the top card of your deck into this card's soul");
+  TG(2605, "when a «superhero» on your field destroys a card on your opponent's field", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT("a «Superhero»") }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(2951, "during your opponent's turn, when a", { event: "cardDestroyed", owner: "you", turn: "opp", np: NPT("a «Prism Dragon»") }, "you gain 1 life");
+  TG(3246, "when a monster on your opponent's field is destroyed by an attack of your black dragon or demon lord", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT("a «Black Dragon» or «Demon Lord»") }, "put a card from your opponent's gauge into the drop zone and deal 1 damage to your opponent", { once: "turn" });
+  TG(3688, "when a card on your field is destroyed by your card effects", { event: "cardDestroyed", owner: "you", by: "yourEffect" }, "[Stand] this card", { once: "turn" });
+  TG(4045, "when a «duel golem» on your field is destroyed by card effects", { event: "cardDestroyed", owner: "you", by: "effect", np: NPT("a «Duel Golem»") }, "you gain 1 life");
+  TG(4197, "when an «evil deity dragon» on your field destroys your opponent's card", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT("an «Evil Deity Dragon»") }, "put the top card of your deck into your gauge, draw a card, and deal 1 damage to your opponent", { once: "turn" });
+  TG(4205, "when a card with", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT('a card with "Masked Vantage" in its card name') }, "[Stand] a «Superhero» on your field");
+  TG(5314, "when an", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT("an «FBI»") }, "put the top card of your deck into your gauge, you gain 1 life and draw a card", { once: "turn" });
+  TG(5625, "when your opponent's character is destroyed", { event: "cardDestroyed", owner: "opp" }, "draw a card", { once: "turn" });
+  TG(6112, "when your cards destroy your opponent's characters", { event: "cardDestroyed", owner: "opp", by: "you" }, "you may drop a soul from this card");
+  TG(6560, "when your opponent's monster is destroyed", { event: "cardDestroyed", owner: "opp" }, "drop up to the top two cards of your opponent's deck, and deal 1 damage to your opponent");
+  // damage dealt / taken
+  TG(5634, "when an «idol» on your field deals damage to your opponent", { event: "dealsDamage", np: NPT("an «Idol»") }, "you gain 1 life");
+  OV42.push([5652, /when \[nagi hisakawa\] on your field deals damage to your opponent/i, () => ({ kind: "triggered", trigger: { event: "dealsDamage", np: NPT("[Nagi Hisakawa]") }, conds: [], steps: [{ op: "r42DamageOwnCrit" }] })]);
+  TG(3839, "when your opponent is dealt damage during their turn", { event: "damageTaken", owner: "opp", turn: "opp" }, "put the top card of your deck into your gauge, and draw a card", { once: "turn" });
+  TG(4143, "when your card effects deal damage to your opponent", { event: "damageTaken", owner: "opp", by: "you", effect: true, need: NPT('a monster with "Yamigedo" in its card name') }, "deal 1 damage to your opponent, and draw a card", { once: "turn" });
+  TG(6446, "when your opponent takes damage by your card effects", { event: "damageTaken", owner: "opp", by: "you", effect: true }, "you may put the top card of your deck into your gauge");
+  // attacks
+  TG(1169, "when an adventurer on your field link attacks", { event: "cardAttacks", owner: "you", link: true, np: NPT("an Adventurer") }, "put the top card of your deck face down into this card's soul", { once: "turn" });
+  TG(1236, "when a hero on your field link attacks", { event: "cardAttacks", owner: "you", link: true, np: NPT("a Hero") }, "draw a card", { once: "turn" });
+  TG(3209, "when a card on your field link attacks", { event: "cardAttacks", owner: "you", link: true }, "you gain 1 life, and deal 1 damage to your opponent", { once: "turn" });
+  TG(5672, "when a card on your opponent's field attacks alone", { event: "cardAttacks", owner: "opp", alone: true }, "deal 1 damage to your opponent");
+  TG(3484, "when a monster on your field is being attacked", { event: "cardAttacks", owner: "opp", defender: "you" }, "put the top two cards of your deck into the gauge", { once: "turn" });
+  TG(2961, "when your opponent attacks and you have a size 3", { event: "cardAttacks", owner: "opp", need: NPT("a size 3 «Raging Spirit»") }, "draw a card", { once: "turn" });
+  TG(5412, "when this card on the right attacks", { event: "cardAttacks", owner: "you", selfOnly: true, selfPos: "right", needPos: { pos: "center", filter: { tribes: ["Astrodragon"] } } }, "for this turn, this card gets [Triple Attack]");
+  TG(4177, "when a «weapon» with this card is in its soul attacks", { event: "cardAttacks", owner: "you", hostIn: true, hostNp: NPT("a «Weapon»") }, "you gain 1 life, and draw a card", { once: "turn" });
+  OV42.push([6270, /when this card or a \[gun-king\]/i, () => ({ kind: "triggered", trigger: { event: "cardAttacks", owner: "you", orSelf: true, np: NPT("a [Gun-King], [First Ace] or [Mayqueen]") }, conds: [], steps: ABX.parseSentenceSteps("deal 1 damage to your opponent", {}).steps })]);
 })(typeof window !== "undefined" ? window : globalThis);

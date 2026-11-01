@@ -227,3 +227,8 @@ Note: #2453 text is contradictory ("link attack ... attacking alone"); implement
 ## Wrong-trigger cards, wave A: zone-change events (r42, tests/wrong_trigger_a.js)
 New events (snapshot diff around the outermost ability run) + `TG()` table: deckToDrop #2849 #2902 #2960 #3968 #2624 #2659 #3425 #5038 #3964(deck->drop half only), fieldToHand #1889 #1892 #1916 #3251 #3267 #4500 #4752, handDiscard #2745 #3942, gaugeUp #1397 #5102.
 Not covered: #6499 (drop gauge until 2), #3964 "returned from drop zone into deck" half; events only detected for effect-driven moves (not game-rule moves).
+
+## Wrong-trigger cards, wave B: destroyed / damage taken / attacks (r42, tests/wrong_trigger_b.js)
+New events cardDestroyed, damageTaken, cardAttacks (wraps of fireOtherDestroyed, applyDamage, fireAttack) with owner/by/turn/np/attacker/link/alone/need filters, matched in `matchEv`.
+Fixed: #213(1st) #215 #756(1st) #1305 #1420(1st) #2605 #2951 #3246 #3688 #4045(life part; "draw if by opp effects" not done) #4197 #4205 #5314(destroy half) #5625 #6112(1st) #6560(1st), #5634 #5652 #3839 #4143 #6446, #1169(1st) #1236 #3209 #5672 #3484 #2961 #5412 #4177 #6270.
+Leftover wrong-trigger: #124 #176 #292 #311 #320 #321 #356 #403(death curse) #1144 #1169/#213/#1415/#1420 soul-count triggers, #1381 #1458 #1644 #1674 #1755 #1878 #1971 #1324 #1552 #5714 #6251 (Thunder Mine variants), #2148 #4132 #4970 #5954 (would-leave replacement), #2210 #2269 #4078 #2359 #2427 #2462.. etc (see audit).
