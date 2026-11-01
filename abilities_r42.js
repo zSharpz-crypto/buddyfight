@@ -1321,4 +1321,102 @@
     } catch (e) { /* ignore */ }
     return sb;
   };
+
+  /* ---- [r42] conditional / unparsed protections (dead r40Static text): #367 #403 #841 #983 #1258 #1271 #1676(items) #2213 #2733 #3046 #3254 #3283 #3619
+   *      #4156 #4690 #5158 #6107 #6315 #6360 #6430 #6477 #6482 #6503 #6504 #6509 #6532. One rule per card, evaluated for each source on the protected side. ---- */
+  const norm = (a) => lc(a).replace(/[^a-z0-9]/g, "");
+  const hasTribe = (c, n) => !!c && (c.attrs || []).some(a => norm(a) === norm(n));
+  const posOfU = (fighter, unit) => ["left", "center", "right", "center2"].find(p => fighter.monsters[p] === unit) || null;
+  const monsCount = (fighter) => ["left", "center", "right", "center2"].filter(p => fighter.monsters[p]).length;
+  const isItemU = (fighter, unit) => ["item", "item2", "item3", "item4"].some(k => fighter[k] === unit);
+  const onFieldU = (fighter, unit) => core.fieldUnits(fighter, true).some(x => x.unit === unit);
+  const oneOnOne = (fighter) => monsCount(fighter) === 1 && monsCount(F(otherSide(sideOfF(fighter)))) === 1;
+  const KD = (k) => k === "destroyed", KRET = (k) => k === "returned" || k === "returned to hand", KR = (k) => k === "rest" || k === "rested", KN = (k) => k === "nullified", KSD = (k) => k === "souls dropped";
+  const KLEAVE = (k) => KD(k) || KRET(k) || k === "leave the field" || k === "put to other areas";
+  // rule(E, S): E = { f, e, unit, kind, byOpp, byAtk, ctx }, S = { unit, card, host }; returns true when `E.unit` is protected from `E.kind`
+  const PROT42 = {
+    367: (E, S) => E.byAtk && KD(E.kind) && E.unit === S.unit && posOfU(E.f, S.unit) === "center" && ["left", "center", "right"].some(p => E.f.monsters[p] && E.f.monsters[p] !== S.unit && hasTribe(E.f.monsters[p].card, "Asgard")),
+    403: (E, S) => !E.byAtk && KD(E.kind) && E.unit === S.unit && !!(E.ctx && E.ctx.card && E.ctx.card.type === "Spell"),
+    841: (E, S) => (KD(E.kind) || KRET(E.kind)) && S.host && E.unit === S.host && hasTribe(S.host.card, "Weapon"),
+    983: (E, S) => !E.byAtk && KD(E.kind) && E.unit === S.unit && oneOnOne(E.f),
+    1258: (E, S) => E.byAtk && KD(E.kind) && E.unit === S.unit && ["center", "left"].includes(posOfU(E.f, S.unit)) && !!(E.f.monsters.right && hasTribe(E.f.monsters.right.card, "WydarSarkal")),
+    1676: (E, S) => E.byOpp && !E.byAtk && KD(E.kind) && isItemU(E.f, E.unit),
+    2213: (E, S) => E.byOpp && !E.byAtk && KD(E.kind) && E.unit === S.unit,
+    2733: (E, S) => E.byOpp && !E.byAtk && KD(E.kind) && S.host && E.unit === S.host && hasTribe(S.host.card, "DragonChiefEmperor") && !!(E.ctx && E.ctx.card && E.ctx.card.type === "Monster"),
+    3046: (E, S) => E.byOpp && ((KSD(E.kind) && E.unit === S.unit) || (KN(E.kind) && onFieldU(E.f, E.unit))),
+    3254: (E, S) => E.byOpp && KR(E.kind) && E.unit === S.unit && (S.unit.soul || []).length >= 3,
+    3283: (E, S) => E.byOpp && onFieldU(E.f, E.unit) && (KSD(E.kind) || ((KD(E.kind) || KRET(E.kind)) && (hasTribe(E.unit.card, "CrewTrooper") || hasTribe(E.unit.card, "Battleship")))),
+    3619: (E, S) => onFieldU(E.f, E.unit) && ((!E.byAtk && KD(E.kind)) || (E.byOpp && (KRET(E.kind) || KSD(E.kind)))),
+    4156: (E, S) => !E.byAtk && KD(E.kind) && E.unit === S.unit,
+    4690: (E, S) => E.byOpp && !E.byAtk && (((KD(E.kind) || KRET(E.kind)) && E.unit === S.unit) || (KR(E.kind) && hasTribe(E.unit.card, "Bladedancer") && onFieldU(E.f, E.unit))),
+    5158: (E, S) => E.unit === S.unit && (KN(E.kind) || (E.byOpp && KSD(E.kind))),
+    6107: (E, S) => E.byOpp && S.host && E.unit === S.host && /heathcliff/i.test(S.host.card.name || "") && (KD(E.kind) || KRET(E.kind) || KSD(E.kind)),
+    6315: (E, S) => E.byOpp && S.host && E.unit === S.host && /\[g\.boost\]/i.test(S.host.card.skill || "") && KSD(E.kind),
+    6360: (E, S) => E.byOpp && !E.byAtk && (E.unit === S.unit || (hasTribe(E.unit.card, "BlackDragon") && E.unit.card.type === "Monster" && onFieldU(E.f, E.unit))) && (KD(E.kind) || KRET(E.kind) || KN(E.kind)) &&
+      ["left", "center", "right", "center2"].some(p => E.f.monsters[p] && /spectral strike/i.test(E.f.monsters[p].card.name || "")),
+    6430: (E, S) => E.byOpp && !E.byAtk && E.unit === S.unit && KLEAVE(E.kind) && monsCount(E.f) === 1,
+    6477: (E, S) => E.unit === S.unit && ((E.byOpp && KN(E.kind)) || (E.byOpp && KSD(E.kind))),
+    6482: (E, S) => E.byOpp && !E.byAtk && (KD(E.kind) || KR(E.kind)) && onFieldU(E.f, E.unit) && E.f.drop.length >= 10,
+    6503: (E, S) => E.byOpp && !!S.host && hasTribe(S.host.card, "RagingSpirit") && hasTribe(E.unit.card, "RagingSpirit") && onFieldU(E.f, E.unit) && (KR(E.kind) || KN(E.kind) || KSD(E.kind)),
+    6504: (E, S) => E.byOpp && E.unit === S.unit && posOfU(E.f, S.unit) === "center" && (KR(E.kind) || KN(E.kind) || KSD(E.kind)),
+    6509: (E, S) => KD(E.kind) && E.unit.card.type === "Monster" && onFieldU(E.f, E.unit) && (E.f.hand.length === 0 || F(otherSide(sideOfF(E.f))).hand.length === 0),
+    6532: (E, S) => E.byOpp && !E.byAtk && KD(E.kind) && onFieldU(E.f, E.unit) && ((S.unit && posOfU(E.f, S.unit) === "center") || (S.host && hasTribe(S.host.card, "PrismDragon")))
+  };
+  const prot42 = (unit, side, kind, ctx, byAtk) => {
+    if (!unit || !unit.card) return false;
+    const f = F(side), e = F(otherSide(side));
+    const E = { f, e, unit, kind, byOpp: !!(byAtk || (ctx && ctx.side && ctx.side !== side)), byAtk: !!byAtk || !!(ctx && ctx.byAttack), ctx };
+    const srcs = [];
+    core.fieldUnits(f, true).forEach(x => { if (!x.unit) return; srcs.push({ unit: x.unit, card: x.unit.card, host: null }); (x.unit.soul || []).forEach(id => { const c = core.cardOf(id); if (c) srcs.push({ unit: null, card: c, host: x.unit }); }); });
+    (f.setSpells || []).forEach(c => srcs.push({ unit: null, card: c, host: null }));
+    for (const S of srcs) {
+      const rule = PROT42[S.card.id]; if (!rule) continue;
+      if ((S.unit && S.unit.abxNullified === B.turnCount) || (S.host && S.host.abxNullified === B.turnCount)) { if (S.card.id !== 5158 && S.card.id !== 6477) continue; }
+      try { if (rule(E, S)) return true; } catch (e2) { /* ignore */ }
+    }
+    return false;
+  };
+  const prevProt43 = core.isProtected;
+  core.isProtected = function (unit, side, kind, ctx) {
+    if (prevProt43.apply(this, arguments)) return true;
+    try { return prot42(unit, side, kind, ctx, false); } catch (e) { return false; }
+  };
+  // protections that also stop destruction by attacks (#367 #841 #1258 #1271 #3619 #6509 ...)
+  if (typeof B.destroyMonster === "function") {
+    const dmPrev42 = B.destroyMonster;
+    B.destroyMonster = function (side, pos) {
+      try {
+        const f = this.getFighter(side), u = f && f.monsters[pos];
+        if (u && this._destroyByAttack && prot42(u, side, "destroyed", { side: otherSide(side) }, true)) return false;
+      } catch (e) { /* ignore */ }
+      return dmPrev42.apply(this, arguments);
+    };
+  }
+  // stat parts of the same abilities: #983 (one-on-one +2000/+2000), #6430 (only one monster: +10000, crit +2), #6509 (crit +2), #6532 (all cards +5000/+5000)
+  const prevSB4 = ABX.staticBonus;
+  ABX.staticBonus = function (fighter, unit) {
+    const sb = prevSB4.apply(this, arguments);
+    try {
+      if (!unit || !unit.card || !sb || unit.abxNullified === B.turnCount) return sb;
+      const id = unit.card.id;
+      if (id === 983 && oneOnOne(fighter)) { sb.power += 2000; sb.defense += 2000; }
+      if (id === 6430 && monsCount(fighter) === 1) { sb.power += 10000; sb.crit += 2; }
+      if (id === 6509 && (fighter.hand.length === 0 || F(otherSide(sideOfF(fighter))).hand.length === 0)) sb.crit += 2;
+      if (onFieldU(fighter, unit) && core.fieldUnits(fighter, true).some(x => x.unit && x.unit.card.id === 6532 && x.unit.abxNullified !== B.turnCount &&
+        (posOfU(fighter, x.unit) === "center" || false))) { sb.power += 5000; sb.defense += 5000; }
+    } catch (e) { /* ignore */ }
+    return sb;
+  };
+  // #4156: you cannot be dealt damage by card effects; #6532: by your opponent's card effects
+  const prevAD3 = core.applyDamage;
+  core.applyDamage = function (side, n, src) {
+    try {
+      if (src && src.kind === "effect" && n > 0 && !src.unreducible) {
+        const f = F(side);
+        if (core.fieldUnits(f, true).some(x => x.unit && x.unit.card.id === 4156 && x.unit.abxNullified !== B.turnCount)) return 0;
+        if (core.fieldUnits(f, true).some(x => x.unit && x.unit.card.id === 6532 && x.unit.abxNullified !== B.turnCount && posOfU(f, x.unit) === "center") && src.sourceSide && src.sourceSide !== side) return 0;
+      }
+    } catch (e) { /* ignore */ }
+    return prevAD3.apply(this, arguments);
+  };
 })(typeof window !== "undefined" ? window : globalThis);

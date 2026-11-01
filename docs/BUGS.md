@@ -215,3 +215,7 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 Fixed: #2513 #3257 #6561 (cannot be destroyed/returned, impact-only calls, unlimited impact calls; #6561 no rest/nullify; #3257 Gemclone impact monsters protected), #6226 (all transformed cards protected), #4527 (opp can't rest, Penetrate), #4224/#6208 (opp can't [Counter] vs Superhero/Super Warrior attacks on monsters), #5199 (6 souls = win), #2160/#4499 (new `transformInto` event; Caardian bonuses; #4499 soul count kept in `f.r42Soul4499`), #4496 (Galaxy Exalt cost -1, souls undroppable by opp).
 Already worked: crit+3 with no opp monsters (#4224 #6208), #4527 mill 3, #6561 crit boost.
 Leftover: #6226 double Impact Transform / equip Super Warrior without Gemclone; #6208 "attack and destroy -> [Stand]" untested.
+
+## Conditional protections (r42 PROT42, tests/cond_protections.js)
+Fixed (rule table + destroyMonster wrap for attack destruction + stat/damage parts): #367 #403 #841 #983 #1258 #1271 #1676(items) #2213 #2733 #3046 #3254(rest) #3283 #3619 #4156 #4690 #5158 #6107 #6315 #6360 #6430 #6477 #6482 #6503 #6504 #6509 #6532.
+Leftover: "attack cannot be nullified if attacking alone" family (#349 #2453 #2462 #3065 #3234 #3254(attack part) #4234 #5646 #6245 #6252 #6351), #6274 ("event effects"), #3941 flag, #6532 stat bonus only when on center (not when in a Prism Dragon's soul), #6477 gained impact abilities.
