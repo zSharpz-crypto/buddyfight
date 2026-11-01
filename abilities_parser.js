@@ -817,7 +817,8 @@
   // --- attack permissions / restrictions (checked by the attack code) ---
   ar(/^(?:this card|it) can attack (?:your opponent |the opponent )?even if (?:there (?:is|are)|(?:your opponent|they|you) (?:has|have)) (.+)$/i, (m) => SDEF("attackThrough", { np: parseNP(m[1]), raw: m[1] }));
   ar(/^you can attack with this card even if (?:you have|there (?:is|are)) (.+)$/i, (m) => SDEF("attackThrough", { np: parseNP(m[1]), raw: m[1] }));
-  ar(/^this card can attack even if (?:you have|there (?:is|are)|an? |a ) ?(.+)$/i, (m) => SDEF("attackThrough", { np: parseNP(m[1]), raw: m[1] }));
+  ar(/^(?:this|his) card can attack even if (?:you have|there (?:is|are)|an? |a ) ?(.+)$/i, (m) => SDEF("attackThrough", { np: parseNP(m[1]), raw: m[1] }));   // "his card" is a typo on #4867
+  ar(/^this card can attack even if (characters?|monsters?) (?:is|are) on your center$/i, (m) => SDEF("attackThrough", { np: parseNP(m[1]), raw: "you have " + m[1] + " on your center" }));   // #5913 #6398
   ar(/^this card can attack during your final phase$/i, () => SDEF("attackInFinal"));
   ar(/^(?:this card|it) cannot attack(?: the)? (?:the )?(left|center) or (?:the )?(right|center)(?: with this card)?$|^you cannot attack the (left|center) or (right|center) with this card$/i, () => SDEF("noAttackPos", { pos: ["left", "right"] }));
   ar(/^this card cannot attack$/i, () => SDEF("cannotAttack"));

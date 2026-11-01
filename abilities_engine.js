@@ -1554,7 +1554,7 @@
         if (st.op !== "static" || st.kind !== "attackThrough") continue;
         if (st.cond && !(condExecutable(st.cond) && evalCond(st.cond, ctx))) continue;
         const raw = lc(st.raw || "");
-        const own = /\byour center\b|\byou have\b/.test(raw) && !/opponent/.test(raw);
+        const own = /\byour center\b|\byou have\b|\b(?:in|on) the center\b/.test(raw) && !/opponent/.test(raw);
         if ((which === "own") !== own) continue;
         if (!own) return true;
         const cm = f.monsters.center;
