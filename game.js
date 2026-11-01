@@ -1096,8 +1096,8 @@ function getMaxAllowedItems(fighter, incomingCard = null) {
   ].filter(Boolean);
   if (allSources.some(c => cardAllowsUnlimitedItems(c))) return 99;
   if (allSources.some(c => /equip up to three/i.test(c.skill || ""))) return 3;
-  if (allSources.some(c => cardAllowsMultiItems(c))) return 2;
-  return 1;
+  if (allSources.some(c => cardAllowsMultiItems(c))) return Math.max(2, fighter.abxItemCap || 0);
+  return Math.max(1, fighter.abxItemCap || 0);   // abxItemCap: set while an effect like #4195 "Equip up to two" resolves
 }
 function hasMultiItems(fighter, incomingCard = null) {
   return getMaxAllowedItems(fighter, incomingCard) >= 2;

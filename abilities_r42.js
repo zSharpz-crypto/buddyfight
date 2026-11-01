@@ -338,6 +338,12 @@
       return true;
     }, check: () => true
   };
+  // #99 Champion Wrestler Asmodai: "you may discard as many cards as you like from your hand. If you do, destroy cards on your opponent's field equal to the number discarded."
+  // The parse kept only the discard; the "if you do, destroy" half was lost.
+  OV42.push([99, /discard as many cards as you like from your hand/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [
+    { op: "r40StructuredExec", text: "you may discard as many cards as you like from your hand." },
+    { op: "destroy", gate: "ifYouDo", np: Object.assign(np({ types: [] }, "field", null, "opp"), { qty: { n: 1, upTo: true, all: false, any: false, each: false, fromLast: true } }) }
+  ] })]);
   OV42.push([6526, /when this card is destroyed, put this card into the soul/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true, destroyedOnly: true }, conds: [], steps: [{ op: "r42AziRebDestroy" }] })]);
   // #1541 Darkness Final Mission Card "World End" ([Set] impact): "When your Demon Lord on your field attacks, put the top card of your deck face down into this card's soul."
   // It used to parse as a one-shot on cast; now it is an attack trigger of the set card (fires from the set zone, see ABX.fireAttack otherAttack).

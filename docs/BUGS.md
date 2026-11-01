@@ -7,16 +7,16 @@
 
 ## Reported by you
 - [x] B1 "Come to hand at end of turn" abilities do not fire. Commit bbe5aca says it fixed endTurn return-to-hand: first write a headless test; if it already passes, just tick it. -> Verified fixed by bbe5aca; regression test tests/b1_eot_hand.js (#5185, #2645 own+opp turn, #6036) passes.
-- [ ] B2 Counter skills/abilities cannot be used on the opponent's turn. Not tested yet. Test style: tests/counter.js. Engine: abilities_engine.js (counter / defense options).
+- [x] B2 Counter skills/abilities on the opponent's turn: verified working (tests/counter.js 208/208, counter_free, counter_cond, hotseat_counter, counter_timing, counter_state pass; see the [Counter] section below). Test style: tests/counter.js. Engine: abilities_engine.js (counter / defense options).
 - [x] B3 During a fight a player cannot open a card's skill banner to read its skill when it is not their turn. -> Fixed in game.js: `onHandCardClick` / `onZoneClick` no longer bail out when `isLocalTurn()` is false (bot / online friend / match over); they open the banner read-only, and `openCardBanner` only builds hand/field action buttons on a local turn (a bot's own units used to show Attack/Act buttons). Test: tests/b3_inspect.js.
 
 ## Failing tests found by audit (all also fail on older code, so not new regressions)
 The test already exists. Check the test's expectation against the real card text first (query the card with node, never open cards_data.js), then fix the code or the test.
-- [ ] T1 tests/round20.js - opponent's "drop a soul" skips 6214 but still hits a normal monster
-- [ ] T2 tests/round22.js - #99 Champion Wrestler Asmodai discards hand and destroys opponent cards
-- [ ] T3 tests/round39.js - #4195 One Who Leads equips two Hero items from drop zone into item and item2
-- [ ] T4 tests/round5.js - "first destruction prevented, +1 life" (1 of 26 fails)
-- [ ] T5 tests/vanity_end.js - 4b: opponent's effect cannot drop its souls (35 -> 34)
+- [x] T1 tests/round20.js - opponent's "drop a soul" skips 6214 but still hits a normal monster -> passes now (checked 2026-11-01)
+- [x] T2 tests/round22.js - #99 Champion Wrestler Asmodai discards hand and destroys opponent cards -> #99 Asmodai: the 'if you do, destroy cards equal to the number discarded' half was lost in parsing; override in abilities_r42.js
+- [x] T3 tests/round39.js - #4195 One Who Leads equips two Hero items from drop zone into item and item2 -> #4195: 'Equip up to two' now lifts the one-item cap while it resolves (f.abxItemCap in game.js getMaxAllowedItems, abilities_r39.js)
+- [x] T4 tests/round5.js - "first destruction prevented, +1 life" (1 of 26 fails) -> r40 saveOnce override dropped 'you gain N life' / [Counterattack]; now kept (abxSaveLife in abilities_r40.js)
+- [x] T5 tests/vanity_end.js - 4b: opponent's effect cannot drop its souls (35 -> 34) -> passes now (checked 2026-11-01)
 
 ## Suspects from the crash sweep (card count changed during the ability; may be legitimate)
 - [ ] S1 #4943, #5760, #2019, #867, #4569, #4997, #6363 - compare what each does with its card text

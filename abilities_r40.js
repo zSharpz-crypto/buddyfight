@@ -78,7 +78,18 @@
 
   OPS.saveOnce = {
     run(s, ctx) {
-      return OPS.preventLeave.run(s, ctx);
+      const ok = OPS.preventLeave.run(s, ctx);
+      // "you gain N life" / "give it [Counterattack]" riders of the save (kept in s.life / s.kw by the parser)
+      if (ok && (s.life || s.kw)) {
+        const targets = (ctx.bind && ctx.bind.chosen && ctx.bind.chosen.length)
+          ? ctx.bind.chosen.map(r => r.unit).filter(Boolean)
+          : (ctx.unit ? [ctx.unit] : []);
+        targets.forEach(u => {
+          if (s.life) u.abxSaveLife = { turn: B.turnCount, life: s.life, side: ctx.side };
+          if (s.kw === "counterattack") u.tempCA = true;
+        });
+      }
+      return ok;
     },
     check: () => true
   };
@@ -173,6 +184,8 @@
       if (_origWLS40.apply(this, arguments)) return true;
       if (unit && unit.abxSaveOnceTurn === B.turnCount && unit.abxCannotRemainTurn !== B.turnCount) {
         unit.abxSaveOnceTurn = 0;
+        if (unit.abxSaveLife && unit.abxSaveLife.turn === B.turnCount) { F(unit.abxSaveLife.side || side).life += unit.abxSaveLife.life; }
+        unit.abxSaveLife = null;
         return true;
       }
       return false;

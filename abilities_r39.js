@@ -659,10 +659,13 @@
       if (!ABX.equipFrom) return false;
       const heroItems = f.drop.map(id => cardOf(id)).filter(c => c && c.type === "Item" && hasAttr(c, "Hero"));
       let equipped = 0;
-      for (const itemCard of heroItems) {
-        if (equipped >= 2) break;
-        if (ABX.equipFrom(ctx.side, "drop", itemCard.id, false)) equipped++;
-      }
+      f.abxItemCap = 2;   // "Equip up to two" lets both items sit in the item slots even without a multi-item rule
+      try {
+        for (const itemCard of heroItems) {
+          if (equipped >= 2) break;
+          if (ABX.equipFrom(ctx.side, "drop", itemCard.id, false)) equipped++;
+        }
+      } finally { delete f.abxItemCap; }
       fresh();
       return equipped > 0;
     },
