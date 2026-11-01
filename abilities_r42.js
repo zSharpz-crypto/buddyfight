@@ -595,7 +595,7 @@
         const throne = (f.setSpells || []).find(c => c.id === 941 && (c.soul || []).some(x => Number(x && typeof x === "object" ? x.id : x) === 6526));
         if (throne) {
           u.abxRebTurn = B.turnCount;
-          u.abxAttackAllOpp = B.turnCount;
+          u.abxAttackAllOpp = B.turnCount; u.abxAttackAllFighter = true;
           u.tempPower = (u.tempPower || 0) + 10000;
           if (!u.tempTA) { u.tempTA = true; u.attacksLeft = (u.attacksLeft || 0) + 2; }
         }

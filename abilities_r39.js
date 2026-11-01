@@ -805,9 +805,9 @@
   OPS.r39GeilEnter4943 = {
     async run(s, ctx) {
       if (countOppUnderFlag(ctx.side) < 1) return false;
-      const es = otherSide(ctx.side);
-      const mons = core.fieldUnits(es, false).filter(r => !core.isProtected(r.unit, es, "destroyed", ctx));
-      if (mons.length > 0) B.destroyMonster(es, mons[0].pos);
+      // "destroy a card on your opponent's field": any card (monster, item, [Set] card), chosen by the player
+      const step = { op: "destroy", np: { raw: "a card on your opponent's field", qty: { n: 1, upTo: false, all: false, any: false, each: false }, ref: null, self: false, filter: { types: [] }, zone: { owner: "opp", area: "field" }, excludeSelf: false, topN: null, soulOf: null } };
+      await OPS.destroy.run(step, ctx);
       fresh();
       return true;
     },
@@ -818,6 +818,11 @@
     async run(s, ctx) {
       const f = ctx.f;
       if (f.life <= 1) return false;
+      // "you may pay 1 life": a real choice
+      if (!auto(ctx.side) && ABX.ui && ABX.ui.confirm) {
+        const yes = await ABX.ui.confirm({ title: `${ctx.card.name} - use effect?`, text: "You may: pay 1 life. If you do, put the top card of your opponent's deck face up under their flag, and return this card to hand.", card: ctx.card, yes: "Yes", no: "No / Skip" });
+        if (!yes) return false;
+      }
       f.life -= 1;
       putTopOppDeckUnderFlag(ctx.side, 1);
       const di = f.drop.lastIndexOf(4943);

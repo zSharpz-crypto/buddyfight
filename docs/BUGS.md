@@ -19,11 +19,11 @@ The test already exists. Check the test's expectation against the real card text
 - [x] T5 tests/vanity_end.js - 4b: opponent's effect cannot drop its souls (35 -> 34) -> passes now (checked 2026-11-01)
 
 ## Suspects from the crash sweep (card count changed during the ability; may be legitimate)
-- [ ] S1 #4943, #5760, #2019, #867, #4569, #4997, #6363 - compare what each does with its card text
+- [x] S1 (checked 2026-11-02, see 'S1 review' below) #4943, #5760, #2019, #867, #4569, #4997, #6363 - compare what each does with its card text
 
 ## Broken test scripts (not card bugs)
-- [ ] tests/modal_partial.js: TypeError reading 'options'
-- [ ] tests/would_destroy.js: does not finish within 35 s
+- [x] tests/modal_partial.js: was stale (#1604 now has its own r39 implementation); test updated
+- [x] tests/would_destroy.js: finishes in under 1 s now, passes
 - [ ] tests/smoke.js, tests/smoke11.js: need `playwright` (optional)
 
 ## Found by the 2026-10-29 audit (fixed)
@@ -178,3 +178,9 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [x] #3902 Jackknife: Overturn is now a response-window nullifier (pay a soul into the drop zone when the opponent uses a card on their turn). #5161 El Quixote: drop a Knight from hand, equip up to two Knight items from the deck (f.abxItemCap lifts the one-item cap while it resolves), shuffle.
 - [x] Timing windows now enforced: #3843 only in the defense window (counter-style act, cond underAttack), #4163 optional trigger when this card link attacks (opponent cannot [Counter], crit+2, infinite power until the battle ends), #3595 as a "would be destroyed" replacement (also saves itself; that monster cannot be destroyed again this turn), #3822 offered when its link attack is about to be nullified (the attack then goes through).
 - [x] #3629 pays its printed 1 gauge (the generic cost pass from 2026-11-01 covers it; test added).
+
+## S1 review (2026-11-02, tests: tests/attack_all.js, round40, round39)
+- #4943 Geil: "destroy a card on your opponent's field" auto-picked their first MONSTER; now any card, chosen by the player. "You may pay 1 life" was forced; now a real yes/no.
+- #5760 / #4569 Lost World ("Belost"): was usable on your own turn and without the card in hand, and always paid the 2 gauge; now only at the end of the OPPONENT's turn, with the card in hand, with a yes/no. tests/round40.js expected "draws 2" which is not on the card; fixed to 30 cards.
+- #2019 / #867 Azi Dahaka: when destroyed with no "Aqulta Gwaneff" in hand or deck it gave you a free copy of #2020 (test fallback left in the real code): removed. "Attacks all your opponent's monsters and your opponent instead" is now played by the battle engine (game.js executeAttackResolution, flag abxAttackAllOpp; also #6526's item, #5277 and the other attackAllOpp statics when armed); "when it deals damage, destroy all items" now happens on damage, not when the attack is declared.
+- #4997 Sentence of Curse and #6363 Curse Count: match their card text.

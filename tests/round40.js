@@ -64,7 +64,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     ABX.OPS.r40AziDahakaAttack867.run({}, { side: "plr", f: battle.plr, e: battle.opp, card: CARD_MAP.get(867), unit: battle.plr.monsters.center });
   }`);
   await wait(100);
-  ok(env.run(`battle.plr.monsters.center.attackAll === true && battle.opp.item === null`), "#867 Azi Dahaka 'Erasure of History' sets attackAll and destroys all opponent items");
+  ok(env.run(`battle.plr.monsters.center.abxAttackAllOpp === battle.turnCount && battle.plr.monsters.center.abxAttackAllFighter === true && battle.plr.monsters.center.abxDestroyItemsOnDamage === battle.turnCount && !!battle.opp.item`), "#867 Azi Dahaka 'Erasure of History' arms the sweep; items are destroyed only when it deals damage (tests/attack_all.js covers the battle)");
 
   env.run(`{
     ABX.fireLeave("plr", CARD_MAP.get(867), false);
@@ -119,10 +119,13 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     ABX.autoPlay = true;
     battle.plr.hand.push(4569);
     battle.plr.gauge = [46, 46, 46];
+    battle.activeSide = "plr";
+    window.__belostOwnTurn = ABX.OPS.r40Belost.run({}, { side: "plr", f: battle.plr, e: battle.opp, card: CARD_MAP.get(4569) });   // own turn: not allowed
+    battle.activeSide = "opp";   // "at the end of your opponent's turn"
     ABX.OPS.r40Belost.run({}, { side: "plr", f: battle.plr, e: battle.opp, card: CARD_MAP.get(4569) });
   }`);
   await wait(100);
-  ok(env.run(`battle.plr.flagId === 4569 && battle.plr.belostUsed === true && battle.plr.deck.length === 28`), "#4569 Lost World 'Belost' stacks on top of your flag, swaps in the 30-card Lost Deck, and draws 2 cards");
+  ok(env.run(`battle.plr.flagId === 4569 && battle.plr.belostUsed === true && battle.plr.deck.length === 30`), "#4569 Lost World 'Belost' only at the end of the opponent's turn: stacks on top of your flag and puts the 30-card Lost Deck in the fight");
 
   // #5958 Clock-I, #5959 Clock-II, #5960 Clock-III ("Horary Domination") + #5957 Endruler Dragon [Reversal] + #6202 Overgod "0"
   env.run(`{

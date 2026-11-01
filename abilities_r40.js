@@ -200,14 +200,8 @@
   OPS.r40AziDahakaAttack867 = {
     async run(s, ctx) {
       const es = otherSide(ctx.side), e = ctx.e;
-      if (ctx.unit) ctx.unit.attackAll = true;
-      ["item", "item2"].forEach(slot => {
-        if (e[slot] && !e[slot].isEndrulerFlag && !core.isProtected(e[slot], es, "destroyed", ctx)) {
-          if (Array.isArray(e[slot].soul)) e.drop.push(...e[slot].soul.map(getCid));
-          e.drop.push(e[slot].card.id);
-          e[slot] = null;
-        }
-      });
+      // "Erasure of History": the sweep + "destroy all items when this card deals damage" are resolved by the battle engine (game.js executeAttackResolution)
+      if (ctx.unit) { ctx.unit.abxAttackAllOpp = B.turnCount; ctx.unit.abxAttackAllFighter = true; ctx.unit.abxDestroyItemsOnDamage = B.turnCount; }
       fresh();
       return true;
     },
@@ -235,10 +229,6 @@
           f.item = { card: eqCard, rested: false, attacksLeft: eqCard.atk_max || 1, soul: [], itemMode: "equip" };
           if (ABX.fireEquipped) ABX.fireEquipped(ctx.side, eqCard, f.item);
         }
-      } else if (CARD_MAP.get(2020) && !f.item) {
-        // Fallback if testing without #2020 in deck
-        const eqCard = CARD_MAP.get(2020);
-        f.item = { card: eqCard, rested: false, attacksLeft: eqCard.atk_max || 1, soul: [], itemMode: "equip" };
       }
       fresh();
       return true;
@@ -401,10 +391,19 @@
     async run(s, ctx) {
       const f = ctx.f;
       if (f.belostUsed || f.gauge.length < 2) return false;
+      // "At the end of YOUR OPPONENT'S turn" ... "put this HAND card on top of the chosen card"
+      const turnSide = (ctx.event && ctx.event.activeSide) || B.activeSide;
+      if (turnSide === ctx.side) return false;
+      const hi = f.hand.findIndex(id => id === 4569 || id === 5760);
+      if (hi < 0) return false;
+      // "you may pay 2 gauge": a real choice
+      if (!(f.isBot || ABX.autoPlay === true) && ABX.ui && ABX.ui.confirm) {
+        const yes = await ABX.ui.confirm({ title: `${ctx.card ? ctx.card.name : "Belost"} - use "Belost"?`, text: "You may pay 2 gauge. If you do, put this hand card on top of your flag, remove your deck from the fight, and shuffle your Lost Deck and put it in the fight.", card: ctx.card, yes: "Yes", no: "No / Skip" });
+        if (!yes) return false;
+      }
       f.drop.push(f.gauge.pop(), f.gauge.pop());
       f.belostUsed = true;
-      const hi = f.hand.findIndex(id => id === 4569 || id === 5760);
-      const flagId = hi >= 0 ? f.hand.splice(hi, 1)[0] : (ctx.card ? ctx.card.id : 4569);
+      const flagId = f.hand.splice(hi, 1)[0];
       f.flagId = flagId;
       f.flagCard = cardOf(flagId) || ctx.card;
       if (Array.isArray(f.lostDeck) && f.lostDeck.length > 0) {

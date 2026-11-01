@@ -370,7 +370,7 @@
         return us.length > 0;
       }
       if (s && s.kind === "attackAllOpp") {
-        if (ctx.unit) ctx.unit.abxAttackAllOpp = B.turnCount;
+        if (ctx.unit) { ctx.unit.abxAttackAllOpp = B.turnCount; ctx.unit.abxAttackAllFighter = s.includeFighter !== false; }
         return true;
       }
       if (s && s.kind === "oppressedArea") {

@@ -8813,11 +8813,7 @@ const battle = {
       defFighter.timeStoppedThisBattle = false;
       const targetMonster = MONSTER_POSITIONS.includes(targetPos) ? defFighter.monsters[targetPos] : null;
       const outcome = { destroyedMonster: false, dealtDamage: false };
-
-      if (targetMonster) {
-        outcome.destroyedMonster = !!this.resolveMonsterVsMonster(attSide, units, defSide, targetPos, combinedPower, combinedCrit, anyPenetrate);
-        outcome.dealtDamage = outcome.destroyedMonster && (targetPos === "center" || targetPos === "center2") && anyPenetrate;
-      } else {
+      const dealDirect = () => {
         let finalDmg = combinedCrit;
         if (defFighter.tempDamageReduce && defFighter.tempDamageReduce > 0 && !unreducible) {
           finalDmg = Math.max(0, finalDmg - defFighter.tempDamageReduce);
@@ -8826,8 +8822,37 @@ const battle = {
         // ABX damage shields ("the next damage you take from attacks is reduced to 0", continuous reductions, ...)
         if (window.ABX && ABX.core && ABX.core.applyDamage) finalDmg = ABX.core.applyDamage(defSide, finalDmg, { kind: "attack", unreducible });
         else defFighter.life -= finalDmg;
-        outcome.dealtDamage = finalDmg > 0;
         this.setPrompt(`💥 ${units.length > 1 ? "LINK ATTACK " : ""}DIRECT HIT! ${attDisplayNames} dealt ${finalDmg} Critical damage to ${defFighter.name}!`);
+        return finalDmg;
+      };
+      // "attacks all of your opponent's monsters (and your opponent) instead" (#867 #2019 #857 #4151 #5277, #6526's item): set for this turn by the card's ability
+      const sweeper = units.length === 1 && units[0].unit.abxAttackAllOpp === this.turnCount ? units[0].unit : null;
+
+      if (sweeper) {
+        let anyDestroyed = false;
+        ["left", "center", "right"].forEach(p => {
+          if (this.matchOver || !defFighter.monsters[p]) return;
+          if (this.resolveMonsterVsMonster(attSide, units, defSide, p, combinedPower, combinedCrit, anyPenetrate)) anyDestroyed = true;
+        });
+        outcome.destroyedMonster = anyDestroyed;
+        if (sweeper.abxAttackAllFighter !== false && !this.matchOver) outcome.dealtDamage = dealDirect() > 0;
+        // #867 / #2019: "When this card deals damage to your opponent, destroy all items on your opponent's field."
+        if (outcome.dealtDamage && sweeper.abxDestroyItemsOnDamage === this.turnCount) {
+          const es = defSide;
+          ["item", "item2"].forEach(slot => {
+            const it = defFighter[slot];
+            if (!it || it.isEndrulerFlag) return;
+            if (window.ABX && ABX.core && ABX.core.isProtected && ABX.core.isProtected(it, es, "destroyed", { side: attSide, f: attFighter, e: defFighter, card: sweeper.card, bind: {} })) return;
+            if (Array.isArray(it.soul)) defFighter.drop.push(...it.soul.map(x => (typeof getSoulCardId === "function" ? getSoulCardId(x) : x)));
+            defFighter.drop.push(it.card.id);
+            defFighter[slot] = null;
+          });
+        }
+      } else if (targetMonster) {
+        outcome.destroyedMonster = !!this.resolveMonsterVsMonster(attSide, units, defSide, targetPos, combinedPower, combinedCrit, anyPenetrate);
+        outcome.dealtDamage = outcome.destroyedMonster && (targetPos === "center" || targetPos === "center2") && anyPenetrate;
+      } else {
+        outcome.dealtDamage = dealDirect() > 0;
       }
 
       this.checkWinCondition();
