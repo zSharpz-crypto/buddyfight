@@ -8,3 +8,6 @@ desktop.ini
 
 # Test tooling
 node_modules/
+
+# Screenshot written by tests/smoke11.js
+defense.png
