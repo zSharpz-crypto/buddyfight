@@ -372,6 +372,40 @@
     { op: "r40StructuredExec", text: "you may discard as many cards as you like from your hand." },
     { op: "destroy", gate: "ifYouDo", np: Object.assign(np({ types: [] }, "field", null, "opp"), { qty: { n: 1, upTo: true, all: false, any: false, each: false, fromLast: true } }) }
   ] })]);
+  // Mission Cards (#213 #1169 #1415): Set spells that collect the top card of the deck in their soul, then cash in at N cards.
+  const missionDrop = (f, card) => { const i = (f.setSpells || []).indexOf(card); if (i < 0) return false; f.setSpells.splice(i, 1); f.drop.push(card.id); return true; };
+  OPS.r42MissionAdd = {
+    run(s, ctx) {
+      const f = ctx.f, c = ctx.card;
+      if (!c || !Array.isArray(c.soul) || !(f.setSpells || []).includes(c) || !f.deck.length) return false;
+      c.soul.push(f.deck.shift());   // face down
+      fresh();
+      if (ABX.watchFighters) ABX.watchFighters();
+      return true;
+    }, check: () => true
+  };
+  OPS.r42MissionDone = {
+    run(s, ctx) {
+      const f = ctx.f, c = ctx.card;
+      if (!c || !Array.isArray(c.soul) || c.soul.length < (s.n || 1)) return false;
+      const soul = c.soul.splice(0, c.soul.length);
+      if (!missionDrop(f, c)) { c.soul.push(...soul); return false; }
+      if (s.mode === "hand") f.hand.push(...soul);
+      else if (s.mode === "teamwork") { if (soul.length) f.hand.push(soul.shift()); f.gauge.push(...soul); f.life += 1; }
+      else f.drop.push(...soul);
+      fresh();
+      if (s.mode === "aim") return OPS.r40StructuredExec.run({ op: "r40StructuredExec", text: "destroy a card on your opponent's field." }, ctx);
+      return true;
+    }, check: () => true
+  };
+  const ADV = { raw: "Adventurer", qty: { n: 1, upTo: false, all: false, any: false, each: false }, ref: null, self: false, filter: { tribes: ["Adventurer"] }, zone: null, excludeSelf: false, topN: null, soulOf: null };
+  OV42.push([213, /put the top card of your deck into this card's soul face down/i, () => ({ kind: "triggered", trigger: { event: "otherAttackDestroys", np: ADV }, conds: [], steps: [{ op: "r42MissionAdd" }] })]);
+  OV42.push([213, /soul becomes 2 or more/i, () => ({ kind: "triggered", trigger: { event: "soulAtLeast", n: 2, self: true }, conds: [], steps: [{ op: "r42MissionDone", n: 2, mode: "hand" }] })]);
+  OV42.push([1169, /link attacks/i, () => ({ kind: "triggered", trigger: { event: "otherLink", np: ADV }, once: "turn", conds: [], steps: [{ op: "r42MissionAdd" }] })]);
+  OV42.push([1169, /two or more cards in this card's soul/i, () => ({ kind: "triggered", trigger: { event: "soulAtLeast", n: 2, self: true }, conds: [], steps: [{ op: "r42MissionDone", n: 2, mode: "teamwork" }] })]);
+  OV42.push([1415, /when you cast a spell, put the top card/i, () => ({ kind: "triggered", trigger: { event: "youCast", np: { raw: "a spell", qty: { n: 1 }, filter: { types: ["spell"] }, zone: null } }, conds: [], steps: [{ op: "r42MissionAdd" }] })]);
+  OV42.push([1415, /three or more cards in this card's soul/i, () => ({ kind: "triggered", trigger: { event: "soulAtLeast", n: 3, self: true }, conds: [], steps: [{ op: "r42MissionDone", n: 3, mode: "aim" }] })]);
+
   // #6141 Omega "Preverse": when your flag [Reversal], look at top 3; one -> gauge, one -> hand; drop the rest or put them into a field monster's soul. Once per turn.
   OPS.r42Preverse = {
     async run(s, ctx) {

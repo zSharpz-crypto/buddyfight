@@ -116,7 +116,7 @@
 
   const TRIG_OK = {
     enter: t => t.self, attack: t => t.self && !(t.target && t.target.junk), dealsDamage: t => t.self || !!t.np, damaged: () => true, attackDestroys: t => t.self, attackOutcome: t => t.self, attacked: t => t.self, link: t => t.self, discardedFromHand: t => t.self, otherAttack: t => !!t.np, oppAttack: () => true, battleEnd: () => true, flagReversal: () => true,
-    monsterLeaves: () => true, unitRested: t => !!(t.self || t.front),
+    monsterLeaves: () => true, otherLink: t => !!(t.np && !t.np.self), otherAttackDestroys: t => !!(t.np && !t.np.self), soulAtLeast: t => !!t.self && t.n > 0, unitRested: t => !!(t.self || t.front),
     turnStart: () => true, turnEnd: () => true, phaseStart: t => ["start", "draw", "main", "attack", "final", "turn"].includes(t.phase),
     otherEnter: t => !!t.np, otherDestroyed: t => !!t.np && !t.np.self, youCast: () => true, oppCast: () => true, leave: t => t.self && !t.byOpp,
     lifeGain: () => true, equipped: t => t.self, soulEmpty: t => t.self, hostAttack: t => !t.np || !t.np.junk, hostDealsDamage: t => !t.np || !t.np.junk, hostDestroys: t => !t.np || !t.np.junk, stoodByEffect: t => t.self,
@@ -1052,6 +1052,7 @@
       await fireTriggers((t, src, side) => (t.event === "attack" && t.self && tgtOK(t) && side === attSide && us.has(src.unit)) ||
         (t.event === "link" && t.self && units.length > 1 && side === attSide && us.has(src.unit) && (!ABX.linkWithOK || ABX.linkWithOK(t, src.unit, units, attSide))) ||
         (t.event === "otherAttack" && side === attSide && (src.unit || (src.card && (F(side).setSpells || []).includes(src.card))) && !us.has(src.unit) && !t.np.self && units.some(u => matchFilter(u.unit.card, t.np.filter || {}, { unit: u.unit, side: attSide }, { f: F(attSide) }))) ||
+        (t.event === "otherLink" && units.length > 1 && side === attSide && src.unit !== undefined && units.some(u => u.unit && matchFilter(u.unit.card, t.np.filter || {}, { unit: u.unit, side: attSide }, { f: F(attSide) }))) ||
         (t.event === "oppAttack" && side === defSide && (!t.fighterTarget || !defUnit)) ||
         (t.event === "attacked" && t.self && side === defSide && defUnit && src.unit === defUnit), { name: "attack", attSide, defSide, attUnits: units.map(u => u.unit), defUnit });
     }).catch(() => {});
@@ -1190,6 +1191,7 @@
   // Watch life totals and soul sizes without touching every place in game.js that changes them.
   const soulSeen = new WeakMap();
   const restSeen = new WeakMap();
+  const soulSeen2 = new WeakMap();
   function sideOfF(f) { return B.plr === f ? "plr" : B.opp === f ? "opp" : null; }
   function watchLife(f) {
     if (!f || typeof f !== "object") return;
@@ -1213,10 +1215,12 @@
       ["plr", "opp"].forEach(side => {
         const f = B.getFighter && B.getFighter(side);
         if (!f || !f.monsters) return;
+        (f.setSpells || []).forEach(c => { const n = Array.isArray(c.soul) ? c.soul.length : 0, pn = soulSeen2.get(c); soulSeen2.set(c, n); if ((pn || 0) < n && ABX.enabled !== false && !B.matchOver) ABX.fireSoulAtLeast(side, c, n, pn || 0); });
         fieldUnits(f, true).forEach(x => {
           const u = x.unit, n = (u.soul || []).length, prev = soulSeen.get(u);
           soulSeen.set(u, n);
           if (prev > 0 && n === 0 && ABX.enabled !== false && !B.matchOver) ABX.fireSoulEmpty(side, u);
+          { const pn = soulSeen2.get(u); soulSeen2.set(u, n); if ((pn || 0) < n) ABX.fireSoulAtLeast(side, u, n, pn || 0); }
           const pr = restSeen.get(u), cr = !!u.rested; restSeen.set(u, cr);
           if (pr === false && cr && ABX.enabled !== false && !B.matchOver) ABX.fireUnitRested(side, u, x.pos);
         });
@@ -1241,6 +1245,9 @@
       if (t.front) { if (src.unit === unit || s === side) return false; const sp = posOfUnit(F(s), src.unit); return !!sp && norm(sp) === norm(pos); }
       return false;
     }, { name: "unitRested" })).catch(() => {});
+  };
+  ABX.fireSoulAtLeast = function (side, host, n, prevN) {
+    return ABX.queue(() => fireTriggers((t, src, s) => t.event === "soulAtLeast" && s === side && (src.unit === host || src.card === host) && prevN < t.n && n >= t.n, { name: "soulAtLeast" })).catch(() => {});
   };
   ABX.fireMonsterLeaves = function (side, card) {
     return ABX.queue(() => fireTriggers((t, src, s) => t.event === "monsterLeaves" && s === side && src.card !== card &&

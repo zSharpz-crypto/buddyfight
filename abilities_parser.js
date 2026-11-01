@@ -1157,6 +1157,11 @@
   // "When your flag [Reversal], ..." (#6050 #6063 #6141): fires when one of YOUR flags is flipped to [Reversal] (ABX.fireFlagReversal)
   tr(/^(?:when|whenever|each time) this card \[rest\]$/i, () => ({ event: "unitRested", self: true }));
   tr(/^(?:when|whenever|each time) (?:your opponent's|an opponent's|the) monster in front of this card (?:becomes )?\[rest\]$/i, () => ({ event: "unitRested", front: true }));
+  // Set-spell "Mission Card" triggers (#213 #1169 #1415)
+  tr(/^(?:when|whenever|each time) an? (.+?) on your field link attacks$/i, (m) => ({ event: "otherLink", np: parseNP(m[1] + " on your field") }));
+  tr(/^(?:when|whenever|each time) an? (?:opponent's|opponents') monster is destroyed by an attack of your (.+)$/i, (m) => ({ event: "otherAttackDestroys", np: parseNP(m[1] + " on your field") }));
+  tr(/^(?:when|whenever|each time) this card's soul becomes (\d+) or more$/i, (m) => ({ event: "soulAtLeast", n: +m[1], self: true }));
+  tr(/^(?:when|whenever|each time) there (?:are|is) (\d+) or more cards? in this card's soul$/i, (m) => ({ event: "soulAtLeast", n: +m[1], self: true }));
   // "When a monster leaves your field (during your attack phase)" (#1381)
   tr(/^(?:when|whenever|each time) (?:a|another) monster leaves your field(?: during (your|the) attack phase)?$/i, (m) => ({ event: "monsterLeaves", phase: m[1] ? "attack" : null, ownTurn: /your/i.test(m[1] || "") }));
   tr(/^(?:when|whenever|each time) your flags? \[reversal\]$/i, () => ({ event: "flagReversal" }));
