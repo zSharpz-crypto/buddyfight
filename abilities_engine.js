@@ -89,7 +89,7 @@
   /* ============================================================
    * 2. EXECUTABILITY (what ABX is allowed to own)
    * ============================================================ */
-  const COND_OK = new Set(["selfStat", "refType", "refTribe", "selfPosAny", "turn", "phase", "underAttack", "selfPos", "selfOnField", "selfIn", "selfInSoulOf", "selfRested", "selfSoul", "selfSoulName", "selfSet",
+  const COND_OK = new Set(["selfStat", "refType", "refTribe", "selfPosAny", "turn", "phase", "underAttack", "selfPos", "selfOnField", "selfIn", "selfInSoulOf", "selfRested", "selfSoul", "fieldSouls", "selfSoulName", "selfSet",
     "life", "lifeVs", "gauge", "hand", "flagIs", "flagWorld", "reversal", "hasNot", "has", "count", "itemEquipped", "monsterCount", "onlyThis", "buddyOnField",
     "noBattle", "inBattle", "oppAttackCount", "myAttackCount", "attackedThisTurn", "castThisTurn", "event", "and", "or", "not", "always"]);
   ABX.COND_OK = COND_OK;
@@ -400,6 +400,7 @@
       case "refTribe": { const r = (ctx.bind.revealed || []).concat(ctx.bind.looked || [], ctx.bind.chosen || []).filter(x => x && x.card).pop(); return !!r && tribeEq(r.card, c.tribe); }
       case "selfPosAny": return !!ctx.unit && c.pos.includes((posOfUnit(f, ctx.unit) || "").replace("center2", "center"));
       case "selfRested":      case "selfRested": return !!ctx.unit && (!!ctx.unit.rested === c.v);
+      case "fieldSouls": { const o = c.who === "opp" ? e : f; let n = 0; Object.values(o.monsters || {}).forEach(u => { if (u && u.soul) n += u.soul.length; }); [o.item, o.item2].forEach(u => { if (u && u.soul) n += u.soul.length; }); return cmpN(n, c); }   // total cards in the souls of all cards on that field
       case "selfSoul": { const h = ctx.unit || (ctx.card && Array.isArray(ctx.card.soul) ? ctx.card : null); return !!h && cmpN((h.soul || []).length, c); }   // a [Set] card's soul lives on the set card itself
       case "selfSoulName": return !!ctx.unit && (ctx.unit.soul || []).some(id => lc((cardOf(id) || {}).name).includes(c.name));
       case "selfSet": return (f.setSpells || []).includes(ctx.card);

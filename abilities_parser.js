@@ -501,6 +501,18 @@
   cr(/^you (?:are|were) \[ride\] on this card$/i, () => ({ t: "always" }));
 
   cr(/^there (?:is|are) (?:no|0) (.+)$/i, (m) => ({ t: "hasNot", owner: "any", np: parseNP(m[1]) }));
+  // "if there are a total of eight or more «A» and «B» in your drop zone" (also the typo "there a total of"): ONE count over all the
+  // listed kinds (A and B both count). Before this the "a total of ..." was read as "there is a ..." and the effect lost its condition.
+  const TOTAL_N = "(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)";
+  const totalOwner = (np) => ((np && np.zone && np.zone.owner) || "you");
+  cr(new RegExp("^there (?:(?:is|are) )?(?:a )?total of " + TOTAL_N + " or (more|less|fewer) (.+?) and " + TOTAL_N + " or (more|less|fewer) (.+?) in (your opponent's|your|the) (drop zone|gauge|hand|field)$", "i"),
+    (m) => { const z = " in " + m[7] + " " + m[8], a = parseNP(m[3] + z), b = parseNP(m[6] + z); if (!a || !b || a.junk || b.junk) return null;
+      return { t: "and", list: [{ t: "count", owner: totalOwner(a), np: a, n: toNum(m[1]), cmp: CMP(m[2]) }, { t: "count", owner: totalOwner(b), np: b, n: toNum(m[4]), cmp: CMP(m[5]) }] }; });
+  cr(new RegExp("^there (?:(?:is|are) )?(?:a )?total of " + TOTAL_N + " or (more|less|fewer) cards? in the souls? of cards on (your|your opponent's) field$", "i"),
+    (m) => ({ t: "fieldSouls", who: /opponent/i.test(m[3]) ? "opp" : "you", n: toNum(m[1]), cmp: CMP(m[2]) }));
+  cr(new RegExp("^there (?:(?:is|are) )?(?:a )?total of " + TOTAL_N + " or (more|less|fewer) (.+)$", "i"),
+    (m) => { const rest = m[3].replace(/(»|") and («|")/g, "$1 or $2").replace(/\bwith ([A-Z][\w']*(?: [A-Z][\w']*)*) or ([A-Z][\w']*(?: [A-Z][\w']*)*)(?= in )/, "with «$1» or «$2»"); const np = parseNP(rest); if (!np || np.junk) return null;
+      return { t: "count", owner: totalOwner(np), np, n: toNum(m[1]), cmp: CMP(m[2]) }; });
   cr(/^there (?:is|are) (?:a|an|1 or more|one or more|another) (.+)$/i, (m) => ({ t: "has", owner: "any", np: parseNP(m[1]), n: 1 }));
   cr(/^there (?:is|are) (\d+|one|two|three|four|five|six|seven|eight|nine|ten) or (more|less|fewer) (.+)$/i, (m) => ({ t: "count", owner: "any", np: parseNP(m[3]), n: toNum(m[1]), cmp: CMP(m[2]) }));
   cr(/^(?:a|an|another) (.+?) (?:is|are) on (?:your|the) field$/i, (m) => ({ t: "has", owner: "you", np: parseNP(m[1] + " on your field"), n: 1, other: /^another/i.test(m[0]) }));
