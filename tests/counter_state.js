@@ -6,7 +6,7 @@ run(`ABX.fast=true; ABX.autoPlay=true;
  globalThis.plain=ALL_CARDS.find(x=>x.type==='Monster'&&x.size===1&&!x.skill);
  globalThis.mk=(card)=>({card,rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0});
  globalThis.setup=function(id,fn,tp){ battle.start('hotseat', generateFlagDeck(447,'T',571,true), generateFlagDeck(447,'O',571,true)); battle.renderBattle=function(){};
-  const me=battle.opp; me.gauge=me.deck.splice(0,8); me.life=10; me.hand=[id]; me.drop=me.deck.splice(0,8); me.monsters.center=mk(plain);
+  const me=battle.opp; me.gauge=me.deck.splice(0,8); me.life=10; me.hand=(id===6190?[id,46]:[id]); me.drop=me.deck.splice(0,8);   /* #6190: [Put a hand card on the bottom of your deck] needs another hand card */ me.monsters.center=mk(plain);
   const a=battle.plr; a.monsters.center=mk(plain); battle.turn='plr'; battle.activeSide='plr'; battle.phase='attack'; battle.turnCount=5; if(fn) fn(me,a);
   return battle.getAvailableDefenseCards('opp',false,tp||'center',[a.monsters.center]).some(o=>o.handIdx===0); };`);
 let pass = 0, fail = 0;

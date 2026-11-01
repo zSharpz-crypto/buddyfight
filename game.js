@@ -8320,7 +8320,8 @@ const battle = {
       // zone / link checks below.
       if (!info && (c.type === "Spell" || c.type === "Impact") && window.ABX && ABX.counterSpellOption) {
         const cs = ABX.counterSpellOption(defSide, c, { targetPos, attUnits });
-        if (cs && evaluateCardConditions(c, defFighter, attFighter).met) {
+        const extrasOk = !(c.type === "Spell" && ABX.hasExtras && ABX.canPayExtras && ABX.hasExtras(c) && !ABX.canPayExtras(defSide, c, handIdx));   // rest of the [Cast Cost] payable
+        if (cs && extrasOk && evaluateCardConditions(c, defFighter, attFighter).met) {
           valid.push({ card: c, handIdx, info: { category: "abx_counter_spell", nullifies: cs.nullifies } });
         }
         return;
@@ -8329,6 +8330,8 @@ const battle = {
 
       const cond = evaluateCardConditions(c, defFighter, attFighter);
       if (!cond.met) return;
+      // the rest of the [Cast Cost] (drop a soul, put a hand card on the deck, ...) must be payable too
+      if (c.type === "Spell" && window.ABX && ABX.hasExtras && ABX.canPayExtras && ABX.hasExtras(c) && !ABX.canPayExtras(defSide, c, handIdx)) return;
       // the engine's own cast conditions (a tribe on the field, an item equipped, ...) also apply to the known categories
       if (c.type === "Spell" && window.ABX && ABX.counterSpellOption && ABX.ownsCounter && ABX.ownsCounter(c) && !ABX.counterSpellOption(defSide, c, { targetPos, attUnits })) return;
 
@@ -8711,7 +8714,10 @@ const battle = {
     for (let i = 0; i < cost.gauge && defFighter.gauge.length > 0; i++) {
       defFighter.drop.push(defFighter.gauge.pop());
     }
+    if (cost.life > 0) defFighter.life = Math.max(1, defFighter.life - cost.life);   // "[Cast Cost] [Pay 1 life]" (was never paid for a [Counter])
     defFighter.hand.splice(handIdx, 1);
+    // the other parts of the [Cast Cost] (drop a soul, put a hand card on the bottom of the deck, ...)
+    const extrasPaid = (window.ABX && ABX.payExtras && ABX.hasExtras && ABX.hasExtras(c)) ? ABX.payExtras(defSide, c, null) : Promise.resolve();
     defFighter.drop.push(cid);
     noteSpellCast(defFighter, c);
 
@@ -8720,7 +8726,7 @@ const battle = {
     this.showCutin("COUNTER — DEFENSE!", `${defFighter.name} cast ${c.name}!`, c.img);
 
     if (window.ABX && ABX.ownsCounter && ABX.ownsCounter(c)) {
-      ABX.runCounter(defSide, c, { attSide, attackerZones, targetPos }).then(res => {
+      Promise.resolve(extrasPaid).then(() => ABX.runCounter(defSide, c, { attSide, attackerZones, targetPos })).then(res => {
         if (this.matchOver) return;
         this.executeAttackResolution(attSide, attackerZones, targetPos, !!res.nullified);
       });

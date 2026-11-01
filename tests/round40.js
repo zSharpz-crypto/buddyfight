@@ -59,7 +59,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     battle.start("hotseat", generateFlagDeck(447, "Azi Dahaka", 867, false), generateFlagDeck(447, "Opp", 571, false));
     ABX.autoPlay = true;
     battle.plr.monsters.center = { card: CARD_MAP.get(867), rested: false, attacksLeft: 1, soul: [] };
-    battle.plr.deck.unshift(2020); // Aqulta Gwaneff in deck
+    battle.plr.deck.unshift(942); // 'Demonic Demise Sword, Aqulta Gwaneff' (the exact name on the card) in deck
     battle.opp.item = { card: CARD_MAP.get(15), rested: false, attacksLeft: 1, soul: [] };
     ABX.OPS.r40AziDahakaAttack867.run({}, { side: "plr", f: battle.plr, e: battle.opp, card: CARD_MAP.get(867), unit: battle.plr.monsters.center });
   }`);
@@ -70,7 +70,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     ABX.fireLeave("plr", CARD_MAP.get(867), false);
   }`);
   await wait(200);
-  ok(env.run(`Boolean(battle.plr.item && battle.plr.item.card.id === 2020)`), "#867 Azi Dahaka searches deck for #2020 'Demonic Demise Sword, Aqulta Gwaneff' and equips it when destroyed");
+  ok(env.run(`Boolean(battle.plr.item && battle.plr.item.card.id === 942)`), "#867 Azi Dahaka searches deck for #942 'Demonic Demise Sword, Aqulta Gwaneff' and equips it when destroyed");
 
   console.log("\n=== 3. #1635 Burn Nova (Borrow Abilities), #3383 Rebel Gallows & #4461 Kagura-bell ===");
   env.run(`{

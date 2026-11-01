@@ -1300,6 +1300,15 @@
         return (ab.conds || []).every(c => evalCond(c, probe));
       });
       if (!ok) return null;
+      // "You may only cast this card during an attack on your opponent's turn, and if a «Time Dragon» is on your field": the rule line's
+      // conditions (kept apart from the [Counter] body by the parser) were never checked. Not for the spell-response window ({free:true}).
+      if (!(info && info.free)) {
+        const rulesOk = abilitiesOf(card, a => a.kind === "rule" && (a.conds || []).length > 0 && !/\bwith "[^"]+"(?! in (?:its|their) card names?)/i.test(a.raw || "")).every(ab => {   // (a quoted keyword like a monster with "Oppress" is read as a card name: not enforced)
+          const probe = { side: defSide, f: defF, e: attF, card, unit: null, ab, bind: { chosen: [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [], event: { name: "counter" } };
+          return ab.conds.every(c => evalCond(c, probe));
+        });
+        if (!rulesOk) return null;
+      }
       return { nullifies: bodies.some(ab => (ab.steps || []).some(s => s.op === "nullifyAttack")) };
     } catch (e) { if (ABX.debug) console.error(e); return null; }
     finally { ABX.battleCtx = prev; }
@@ -1344,6 +1353,13 @@
         out.push({ soulFrom: { area: mZ[2].toLowerCase(), n: 1, np: { raw: what, qty: { n: 1 }, filter: flt } }, text: txt });
         return;
       }
+      // [Cast Cost] [Put a hand card on the bottom of your deck] (#6190 -Damuna-): needs that many OTHER hand cards, goes to the bottom of the deck
+      const mBottom = txt.match(/^put (a|an|one|two|three|\d+) hand cards? on the bottom of your deck\.?$/i);
+      if (mBottom) {
+        const bn = { a: 1, an: 1, one: 1, two: 2, three: 3 }[mBottom[1].toLowerCase()] || parseInt(mBottom[1], 10) || 1;
+        out.push({ discard: { n: bn, np: { raw: "a hand card", qty: { n: bn }, filter: {} } }, toDeckBottom: true, text: txt });
+        return;
+      }
       const mChooseSoul = txt.match(/^choose a card from your hand,\s*deck,?\s*or drop zone/i);
       if (mChooseSoul) {
         out.push({ chooseSoulFromAny: true, faceDown: /face\s*down/i.test(card.skill || ""), text: txt });
@@ -1376,6 +1392,8 @@
     const spec = part.soulFrom || part.discard || part.destroy;
     const flt = (spec.np && spec.np.filter) || {};
     let area = part.soulFrom ? AREA[spec.area] : part.discard ? "hand" : "field";
+    // "Drop a soul from a monster on your field": the cost is a soul of a field card, not a hand card
+    if (part.discard && spec.np && spec.np.zone && spec.np.zone.area === "soul") return refsFor(spec.np, ctx, { owner: "you", area: "field" });
     if (area === "field") return refsFor(spec.np, ctx, { owner: "you", area: "field" });
     return (f[area] || []).map((id, i) => ({ k: "zone", side, area, idx: i, id, card: cardOf(id) }))
       .filter((r, i) => !(area === "hand" && i === exclHandIdx) && matchFilter(r.card, flt, r, ctx));
@@ -1437,7 +1455,7 @@
         const id = detach(r); if (id == null) continue;
         const isFD = Boolean(spec.faceDown || /face\s*down/i.test(part.text || ""));
         const entry = (isFD && typeof root.createSoulEntry === "function") ? root.createSoulEntry(id, true) : (isFD ? { id, isFaceDown: true } : id);
-        if (part.soulFrom && unit && Array.isArray(unit.soul)) unit.soul.push(entry); else f.drop.push(id);
+        if (part.soulFrom && unit && Array.isArray(unit.soul)) unit.soul.push(entry); else if (part.toDeckBottom) f.deck.push(id); else f.drop.push(id);
         if (r.area === "deck" && B.shuffleFighterDeck) B.shuffleFighterDeck(side);
       }
     }
