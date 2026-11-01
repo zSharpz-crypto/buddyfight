@@ -348,6 +348,119 @@
     { op: "destroy", gate: "ifYouDo", np: Object.assign(np({ types: [] }, "field", null, "opp"), { qty: { n: 1, upTo: true, all: false, any: false, each: false, fromLast: true } }) }
   ] })]);
   OV42.push([6526, /when this card is destroyed, put this card into the soul/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true, destroyedOnly: true }, conds: [], steps: [{ op: "r42AziRebDestroy" }] })]);
+  // #3902 Shining Dragoner, Jackknife [Overturn]: "[Put a soul from this card into the drop zone if your opponent would use a card other than from effects during their turn]
+  // Nullify the card your opponent used!!" - was a dead static. Now a response-window ability (same window as other "when your opponent casts" nullifiers).
+  OV42.push([3902, /\[overturn\]/i, () => ({ kind: "triggered", tags: ["kw:overturn"], trigger: { event: "oppCast" }, once: "game", conds: [], steps: [
+    { op: "r42SoulToDrop", cost: true, cond: { t: "selfSoul", n: 1, cmp: "ge" } }, { op: "nullifyCast", what: "any" }] })]);
+  OPS.r42SoulToDrop = {
+    run(s, ctx) {
+      const u = ctx.unit; if (!u || !(u.soul || []).length) return false;
+      const sid = u.soul.pop();
+      ctx.f.drop.push(typeof root.getSoulCardId === "function" ? root.getSoulCardId(sid) : sid);
+      ctx.f.overturnUsed = true;
+      return true;
+    },
+    check: () => true
+  };
+  // #5161 Thunder Sky's Holy Knight, El Quixote [Overturn]: "[During your turn, drop a Knight from your hand] Equip up to two Knight items from your deck without paying their
+  // [Equip Cost], and shuffle your deck!!" - was a dead static.
+  OV42.push([5161, /\[overturn\]/i, () => ({ kind: "act", tags: ["kw:overturn"], trigger: null, once: "game", conds: [{ t: "turn", who: "you" }], steps: [{ op: "r42ElQuixote" }] })]);
+  OPS.r42ElQuixote = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const isKnight = (c) => !!c && (c.attrs || []).some(a => /^knight$/i.test(a));
+      const hand = f.hand.map((id, i) => ({ k: "zone", side, area: "hand", idx: i, id, card: core.cardOf(id) })).filter(x => isKnight(x.card));
+      if (!hand.length) return false;
+      const ch = await core.pick(hand, { qty: { n: 1 }, raw: "a Knight from your hand", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - drop a Knight from your hand` });
+      const r = ch && ch[0]; if (!r) return false;
+      const hi = f.hand.indexOf(r.id); if (hi < 0) return false;
+      f.drop.push(f.hand.splice(hi, 1)[0]);
+      ctx.f.overturnUsed = true;
+      const items = f.deck.map((id, i) => ({ k: "zone", side, area: "deck", idx: i, id, card: core.cardOf(id) })).filter(x => x.card && x.card.type === "Item" && isKnight(x.card));
+      if (items.length && ABX.equipFrom) {
+        const picked = await core.pick(items, { qty: { n: 2, upTo: true }, raw: "up to two Knight items from your deck", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - equip up to two Knight items from your deck` });
+        f.abxItemCap = 2;
+        try { for (const x of (picked || []).slice(0, 2)) ABX.equipFrom(side, "deck", x.id, false); } finally { delete f.abxItemCap; }
+      }
+      if (B.shuffleFighterDeck) B.shuffleFighterDeck(side);
+      fresh();
+      return true;
+    },
+    check: () => true
+  };
+  /* ---- [Overturn]/[Overkill] timing windows ---- */
+  // #3843 Golden Crystal Dragon, Athora: "[Discard a card from your hand when your opponent's cards would attack]" -> only in the defense window (a [Counter]-style act)
+  OV42.push([3843, /\[overturn\]/i, (ab) => ({ kind: "act", tags: ["kw:overturn", "counter"], trigger: null, once: "game", conds: [{ t: "underAttack" }], steps: clone(ab.steps || []) })]);
+  // #4163 Drum Bunker Dragon: "[Pay 1 gauge when this card would link attack with you]" -> optional trigger when this card link attacks
+  OV42.push([4163, /\[overturn\]/i, () => ({ kind: "triggered", tags: ["kw:overturn"], trigger: { event: "link", self: true }, once: "game", conds: [], steps: [
+    { op: "pay", gauge: 1, optional: true, cost: true }, { op: "r42DrumBunker", gate: "ifYouDo" }] })]);
+  OPS.r42DrumBunker = {
+    run(s, ctx) {
+      const u = ctx.unit; if (!u) return false;
+      u.abxNoCounter = { turn: B.turnCount, mode: "link" };
+      u.abxBattleBoost = { power: 99999999, crit: 2 };   // "for this battle": removed again when the battle ends
+      u.tempPower = (u.tempPower || 0) + 99999999; u.tempCrit = (u.tempCrit || 0) + 2;
+      ctx.f.overturnUsed = true; fresh(); return true;
+    },
+    check: () => true
+  };
+  {
+    const prevBE = ABX.fireBattleEnd;
+    ABX.fireBattleEnd = function (attSide, units) {
+      try { (units || []).forEach(x => { const u = x && (x.unit || x); if (u && u.abxBattleBoost) { u.tempPower = (u.tempPower || 0) - u.abxBattleBoost.power; u.tempCrit = (u.tempCrit || 0) - u.abxBattleBoost.crit; u.abxBattleBoost = null; } }); } catch (e) { /* ignore */ }
+      return prevBE.apply(this, arguments);
+    };
+  }
+  // #3595 Shuten Demonic Deity, Kid Ibuki: "[Overkill] [Pay 1 gauge when monsters on your field would be destroyed] Choose a monster on your field, and for this turn that card cannot be destroyed"
+  // -> same replacement window as the other "would be destroyed" saves (wouldLeaveOther for the other monsters, wouldLeave for itself).
+  OV42.push([3595, /\[overkill\]/i, () => ({ kind: "triggered", tags: ["kw:overkill"], trigger: { event: "wouldLeaveOther", np: np({ types: ["monster"] }) }, once: "game", conds: [], steps: [
+    { op: "pay", gauge: 1, optional: true, cost: true }, { op: "preventLeave", gate: "ifYouDo" }] })]);
+  {
+    const prevWLS = ABX.wouldLeaveSave;
+    ABX.wouldLeaveSave = function (side, pos, unit, byAttack) {
+      if (unit && unit.abxNoDestroyTurn === B.turnCount) return true;       // #3595: "for this turn, that card cannot be destroyed"
+      const f = F(side);
+      const src = f && core.fieldUnits(f, true).find(x => x.unit && x.unit.card && x.unit.card.id === 3595 && x.unit.abxNullified !== B.turnCount);
+      const ab = src && core.abilitiesOf(src.unit.card, a => a.r42 && a.trigger && a.trigger.event === "wouldLeaveOther")[0];
+      const before = !!(ab && core.onceUsed(f, src.unit.card, ab, src.unit));
+      let r = prevWLS.apply(this, arguments);
+      // the monster being destroyed IS the Overkill card: it has no "other monster" to save it, so offer the same save for itself
+      if (!r && ab && src.unit === unit && !before && f.gauge.length >= 1) {
+        const auto = ABX.autoPlay || f.isBot;
+        let yes = auto; if (!auto) { try { yes = typeof root.confirm === "function" ? !!root.confirm(`${unit.card.name}: pay 1 gauge so it cannot be destroyed this turn?`) : true; } catch (e) { yes = true; } }
+        if (yes) { f.drop.push(f.gauge.pop()); core.markOnce(f, unit.card, ab, unit); r = true; ABX.say && ABX.say(`🛡️ "${unit.card.name}" cannot be destroyed this turn!`); }
+      }
+      if (r && ab && !before && core.onceUsed(f, src.unit.card, ab, src.unit)) { unit.abxNoDestroyTurn = B.turnCount; f.overturnUsed = true; }
+      return r;
+    };
+  }
+  // #3822 Knight of Overturn, El Quixote: "[Pay 1 gauge when a link attack of this card is nullified] For this turn, link attacks of this card cannot be nullified."
+  // -> when a link attack of this card is about to be nullified, offer it; the attack then goes through.
+  OV42.push([3822, /\[overturn\]/i, (ab) => ({ kind: "act", tags: ["kw:overturn"], trigger: null, once: "game", conds: [{ t: "phase", phase: "__only_when_link_nullified__" }], steps: clone(ab.steps || []) })]);
+  if (typeof B.executeAttackResolution === "function" && !B.__r42Overturn3822) {
+    B.__r42Overturn3822 = true;
+    const prevEAR = B.executeAttackResolution;
+    B.executeAttackResolution = function (attSide, attackerZones, targetPos, attackNullified) {
+      try {
+        if (attackNullified === true && Array.isArray(attackerZones) && attackerZones.length > 1) {
+          const f = F(attSide);
+          const hit = attackerZones.map(z => (z === "item" ? f.item : f.monsters[z])).find(u => u && u.card && u.card.id === 3822 && u.abxNullified !== B.turnCount);
+          const ab = hit && core.abilitiesOf(hit.card, a => (a.tags || []).includes("kw:overturn") && a.kind === "act")[0];
+          if (ab && !core.onceUsed(f, hit.card, ab, hit) && f.gauge.length >= 1) {
+            const auto = ABX.autoPlay || f.isBot;
+            let yes = auto; if (!auto) { try { yes = typeof root.confirm === "function" ? !!root.confirm(`${hit.card.name}: pay 1 gauge so this link attack cannot be nullified?`) : true; } catch (e) { yes = true; } }
+            if (yes) {
+              f.drop.push(f.gauge.pop()); core.markOnce(f, hit.card, ab, hit);
+              hit.abxUnnull = { turn: B.turnCount, cond: "link" }; f.overturnUsed = true;
+              ABX.say && ABX.say(`🛡️ "${hit.card.name}": this link attack cannot be nullified!`);
+              attackNullified = false;
+            }
+          }
+        }
+      } catch (e) { /* fall through to the normal resolution */ }
+      return prevEAR.call(this, attSide, attackerZones, targetPos, attackNullified);
+    };
+  }
   // #1541 Darkness Final Mission Card "World End" ([Set] impact): "When your Demon Lord on your field attacks, put the top card of your deck face down into this card's soul."
   // It used to parse as a one-shot on cast; now it is an attack trigger of the set card (fires from the set zone, see ABX.fireAttack otherAttack).
   // #6356 Last Symphony -Epilogue- ([Set] impact): "At the start of each player's turn, if your opponent's life is 4 or more, and three or more different «Dark Burial» are [Set] on your field,
@@ -589,6 +702,7 @@
           if (o.options) ab.options = o.options;
           if (o.action) ab.action = o.action;
           if (o.once) ab.once = o.once;
+          if (o.tags) ab.tags = o.tags;
           if (o.repeatLW) ab.repeatLW = o.repeatLW;
           if (o.trigger) ab.trigger = o.trigger; else if (o.trigger === null) delete ab.trigger;
           if (o.conds !== undefined) ab.conds = o.conds;

@@ -173,3 +173,8 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 
 ## Gargantua Slash Wyvern #5767 / #6066 (2026-11-01, tests: tests/wyvern.js)
 - [G.BOOST-Will-] "for this turn ... at the end of battle / when a monster attacks" paid its life/damage immediately at attack-phase start (#5767 also ignored the "another Deity Dragon Tribe" check, #6066 gained 2 life unconditionally). Now the condition is checked on resolve and the life/damage pays out at end of each battle (#5767: +1 life, 1 dmg) / on each monster attack (#6066: +2 life); abilities_r42.js.
+
+## [Overturn] / [Overkill] gaps (fixed 2026-11-02, test: tests/overturn_r42.js)
+- [x] #3902 Jackknife: Overturn is now a response-window nullifier (pay a soul into the drop zone when the opponent uses a card on their turn). #5161 El Quixote: drop a Knight from hand, equip up to two Knight items from the deck (f.abxItemCap lifts the one-item cap while it resolves), shuffle.
+- [x] Timing windows now enforced: #3843 only in the defense window (counter-style act, cond underAttack), #4163 optional trigger when this card link attacks (opponent cannot [Counter], crit+2, infinite power until the battle ends), #3595 as a "would be destroyed" replacement (also saves itself; that monster cannot be destroyed again this turn), #3822 offered when its link attack is about to be nullified (the attack then goes through).
+- [x] #3629 pays its printed 1 gauge (the generic cost pass from 2026-11-01 covers it; test added).
