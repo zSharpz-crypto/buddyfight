@@ -116,7 +116,7 @@
 
   const TRIG_OK = {
     enter: t => t.self, attack: t => t.self && !(t.target && t.target.junk), dealsDamage: t => t.self || !!t.np, damaged: () => true, attackDestroys: t => t.self, attackOutcome: t => t.self, attacked: t => t.self, link: t => t.self, discardedFromHand: t => t.self, otherAttack: t => !!t.np, oppAttack: () => true, battleEnd: () => true, flagReversal: () => true,
-    monsterLeaves: () => true,
+    monsterLeaves: () => true, unitRested: t => !!(t.self || t.front),
     turnStart: () => true, turnEnd: () => true, phaseStart: t => ["start", "draw", "main", "attack", "final", "turn"].includes(t.phase),
     otherEnter: t => !!t.np, otherDestroyed: t => !!t.np && !t.np.self, youCast: () => true, oppCast: () => true, leave: t => t.self && !t.byOpp,
     lifeGain: () => true, equipped: t => t.self, soulEmpty: t => t.self, hostAttack: t => !t.np || !t.np.junk, hostDealsDamage: t => !t.np || !t.np.junk, hostDestroys: t => !t.np || !t.np.junk, stoodByEffect: t => t.self,
@@ -1189,6 +1189,7 @@
   };
   // Watch life totals and soul sizes without touching every place in game.js that changes them.
   const soulSeen = new WeakMap();
+  const restSeen = new WeakMap();
   function sideOfF(f) { return B.plr === f ? "plr" : B.opp === f ? "opp" : null; }
   function watchLife(f) {
     if (!f || typeof f !== "object") return;
@@ -1216,6 +1217,8 @@
           const u = x.unit, n = (u.soul || []).length, prev = soulSeen.get(u);
           soulSeen.set(u, n);
           if (prev > 0 && n === 0 && ABX.enabled !== false && !B.matchOver) ABX.fireSoulEmpty(side, u);
+          const pr = restSeen.get(u), cr = !!u.rested; restSeen.set(u, cr);
+          if (pr === false && cr && ABX.enabled !== false && !B.matchOver) ABX.fireUnitRested(side, u, x.pos);
         });
       });
     } catch (e) { if (ABX.debug) console.error(e); }
@@ -1229,6 +1232,16 @@
   })();
 
   // "When this card is destroyed / leaves the field": the card is already gone, so run with no unit.
+  // "When this card [Rest]" / "When the monster in front of this card [Rest]" (#5461 #320 #321): fired from watchFighters when a unit turns rested
+  ABX.fireUnitRested = function (side, unit, pos) {
+    const norm = p => (p === "center2" ? "center" : p);
+    return ABX.queue(() => fireTriggers((t, src, s) => {
+      if (t.event !== "unitRested") return false;
+      if (t.self) return src.unit === unit;
+      if (t.front) { if (src.unit === unit || s === side) return false; const sp = posOfUnit(F(s), src.unit); return !!sp && norm(sp) === norm(pos); }
+      return false;
+    }, { name: "unitRested" })).catch(() => {});
+  };
   ABX.fireMonsterLeaves = function (side, card) {
     return ABX.queue(() => fireTriggers((t, src, s) => t.event === "monsterLeaves" && s === side && src.card !== card &&
       (!t.phase || B.phase === t.phase) && (!t.ownTurn || B.activeSide === side), { name: "monsterLeaves" })).catch(() => {});

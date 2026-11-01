@@ -1155,6 +1155,8 @@
   tr(new RegExp("^(?:when|whenever|each time) " + SUBJ_THIS + " attacks and (?:destroys " + OPP_MON + " or deals damage to (?:your|the) opponent|deals damage to (?:your|the) opponent or destroys " + OPP_MON + ")$", "i"), () => ({ event: "attackOutcome", self: true }));
   tr(new RegExp("^(?:when|whenever|each time) " + SUBJ_THIS + " attacks and destroys " + OPP_MON + "$", "i"), () => ({ event: "attackDestroys", self: true }));
   // "When your flag [Reversal], ..." (#6050 #6063 #6141): fires when one of YOUR flags is flipped to [Reversal] (ABX.fireFlagReversal)
+  tr(/^(?:when|whenever|each time) this card \[rest\]$/i, () => ({ event: "unitRested", self: true }));
+  tr(/^(?:when|whenever|each time) (?:your opponent's|an opponent's|the) monster in front of this card (?:becomes )?\[rest\]$/i, () => ({ event: "unitRested", front: true }));
   // "When a monster leaves your field (during your attack phase)" (#1381)
   tr(/^(?:when|whenever|each time) (?:a|another) monster leaves your field(?: during (your|the) attack phase)?$/i, (m) => ({ event: "monsterLeaves", phase: m[1] ? "attack" : null, ownTurn: /your/i.test(m[1] || "") }));
   tr(/^(?:when|whenever|each time) your flags? \[reversal\]$/i, () => ({ event: "flagReversal" }));
