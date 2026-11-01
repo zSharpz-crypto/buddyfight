@@ -245,3 +245,7 @@ Leftover dead statics: "gets all abilities of impact monsters in soul" (#2562 #2
 
 ## Dead statics batch 3 (r42, tests/dead_statics2.js)
 Attack-through #5612 #6494 #6523 #2118 #5374; nullify [Penetrate] #2972 (via ABX.kwLost); unreducible #6494; #4681 (Electrodeity soul protection); #3076 (return to hand when destroyed in attack phase).
+
+## Wrong-trigger wave D (r42, tests/wrong_trigger_d.js)
+Fixed: #3491 (enter from drop), #5194 #5840 (enter by your effect, gauge + draw), #6354 (enters opp field by your effect), #5657 (draw by your effect), #5656 (opp draws by effect, 3 different Idol), #5771 (opp hand increases), #6499 (opp gauge up -> drop to 2).
+New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` exported. Still open: #1381 (leave during attack phase), plus the one-offs listed above.

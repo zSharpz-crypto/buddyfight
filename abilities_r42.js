@@ -1476,7 +1476,7 @@
   /* ---- [r42] zone-change events + data-driven trigger table (wrong-trigger cards: text parsed as "enter" or a heuristic text executor) ----
    * Events detected by before/after snapshots around the outermost ability run: deckToDrop, fieldToHand, handDiscard, gaugeUp.
    * Trigger fields: owner ("you"|"opp": whose zone changed), by ("you": caused by my card effect), turn ("you"|"opp"), other (not this card), np (filter of the moved card). */
-  Object.assign(ABX.TRIG_OK, { deckToDrop: () => true, fieldToHand: () => true, handDiscard: () => true, gaugeUp: () => true });
+  Object.assign(ABX.TRIG_OK, { draw: () => true, handUp: () => true, enterFromDrop: () => true, deckToDrop: () => true, fieldToHand: () => true, handDiscard: () => true, gaugeUp: () => true });
   const esc = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const TG = (id, snippet, trigger, effect, opts) => OV42.push([id, new RegExp(esc(snippet), "i"), (ab) => {
     const p2 = ABX.parseSentenceSteps(effect, {});
@@ -1535,7 +1535,12 @@
       if (disc.length) evs.push(["handDiscard", { owner, actor, cards: disc.map(core.cardOf) }]);
       const back = inter(msDiff(b.field, a.field), msDiff(a.hand, b.hand));
       if (back.length) evs.push(["fieldToHand", { owner, actor, cards: back.map(core.cardOf) }]);
-      if (a.gauge > b.gauge) evs.push(["gaugeUp", { owner, actor, cards: [] }]);
+      if (a.gauge > b.gauge) evs.push(["gaugeUp", { owner, actor, cards: [], gaugeNow: a.gauge }]);
+      const drew = inter(msDiff(a.hand, b.hand), msDiff(b.deck, a.deck));
+      if (drew.length) evs.push(["draw", { owner, actor, cards: drew.map(core.cardOf) }]);
+      if (a.hand.length > b.hand.length) evs.push(["handUp", { owner, actor, cards: [] }]);
+      const fromDrop = inter(msDiff(a.field, b.field), msDiff(b.drop, a.drop));
+      if (fromDrop.length) evs.push(["enterFromDrop", { owner, actor, cards: fromDrop.map(core.cardOf) }]);
     });
     for (const [ev, data] of evs) { await fire42(ev, data); if (B.matchOver) return; }
   }
@@ -1922,4 +1927,16 @@
     } catch (e) { /* ignore */ }
     return r;
   };
+
+  /* ---- [r42] wave D: draw / hand / gauge / enter-by-effect triggers (#3491 #5194 #5840 #5656 #5657 #5771 #6354 #6499) ---- */
+  ABX.fire42 = fire42;
+  OPS.r42GaugeTo2 = { run(s, ctx) { const e = ctx.e; let n = 0; while (e.gauge.length > 2) { e.drop.push(e.gauge.pop()); n++; } return n > 0; } };
+  TG(3491, "when a monster enters your field from the drop zone", { event: "enterFromDrop", owner: "you" }, "draw a card", { once: "turn" });
+  TG(5194, "when a \u00abblack organization\u00bb character enters your field by card effects", { event: "unitEnters", owner: "you", by: "yourEffect", np: NPT("a Black Organization character") }, "put the top card of your deck into your gauge, and draw a card", { once: "turn" });
+  TG(5840, "when a \u00abyokai\u00bb character enters your field by card effects", { event: "unitEnters", owner: "you", by: "yourEffect", np: NPT("a Yokai character") }, "put the top of your deck into your gauge, and draw a card", { once: "turn" });
+  TG(6354, "when a monster enters your opponent's field by your card effects", { event: "unitEnters", owner: "opp", by: "yourEffect" }, "put the top two cards of your deck into your gauge, and deal 1 damage to your opponent");
+  TG(5657, "when you draw cards from your effects", { event: "draw", owner: "you", by: "yourEffect" }, "draw a card", { once: "turn" });
+  TG(5656, "when your opponent draws cards from their card effects", { event: "draw", owner: "opp", by: "oppEffect", minDifferent: { get filter() { return ABX.parseNP("an Idol card").filter; }, n: 3 } }, "your opponent chooses and drops a hand card");
+  TG(5771, "when the number of cards in your opponent's hand increases", { event: "handUp", owner: "opp" }, "your opponent chooses and drops a hand card");
+  OV42.push([6499, /when a card is put into your opponent's gauge/i, () => ({ kind: "triggered", trigger: { event: "gaugeUp", owner: "opp" }, steps: [{ op: "r42GaugeTo2" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
