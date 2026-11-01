@@ -1504,6 +1504,7 @@
     if (t.by === "effect" && data.byAttack) return false;
     if (t.by === "yourEffect" && (data.byAttack || data.actor !== side)) return false;
     if (t.by === "oppEffect" && (data.byAttack || !data.actor || data.actor === side)) return false;
+    if (t.pos && data.pos !== t.pos) return false;
     if (t.effect && !data.byEffect) return false;
     if (t.np && !(t.orSelf && unitsOf(data).includes(src.unit)) && !(data.cards || []).some(c => c && core.matchFilter(c, t.np.filter || {}, null, { f: F(side) }))) return false;
     if (t.attacker && !(data.attackers || []).some(u => u && u.card && core.matchFilter(u.card, t.attacker.filter || {}, { unit: u, side }, { f: F(side) }))) return false;
@@ -1648,4 +1649,62 @@
   TG(5412, "when this card on the right attacks", { event: "cardAttacks", owner: "you", selfOnly: true, selfPos: "right", needPos: { pos: "center", filter: { tribes: ["Astrodragon"] } } }, "for this turn, this card gets [Triple Attack]");
   TG(4177, "when a «weapon» with this card is in its soul attacks", { event: "cardAttacks", owner: "you", hostIn: true, hostNp: NPT("a «Weapon»") }, "you gain 1 life, and draw a card", { once: "turn" });
   OV42.push([6270, /when this card or a \[gun-king\]/i, () => ({ kind: "triggered", trigger: { event: "cardAttacks", owner: "you", orSelf: true, np: NPT("a [Gun-King], [First Ace] or [Mayqueen]") }, conds: [], steps: ABX.parseSentenceSteps("deal 1 damage to your opponent", {}).steps })]);
+
+  /* ---- [r42] wave C: Thunder Mine variants (unitEnters / itemEquipped / spellSet events) and "would leave" replacements (#4132 #4970 #5954) ---- */
+  Object.assign(ABX.TRIG_OK, { unitEnters: () => true, itemEquipped: () => true, spellSet: () => true });
+  if (ABX.fireOtherEnter) {
+    const prevFOE = ABX.fireOtherEnter;
+    ABX.fireOtherEnter = function (side, unit) {
+      const r = prevFOE.apply(this, arguments);
+      try {
+        if (unit && unit.card) {
+          const data = { owner: side, units: [unit], cards: [unit.card], pos: posOfU(F(side), unit), actor: B.abxEffectSide || null };
+          ABX.queue(() => fire42("unitEnters", data));
+        }
+      } catch (e) { /* ignore */ }
+      return r;
+    };
+  }
+  const prevFE2 = ABX.fireEquipped;
+  if (prevFE2) ABX.fireEquipped = function (side, card, unit) {
+    const r = prevFE2.apply(this, arguments);
+    try { ABX.queue(() => fire42("itemEquipped", { owner: side, cards: [card], units: [unit], actor: side })); } catch (e) { /* ignore */ }
+    return r;
+  };
+  if (typeof B.resolveCastSpell === "function") {
+    const rcs2 = B.resolveCastSpell;
+    B.resolveCastSpell = function (side, c, cid) {
+      const r = rcs2.apply(this, arguments);
+      try { if (c && c.set && (this.getFighter(side).setSpells || []).includes(c)) ABX.queue(() => fire42("spellSet", { owner: side, cards: [c], actor: side })); } catch (e) { /* ignore */ }
+      return r;
+    };
+  }
+  TG(1324, "when a monster enters your opponent's field on their left", { event: "unitEnters", owner: "opp", pos: "left" }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(1552, "when your opponent equips an item", { event: "itemEquipped", owner: "opp" }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(1552, "when your opponent [set] a spell", { event: "spellSet", owner: "opp" }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(1971, "when a monster with [move] enters your opponents field", { event: "unitEnters", owner: "opp", np: NPT("a monster with [Move]") }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(5714, "when monsters enter your opponent's field by card effects", { event: "unitEnters", owner: "opp", by: "yourEffect" }, "deal 1 damage to your opponent");
+  TG(6251, "during your turn, when a card is put from your opponent's field into the drop zone", { event: "cardDestroyed", owner: "opp", turn: "you" }, "deal 2 damage to your opponent");
+  OV42.push([4146, /when your opponent takes damage by "thunder mine" effects/i, () => ({ kind: "triggered", trigger: { event: "effDamage", opp: true, name: "Thunder Mine" }, conds: [], once: "turn", steps: ABX.parseSentenceSteps("put the top card of your deck into your gauge, and draw a card", {}).steps })]);
+  const SAVE_STEPS = () => [{ op: "moveSelf", to: { area: "drop zone", owner: "you", end: "top" }, src: "put this card into your drop zone", optional: true }, { op: "preventLeave", src: "that card remains on your field", gate: "ifYouDo" }];
+  OV42.push([4132, /when a 72 pillars would leave your field/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP("a 72 Pillars on your field"), byOpp: false }, conds: [], steps: SAVE_STEPS() })]);
+  OV42.push([5954, /when an originally size 3 .time dragon. would leave your field/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP("an originally size 3 «Time Dragon» on your field"), byOpp: false }, conds: [], steps: SAVE_STEPS() })]);
+  // set spells that save a monster: #4970 Indestructible Domilord
+  const SPSAVE = { 4970: (f, unit) => hasTribe(unit.card, "MAXDragon") && unit.card.name !== "Indestructible Domilord" };
+  const prevWLS5 = ABX.wouldLeaveSave;
+  if (prevWLS5) ABX.wouldLeaveSave = function (side, pos, unit, byAttack) {
+    if (prevWLS5.apply(this, arguments)) return true;
+    try {
+      const f = F(side); if (!unit || !unit.card || !f) return false;
+      for (const sp of (f.setSpells || []).slice()) {
+        if (!sp || !SPSAVE[sp.id] || !SPSAVE[sp.id](f, unit)) continue;
+        const ok = (ABX.autoPlay || side !== "plr" || typeof root.confirm !== "function") ? true : !!root.confirm(`${sp.name}: put it into the drop zone to keep "${unit.card.name}" on the field?`);
+        if (!ok) continue;
+        f.setSpells.splice(f.setSpells.indexOf(sp), 1); f.drop.push(sp.id);
+        if (B.setPrompt) B.setPrompt(`🛡️ "${sp.name}" kept "${unit.card.name}" on the field!`);
+        return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  };
 })(typeof window !== "undefined" ? window : globalThis);

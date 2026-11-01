@@ -232,3 +232,7 @@ Not covered: #6499 (drop gauge until 2), #3964 "returned from drop zone into dec
 New events cardDestroyed, damageTaken, cardAttacks (wraps of fireOtherDestroyed, applyDamage, fireAttack) with owner/by/turn/np/attacker/link/alone/need filters, matched in `matchEv`.
 Fixed: #213(1st) #215 #756(1st) #1305 #1420(1st) #2605 #2951 #3246 #3688 #4045(life part; "draw if by opp effects" not done) #4197 #4205 #5314(destroy half) #5625 #6112(1st) #6560(1st), #5634 #5652 #3839 #4143 #6446, #1169(1st) #1236 #3209 #5672 #3484 #2961 #5412 #4177 #6270.
 Leftover wrong-trigger: #124 #176 #292 #311 #320 #321 #356 #403(death curse) #1144 #1169/#213/#1415/#1420 soul-count triggers, #1381 #1458 #1644 #1674 #1755 #1878 #1971 #1324 #1552 #5714 #6251 (Thunder Mine variants), #2148 #4132 #4970 #5954 (would-leave replacement), #2210 #2269 #4078 #2359 #2427 #2462.. etc (see audit).
+
+## Wrong-trigger cards, wave C (r42, tests/wrong_trigger_c.js)
+New events unitEnters / itemEquipped / spellSet. Fixed Thunder Mine variants #1324 #1552(both) #1971(enter half) #5714 #4146 #6251(destroyed only), and "would leave" replacements #4132 #5954 (wouldLeaveOther) and #4970 (set-spell saver in ABX.wouldLeaveSave).
+Leftover: #1971 "uses [Move]" half, #2148 (item leaves by opp effect), #5954 call-from-drop half, #6251 non-destroy removals.
