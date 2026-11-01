@@ -34,7 +34,7 @@ async function hand(id) {
   for (const [id, cnt] of [[257,1],[670,1],[905,2],[2123,1],[2326,1],[3431,1],[3638,1],[3649,2],[4936,4],[3179,1],[5851,2]]) {
     const r = await hand(id); ck("#" + id + " pays its " + cnt + " deck soul", r && JSON.stringify(r.soul.slice(0, cnt)) === JSON.stringify(r.top.slice(0, cnt)) && r.soul.length >= cnt, r);
   }
-  for (const id of [105,152,742,3010,1492,2300,4805,6027,4026,5364,4262]) {
+  for (const id of [1492,2300,4805,6027,4026,5364,4262]) {
     const r = await hand(id); ck("#" + id + " unhandled soul cost keeps default 1 deck soul", r && r.soul[0] === r.top[0], r);
   }
   // no Call Cost line: default stays

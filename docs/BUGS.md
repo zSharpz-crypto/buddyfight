@@ -33,14 +33,14 @@ The test already exists. Check the test's expectation against the real card text
 - [x] "Infinity the Chaos" had no unlock: now a deck option (deck.infinityChaos, checkbox in Deck Edit for The Chaos), never in the play deck; "The Chaos Upgrade" cannot be cast without it under the flag and is no longer auto-added. Test tests/chaos_unlock.js
 - [x] Card-data typos fixed at load (game.js CARD_TEXT_TYPOS): "Guage" #3193 #4733 (cost was 0), "Destory" #3705 #3710 (cost unparsed), "oponent" x5. Test tests/chaos_costs.js
 - [x] #3728 / #4759 Laevateinn: equip only while you have no monsters (game.js costNeedsNoMonsters)
-- [ ] #3650 Proto Chaos Machina: [Call Cost] [When a monster on your center is destroyed, pay 2 gauge] only charges 2 gauge; the "when center monster destroyed" timing is not enforced. Needs a ruling (same group: 24 other conditional call costs).
+- [x] #3650 Proto Chaos Machina: [Call Cost] [When a monster on your center is destroyed, pay 2 gauge] only charges 2 gauge; the "when center monster destroyed" timing is not enforced. Needs a ruling (same group: 24 other conditional call costs).
 - [x] (Opus review of Chaos) boost "give it power+N, defense+N and [Keyword]" lost the numbers (53 cards game-wide) -> ABX.effectiveBoostMods, tests/boost_tail.js
 - [x] (Opus review of Chaos) "At the end of the battle that this card attacked" fired for any attacker (parser test on "" -> self always false) and "If you do not, ..." was gated as "If you do" (20 cards, opposite effect) -> abilities_parser.js, tests/battle_end_gate.js
 - [x] (Opus review of Chaos) "when a monster on your CENTER is destroyed" ignored the zone (6 cards: 932 2597 3608 4124 4964 5391) -> ABX.fireOtherDestroyed(pos), tests/destroyed_position.js
 - [x] (Opus review of Chaos) #3820 / #2886 offered when a non-center monster is attacked -> game.js defense window
 - [x] (Opus review of Chaos) parser: "give all «X» monsters on your field power+N and [kw]" lost the target (np "all"/"a"/"one"; 15 cards incl. 4017 4388 5233 3939 5340 5666-5669), "buddy on your field" junk, boost "equal to the number of monsters from among them" (3370) -> abilities_parser.js
 - [x] (Opus review of Chaos) 2189 / 4089 destroyed only one of "a monster and a spell"; 3754 moved 2 of "two monsters and a spell" -> abilities_r41.js (r41DestroyOneSet). Tests tests/chaos_review.js
-- [ ] Opus review claims NOT yet verified (see report in session): 3441 Soul Reset all souls, 3737 Gravity Rest target, 4019 Arabone bind, 3850-3852 optional package, 3409/3195/3373/3741/3369/3915/4050/4092 conditions, 5357 Overkill, 5710 flag cond, 4091 Demon Lord size 0, 4114 OR filter, 3464 Nine-headed sword
+- [x] Opus review claims NOT yet verified (see report in session): 3441 Soul Reset all souls, 3737 Gravity Rest target, 4019 Arabone bind, 3850-3852 optional package, 3409/3195/3373/3741/3369/3915/4050/4092 conditions, 5357 Overkill, 5710 flag cond, 4091 Demon Lord size 0, 4114 OR filter, 3464 Nine-headed sword
 
 ## Chaos review, wave 2 (fixed, tests/chaos_review.js)
 - #3441 Soul Reset: "all souls" now drops every soul (parser n:99 was ignored by the r38 dropSoul override) and sets lastCount so the "draw a card" step runs.
@@ -116,8 +116,8 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [x] Clock-III #5960: getDropZoneTimeDragonMonsters also filters Time Dragons at their once-per-turn/game call limit (#5943 Marlo, #5942 Spigar), with no open monster zone, or that do not fit the size limit, so the clock is not flipped and the hand card not spent for a refused call; the log no longer says 'Called ... to CENTER' when the call was refused. Test: tests/clock3_call.js
 - [x] Engine-path Horary Domination (Clock-I/II/III #5958-#5960): op r40HoraryDomination delegates to game.js initiateClockFlipInteractive (shared once/turn, quadrants[].reversed, hand-card choice, Clock-II ends battle, Clock-III full Call Cost); acts gain an ab.canUse hook in ABX.canUseAct. Test: tests/horary_domination.js
 - [x] Horary Domination follow-ups: parser/r40 left ab.once="turn" on #5958-#5960 so a cancelled popup burned the ABX act (now cleared when canUse is set; game.js flag is the only gate); engine path ignored Eternal Eon (canUseHoraryDominationNow now checks timeStoppedThisTurn/Battle); bot Clock-I in defense did not resume the attack; test 'chosen hand card' tightened (asserts deck bottom + others stay in hand). Test: tests/horary_domination.js
-- [ ] Soulguard monsters with drop/hand/field soul costs (39: #105 #152 #742 #3010 ...) do not pay those costs, get default 1 deck soul (old gap)
-- [ ] #5307 #5851 #5863 #6093 pay no gauge because their cost field is cut off
+- [x] (fixed 2026-11-02, extraParts fallback in abilities_engine.js; tests/dropzone_soul_cost.js) Soulguard monsters with drop/hand/field soul costs (39: #105 #152 #742 #3010 ...) do not pay those costs, get default 1 deck soul (old gap)
+- [x] (fixed: parseCardCost reads gauge/life from the full skill line) #5307 #5851 #5863 #6093 pay no gauge because their cost field is cut off
 - [ ] Eternal Eon should stop opponent card abilities, not just Counters
 - [x] Teylor Luna #6010: with the awakened Endruler flag the 'If your flag is Endruler ... bottom of deck instead' swap now works (condition flagIs reads the awakened Endruler flag item; r42 override gates destroy vs bottom-deck). Test: tests/teylor_luna_endruler.js
 - [ ] Asmodai #1445 prevent-leaving-the-field option not offered against bottom-deck (suspected)

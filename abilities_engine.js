@@ -1327,6 +1327,16 @@
       }
       if (p.allHandToSoul) { out.push(p); return; }
       const txt = String(p.text || "");
+      // "Put a card / an Armorknight / a «Chess» / a card with "Cobalt" in its card name from your drop zone into this monster's soul" (parser leaves these without soulFrom)
+      const mZ = !p.soulFrom && txt.match(/^(?:pay \d+ gauge\.?\s*)?(?:then,?\s*)?put (?:a|an|one) (.+?) from your (drop zone|hand)(?: with "([^"]+)" in its card name)? into (?:this (?:monster|card)'s|its) soul\.?$/i);
+      if (mZ) {
+        const what = mZ[1].trim(), flt = {};
+        const nm = mZ[3] || (what.match(/with "([^"]+)" in its card name/i) || [])[1];
+        if (nm) flt.names = [lc(nm)];
+        else if (!/^card$/i.test(what)) { const t = what.replace(/[«»]/g, "").replace(/^\[|\]$/g, "").trim(); if (/^[\w' -]+$/.test(t)) flt.tribes = [t]; else return; }
+        out.push({ soulFrom: { area: mZ[2].toLowerCase(), n: 1, np: { raw: what, qty: { n: 1 }, filter: flt } }, text: txt });
+        return;
+      }
       const mChooseSoul = txt.match(/^choose a card from your hand,\s*deck,?\s*or drop zone/i);
       if (mChooseSoul) {
         out.push({ chooseSoulFromAny: true, faceDown: /face\s*down/i.test(card.skill || ""), text: txt });
