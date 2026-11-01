@@ -9267,7 +9267,8 @@ const battle = {
         }
       }
 
-      ["left", "right", "center"].forEach(zonePos => {
+      if (this.botSmartCalls) { try { this.botSmartCalls(bot); } catch (e) { console.error(e); } }
+      else ["left", "right", "center"].forEach(zonePos => {
         if (!bot.monsters[zonePos]) {
           const mIdx = bot.hand.findIndex(cid => {
             const c = CARD_MAP.get(cid);
@@ -9295,7 +9296,7 @@ const battle = {
 
       this.renderBattle();
 
-      setTimeout(() => this.botPriority("the opponent's Main Phase ends", () => {
+      const toAttackPhase = () => setTimeout(() => this.botPriority("the opponent's Main Phase ends", () => {
         if (!stillThisMatch() || this.activeSide !== "opp") return;
         this.phase = "attack";
         this.renderBattle();
@@ -9304,6 +9305,7 @@ const battle = {
         if (bot.item && (!bot.monsters.center || bot.item.isEndrulerFlag)) attackers.push("item");
 
         let step = 0;
+        let botAttacksPlanned = 0;
         let botImpactTried = false;
         const runNextBotAttack = () => {
           if (!stillThisMatch()) return;
@@ -9342,6 +9344,20 @@ const battle = {
             return;
           }
 
+          // Smart attack: link attacks / the best target (bot_ai.js). No plan = nothing worth attacking with is left.
+          if (this.botPlanAttack && this.activeSide === "opp") {
+            if ((botAttacksPlanned = (botAttacksPlanned || 0) + 1) > 14) { step = attackers.length; return runNextBotAttack(); }
+            let plan = null;
+            try { plan = this.botPlanAttack(bot, "opp"); } catch (e) { console.error(e); plan = undefined; }
+            if (plan !== undefined) {
+              if (!plan) { step = attackers.length; return runNextBotAttack(); }
+              attackers.length = 0; attackers.push(...plan.zones); step = 0;
+              this.oppContinueCallback = () => runNextBotAttack();
+              this.setPrompt(`⚔️ Rival ${plan.zones.length > 1 ? "LINK ATTACKS" : "attacks"} (${plan.why})!`);
+              this.initiateAttackWithDefenseCheck("opp", plan.zones.slice(), plan.target);
+              return;
+            }
+          }
           const attZone = attackers[step];
           const unit = unitAt(bot, attZone);
           if (unit && unit.attacksLeft > 0 && !unit.rested) {
@@ -9359,6 +9375,9 @@ const battle = {
 
         runNextBotAttack();
       }), 750);
+      // [Act]s and useful spells first (the bot plays its abilities now), then the attack phase
+      if (this.botUseAbilities) Promise.resolve(this.botUseAbilities(bot)).catch(e => console.error(e)).then(() => { if (stillThisMatch()) toAttackPhase(); });
+      else toAttackPhase();
     };
 
     if (!bot.chargedThisTurn && bot.hand.length > 2) {

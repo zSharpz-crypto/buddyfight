@@ -15,6 +15,7 @@ Current focus: **card ability functions** (~9.7k abilities, ~89% built) and fixi
 - `abilities_engine.js` - runs ability steps, triggers, counters, defense options.
 - `abilities_ops.js`, `abilities_more.js`, `abilities_gkw.js`, `abilities_r9.js` ... `abilities_r41.js` - add/override ops and per-card abilities in "rounds". Later rounds load later and win. A new fix usually goes in the newest round file or the file that owns the op.
 - `abilities_ui.js` - ability prompts, banners, skill inspect.
+- `bot_ai.js` - smarter bot: `battle.botPlanAttack` (link attacks, best target, lethal), `botSmartCalls`, `botUseAbilities` ([Act]s + spells). Wired in game.js `runBotTurn`. Test: `tests/bot_ai.js`.
 - `impact_monsters.js` - `IMX`, impact monster logic.
 - `index.html` - script load order. Every script has `?v=YYYYMMDDx`; **bump the `v` of any JS file you change** or players keep the old cached file.
 

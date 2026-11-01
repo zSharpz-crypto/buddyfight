@@ -188,3 +188,6 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 ## Opus review claims (verified 2026-11-02)
 - [x] 3441 (cast needs N+ monsters), 3737, 4019, 3850-3852 (3851 attacking filter fixed), 3409/3195/3373/3741/3369/3915/4050/4092, 5357, 5710, 4091, 4114 (OR tribe filter), 3464 — all covered by `tests/opus_claims1.js` / existing tests.
 - [x] #3650 Proto Chaos Machina + other conditional call costs: already enforced via `ABX.destroyCallInfo` / `timingCallInfo` (`tests/destroy_calls.js`). #1448 Burn Nova (life would become 0 on opp's turn) now implemented too.
+
+## Bot AI (2026-11-02)
+- [x] Rival now plans attacks (bot_ai.js): link attacks to break high-Defense monsters, any target (not only center), lethal first, avoids [Counterattack] walls and pointless attacks, calls its strongest monsters, uses [Act]s and useful spells. tests/bot_ai.js
