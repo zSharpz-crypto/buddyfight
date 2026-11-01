@@ -24,7 +24,12 @@
 
   const buddyCallRow = (name) => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [{ t: "enterByBuddyCall" }], steps: [{ op: "r42BuddyCall", name }] });
 
+  let _exactNames = null;
+  const exactNameSet = () => _exactNames || (_exactNames = new Set((typeof ALL_CARDS !== "undefined" ? ALL_CARDS : (root.ALL_CARDS || [])).map(c => String(c.name || "").toLowerCase())));
+  const OVER_SELF_PAY = new Set([6512, 4115]);   // their ops already pay the printed cost
   const OV42 = [
+    /* ---- catalog check: #2920 Vermolt only triggers when it enters the CENTER ---- */
+    [2920, /when this card enters your center/i, (ab) => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [{ t: "selfPos", pos: "center" }], steps: clone(ab.steps || []) })],
     /* ---- Dimension Dragon review ---- */
     // #4633 Zorune: the looked cards go back on top (any order) and ONLY then, if a DD was dropped, a card is drawn
     [4633, /look at the top three cards of your deck/i, (ab) => {
@@ -319,15 +324,207 @@
   };
   OV42.push([4669, /you gain 1 life and draw a card/i, () => ({ kind: "spell", steps: [{ op: "r42ScapegoatGain" }], once: "turn" })]);
 
+  // #6526 Azi Dahaka "Re:B" (Dragon Ein): when destroyed it goes into the soul of up to one spell on your field (prefers "Dragon Throne" #941),
+  // then equips #2020 Aqulta Gwaneff from hand/deck (same equip logic as #867).
+  OPS.r42AziRebDestroy = {
+    async run(s, ctx) {
+      const f = ctx.f, sid = ctx.card && ctx.card.id;
+      const hosts = f.setSpells || [];
+      const host = hosts.find(c => c.id === 941) || hosts[0];
+      const di = f.drop.lastIndexOf(sid);
+      if (host && di >= 0) { f.drop.splice(di, 1); (host.soul = host.soul || []).push(sid); }
+      if (OPS.r40AziDahakaDestroy867) await OPS.r40AziDahakaDestroy867.run(s, ctx);
+      fresh();
+      return true;
+    }, check: () => true
+  };
+  OV42.push([6526, /when this card is destroyed, put this card into the soul/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true, destroyedOnly: true }, conds: [], steps: [{ op: "r42AziRebDestroy" }] })]);
+  // #1541 Darkness Final Mission Card "World End" ([Set] impact): "When your Demon Lord on your field attacks, put the top card of your deck face down into this card's soul."
+  // It used to parse as a one-shot on cast; now it is an attack trigger of the set card (fires from the set zone, see ABX.fireAttack otherAttack).
+  // #6356 Last Symphony -Epilogue- ([Set] impact): "At the start of each player's turn, if your opponent's life is 4 or more, and three or more different «Dark Burial» are [Set] on your field,
+  // your opponent's life becomes 3". The generic parse set the life to 3 on the life check alone; the three-different-Dark-Burial check was lost.
+  OPS.r42LastSymphony = {
+    run(s, ctx) {
+      const f = ctx.f, e = ctx.e || F(otherSide(ctx.side));
+      if (e.life < 4) return false;
+      const names = new Set((f.setSpells || []).filter(c => c && (c.attrs || []).some(a => lc(a).replace(/\s+/g, "") === "darkburial")).map(c => lc(c.name)));
+      if (names.size < 3) return false;
+      e.life = 3;
+      if (B.renderBattle) B.renderBattle();
+      return true;
+    }, check: () => true
+  };
+  OV42.push([6356, /at the start of each player's turn, if your opponent's life is 4 or more/i, (ab) => ({ kind: "triggered", trigger: clone(ab.trigger), conds: [], steps: [{ op: "r42LastSymphony" }] })]);
+  // #297 Super Lethal Formation ([Set] impact): "All Ninja on your field gets power+1000 and defense+1000" lasts while it is set; it parsed as a one-shot spell effect (temp boost on cast only).
+  // #3619 Abygale [Overturn]: an [Act] (main phase, pay 1 gauge, once per game). At the start of the opponent's NEXT turn it ends
+  // at once, and the user's cards cannot attack during their following turn.
+  OV42.push([3619, /\[overturn\]|end the turn/i, () => ({ kind: "act", trigger: null, once: "game", conds: [{ t: "phase", phase: "main", who: "you" }], steps: [{ op: "pay", gauge: 1, cost: true }, { op: "r42AbygaleArm" }] })]);
+  OPS.r42AbygaleArm = { run(s, ctx) { ctx.f.abxAbygale = 1; ctx.f.overturnUsed = true; return true; }, check: () => true };
+  {
+    const prevTE = ABX.fireTurnEvent;
+    ABX.fireTurnEvent = function (kind) {
+      try {
+        if (kind === "turnStart" && !B.matchOver) {
+          ["plr", "opp"].forEach(side => {
+            const f = F(side);
+            if (f.abxAbygale === 1 && B.activeSide !== side) {   // the opponent's turn begins: end it
+              f.abxAbygale = 2;
+              OPS.endPhase.run({ phase: "final" }, { side, f, e: F(side === "plr" ? "opp" : "plr"), bind: {}, log: [] });
+            } else if (f.abxAbygale === 2 && B.activeSide === side) { f.abxAbygale = 0; f.abxNoAttackTurn = B.turnCount; }   // the user's next turn
+          });
+        }
+      } catch (e) { /* ignore */ }
+      return prevTE.apply(this, arguments);
+    };
+    const lockedOut = (side) => { const f = F(side); return !!f && f.abxNoAttackTurn === B.turnCount && B.activeSide === side; };
+    ABX.attackBanned = lockedOut;
+    const prevLock = B.isFirstRoundAttackLocked;
+    B.isFirstRoundAttackLocked = function () { return lockedOut(this.activeSide) || prevLock.apply(this, arguments); };
+    const prevExec = B.executeAttackResolution;
+    B.executeAttackResolution = function (attSide) { if (lockedOut(attSide)) return; return prevExec.apply(this, arguments); };
+  }
+  // Aqulta Gwaneff counters: #942 only against a single (non-link) attack, #4175 only while being link attacked
+  OV42.push([942, /attacks you alone/i, () => ({ kind: "act", tags: ["counter", "act"], counter: true, conds: [{ t: "xLinkAttack", v: false }], steps: [{ op: "nullifyAttack", src: "nullify the attack" }] })]);
+  OV42.push([4175, /being link attacked/i, () => ({ kind: "act", tags: ["counter", "act"], counter: true, conds: [{ t: "xLinkAttack", v: true }], steps: [{ op: "discard", n: 1, cost: true, src: "discard a hand card" }, { op: "pay", life: 1, cost: true, src: "pay 1 life" }, { op: "nullifyAttack", src: "nullify the attack", gate: "ifYouDo" }] })]);
+  // #1094 Twin Demon Dragon, Zahhak: the quoted names are EXACT names ("... Azi Dahaka \"Re:B\"" is a different card)
+  OV42.push([1094, /demonic demise dragon, azi dahaka/i, (ab) => { const steps = clone(ab.steps || []); walk(steps, x => { if (x.filter && x.filter.names) { x.filter.namesExact = x.filter.names; delete x.filter.names; } }); return { kind: "triggered", trigger: clone(ab.trigger), conds: [], steps }; }]);
+  // #3824 Overturn Ice Emperor, Miserea: was a dead static. [Overturn] [Pay 2 gauge during your main phase] (the cost is added by the generic Overturn pass)
+  OV42.push([3824, /\[overturn\]/i, () => ({ kind: "act", tags: ["kw:overturn"], trigger: null, once: "game", conds: [{ t: "phase", phase: "main", who: "you" }], steps: [{ op: "r42Miserea" }] })]);
+  OPS.r42Miserea = {
+    run(s, ctx) {
+      const self = ctx.unit;
+      ["plr", "opp"].forEach(sd => {
+        const pf = F(sd);
+        // nullify all abilities of cards on the field
+        core.fieldUnits(pf, true).forEach(x => { if (x.unit) x.unit.abxNullified = B.turnCount; });
+        // return all other cards from hand, gauge, drop zone and field to the deck
+        ["left", "center", "right"].forEach(p => { const u = pf.monsters[p]; if (u && u !== self) { pf.deck.push(u.card.id, ...(u.soul || []).map(e => (e && e.id != null) ? e.id : e)); pf.monsters[p] = null; } });
+        ["item", "item2"].forEach(k => { const u = pf[k]; if (u && u !== self) { pf.deck.push(u.card.id, ...(u.soul || []).map(e => (e && e.id != null) ? e.id : e)); pf[k] = null; } });
+        (pf.setSpells || []).splice(0).forEach(c => pf.deck.push(c.id, ...(c.soul || []).map(e => (e && e.id != null) ? e.id : e)));
+        pf.deck.push(...pf.hand.splice(0), ...pf.gauge.splice(0), ...pf.drop.splice(0));
+        for (let k = pf.deck.length - 1; k > 0; k--) { const r = Math.floor(Math.random() * (k + 1)); [pf.deck[k], pf.deck[r]] = [pf.deck[r], pf.deck[k]]; }
+        pf.hand.push(...pf.deck.splice(0, 6));
+        pf.gauge.push(...pf.deck.splice(0, 2));
+      });
+      if (B.renderBattle) B.renderBattle();
+      return true;
+    },
+    check: () => true
+  };
+  OV42.push([297, /all ninja on your field gets power\+1000/i, (ab) => ({ kind: "static", steps: clone(ab.steps || []) })]);
+  // #4243 Tempest Thunder Knights Formation! ([Set] impact): "The size of all monsters with 'Thunder Knights' in their card names on your field is reduced by 1" is continuous while set;
+  // as a "spell" ability it parsed to a one-shot becomeSizeZero that never applied.
+  OV42.push([4243, /the size of all monsters with .thunder knights/i, (ab) => { const st = (ab.steps || []).find(x => x.np); return st ? { kind: "static", steps: [{ op: "static", kind: "sizeModOthers", np: clone(st.np), delta: -1, origSize: null, origLe: true, src: st.src }] } : null; }]);
+  // #6414 Finish Effect: MIRRORS SPACE ([Set] impact): "[Counter] [Act] ... call a «Super Warrior» monster from this card's soul by paying its [Call Cost]." The «Super Warrior» monsters are
+  // Impact Monsters, which the generic call op (type "Monster" only) never offered; they are called through the impact-monster engine (B.imCallFromZone), paying their gauge / life.
+  OPS.r42MirrorsCall = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side, host = ctx.soulHost || ctx.card;
+      if (!(root.IMX && B.imCallInfo && B.imCallFromZone) || !host || !Array.isArray(host.soul)) return false;
+      const sw = (c) => c && (c.attrs || []).some(a => lc(a).replace(/\s+/g, "") === "superwarrior");
+      const cands = [];
+      host.soul.forEach((e, si) => {
+        const id = typeof root.getSoulCardId === "function" ? root.getSoulCardId(e) : e, c = core.cardOf(id);
+        if (!sw(c) || !IMX.isImpactMonster(c)) return;
+        const info = B.imCallInfo(side, c, { byEffect: true, ignorePhase: true }), d = info && info.data;
+        if (!info || !info.ok || !d || (d.call.parts || []).length) return;
+        if (!MONSTER_POSITIONS.some(p => !f.monsters[p]) || B.getCurrentSizeUsed(f) + getEffectiveCardSize(f, c) > (f.maxSize || 3)) return;
+        cands.push({ k: "soul", side, host, idx: si, id, card: c, d, unit: null });
+      });
+      if (!cands.length) return false;
+      const ch = await core.pick(cands, { qty: { n: 1 }, raw: "a «Super Warrior» monster from this card's soul", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - call a Super Warrior from its soul` });
+      const r = ch && ch[0]; if (!r) return false;
+      const d = r.d || (cands.find(x => x.card === r.card) || {}).d; if (!d) return false;
+      const si = host.soul.findIndex(e => (typeof root.getSoulCardId === "function" ? root.getSoulCardId(e) : e) === r.id);
+      if (si < 0) return false;
+      const entry = host.soul.splice(si, 1)[0];
+      f.hand.push(r.id);
+      for (let g = 0; g < d.call.gauge; g++) f.drop.push(f.gauge.pop());
+      if (d.call.life > 0) f.life = Math.max(1, f.life - d.call.life);
+      const ok = !!B.imCallFromZone(side, "hand", f.hand.lastIndexOf(r.id), {}, null);
+      if (!ok) { const hi = f.hand.lastIndexOf(r.id); if (hi >= 0) f.hand.splice(hi, 1); host.soul.splice(si, 0, entry); }
+      return ok;
+    }, check: () => true
+  };
+  OV42.push([6414, /call a .super warrior. monster from this card's soul/i, (ab) => Object.assign(clone(ab), { steps: [{ op: "r42MirrorsCall" }] })]);
+  // #1152 New-Era Great Spell, The Creation ([Set] impact): "When you draw by the effect of a card, put the top card of your deck into your gauge, and you gain 1 life. Once per turn."
+  // It used to parse as a one-shot on cast. "effectDraw" fires from OPS.draw (a draw by a card effect, not the draw phase).
+  Object.assign(ABX.TRIG_OK, { effectDraw: () => true });
+  if (OPS.draw && OPS.draw.run && !OPS.draw.__r42Fire) {
+    const origDraw = OPS.draw.run;
+    OPS.draw.run = function (s, ctx) {
+      const r = origDraw.apply(this, arguments);
+      try { const side = ctx.side && (s && s.who === "opp" ? otherSide(ctx.side) : ctx.side); if (r && side) ABX.queue(() => core.fireTriggers((t, src, sd) => t.event === "effectDraw" && sd === side, { name: "effectDraw" })); } catch (e) { /* ignore */ }
+      return r;
+    };
+    OPS.draw.__r42Fire = true;
+  }
+  OV42.push([1152, /when you draw by the effect of a card/i, () => ({ kind: "triggered", trigger: { event: "effectDraw" }, once: "turn", conds: [], steps: [{ op: "mill", who: "you", n: 1, to: "gauge", src: "put the top card of your deck into your gauge" }, { op: "life", who: "you", n: 1, src: "you gain 1 life" }] })]);
+  OV42.push([1541, /when your demon lord on your field attacks/i, () => ({ kind: "triggered", trigger: { event: "otherAttack", np: np({ tribes: ["Demon Lord"] }) }, conds: [], steps: [{ op: "mill", who: "you", n: 1, to: "soul", host: "self", faceDown: true, src: "put the top card of your deck face down into this card's soul" }] })]);
+
+  // #6526 in the soul of "Dragon Throne": when an item on your field attacks ALONE it attacks all opp monsters + opp, and gets power+10000 and [Triple Attack] this turn.
+  // (Soul cards of set spells are not trigger sources in the engine, so this is applied from a fireAttack hook.)
+  const origFireAttackReb = ABX.fireAttack;
+  ABX.fireAttack = function (attSide, units) {
+    try {
+      const f = B[attSide];
+      const u = units && units.length === 1 && units[0] && units[0].unit;
+      if (f && u && u === f.item && u.abxRebTurn !== B.turnCount) {
+        const throne = (f.setSpells || []).find(c => c.id === 941 && (c.soul || []).some(x => Number(x && typeof x === "object" ? x.id : x) === 6526));
+        if (throne) {
+          u.abxRebTurn = B.turnCount;
+          u.abxAttackAllOpp = B.turnCount;
+          u.tempPower = (u.tempPower || 0) + 10000;
+          if (!u.tempTA) { u.tempTA = true; u.attacksLeft = (u.attacksLeft || 0) + 2; }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return origFireAttackReb.apply(this, arguments);
+  };
+
   // #5538: remember that Sector Collapse is active this turn (the attack hook below applies it)
   OPS.r42SectorCollapse = { run(s, ctx) { ctx.f.abxSectorCollapse = battle.turnCount; return true; }, check: () => true };
 
   const prev = ABX.parseCard;
+  /* catalog check: "unaffected by / not affected by the effects of \"<Name>\"" (#402 #405 #2068 vs Gleipnir).
+   * A restriction coming from that named card is undone for the immune unit. */
+  const immuneTo = (unit, srcName) => {
+    if (!unit || !unit.card || !srcName) return false;
+    const m = String(unit.card.skill || "").match(/(?:unaffected by|not affected by) the effects? of "([^"]+)"/i);
+    return !!m && lc(m[1]) === lc(srcName);
+  };
+  if (OPS.restrict && !OPS.restrict._r42Immune) {
+    const prevRun = OPS.restrict.run;
+    OPS.restrict.run = async function (s, ctx) {
+      const units = ["plr", "opp"].flatMap(sd => core.fieldUnits(F(sd), true)).map(x => x.unit).filter(u => immuneTo(u, ctx && ctx.card && ctx.card.name));
+      const before = units.map(u => [u, JSON.stringify(u.abxNo || null), u.tempIndestructible]);
+      const r = await prevRun.call(this, s, ctx);
+      before.forEach(([u, no, ti]) => { u.abxNo = JSON.parse(no) || undefined; if (u.abxNo === undefined) delete u.abxNo; u.tempIndestructible = ti; });
+      return r;
+    };
+    OPS.restrict._r42Immune = true;
+  }
+  ABX.immuneTo = immuneTo;
+
   ABX.parseCard = function (card) {
     const r = prev.apply(this, arguments);
     try {
       if (!card || !r || !Array.isArray(r.abilities)) return r;
-      if (!OV42.some(o => o[0] === card.id) && ![5422, 5748, 5759].includes(card.id)) return r;
+      // A bare quoted name ("Dragon Throne") means that exact card name, not "contains" (that is `with "X" in its card name`).
+      // The parser stores both as filter.names (substring): make the bare ones exact when such a card exists.
+      if (/"/.test(card.skill || "")) {
+        const exact = exactNameSet();
+        r.abilities.forEach(ab => walk(ab.steps, x => {
+          const f = x && x.filter;
+          if (!f || !Array.isArray(f.names) || !f.names.length || f.namesExact) return;
+          if (/\bin (?:its|their) (?:card )?names?\b|\bwith (?:the )?name\b/i.test(String(x.raw || ""))) return;
+          const ex = f.names.filter(n => exact.has(n));
+          if (!ex.length) return;
+          const rest = f.names.filter(n => !exact.has(n));
+          f.namesExact = ex; if (rest.length) f.names = rest; else delete f.names;
+        }));
+      }
+      if (!OV42.some(o => o[0] === card.id) && ![5422, 5748, 5759].includes(card.id) && !/\[(?:overturn|overkill|overthrow)\]\s*\[/i.test(card.skill || "")) return r;
       const extra = [];
       r.abilities.forEach(ab => {
         const raw = String(ab.cleaned || ab.raw || "");
@@ -344,11 +541,23 @@
           if (o.action) ab.action = o.action;
           if (o.once) ab.once = o.once;
           if (o.repeatLW) ab.repeatLW = o.repeatLW;
-          if (o.trigger) ab.trigger = o.trigger;
+          if (o.trigger) ab.trigger = o.trigger; else if (o.trigger === null) delete ab.trigger;
           if (o.conds !== undefined) ab.conds = o.conds;
           // #5757: the same effect also happens when it is dropped from the hand
           if (card.id === 5757 && o.kind === "triggered") { const c2 = clone(ab); c2.trigger = { event: "discardedFromHand", self: true }; extra.push(c2); }
           break;
+        }
+        // [Overturn] / [Overkill] / [Overthrow] [<activation cost / timing>]: the printed cost must be paid when the ability is used
+        if (ab.kind === "act" && Array.isArray(ab.steps) && (ab.tags || []).some(t => /(?:^|:)(overturn|overkill|overthrow)/.test(t)) && !OVER_SELF_PAY.has(card.id)) {
+          const br = /\[(?:overturn|overkill|overthrow)\]\s*\[([^\]]*)\]/i.exec(full);
+          if (br && !(ab.steps[0] && ab.steps[0].cost)) {
+            const txt = br[1], costs = [];
+            let m;
+            if ((m = /pay (\d+) gauge/i.exec(txt))) costs.push({ op: "pay", gauge: +m[1], cost: true, src: "pay " + m[1] + " gauge" });
+            if ((m = /pay (\d+) life/i.exec(txt))) costs.push({ op: "pay", life: +m[1], cost: true, src: "pay " + m[1] + " life" });
+            if (!/life would become/i.test(txt) && /(?:discard|drop) (?:a|one) (?:card|hand card)(?: from your hand)?|(?:discard|drop) a hand card/i.test(txt)) costs.push({ op: "discard", n: 1, cost: true, src: "discard a hand card" });
+            if (costs.length) ab.steps = costs.concat(ab.steps);
+          }
         }
       });
       extra.forEach(x => r.abilities.push(x));
@@ -405,6 +614,29 @@
   };
   core.guardStandLock = guardOp;
   Object.keys(OPS).forEach(name => guardOp(OPS[name]));
+  // A card stood by an ability can attack again: a unit that attacked out (attacksLeft 0, rested) must get its attacks back when an effect stands it
+  // (e.g. #2371 / #6521 Great Demonic End Dragon's [Counter][Act] [Stand] this card).
+  const maxAttacks = (side, u) => {
+    try { const eff = getUnitEffectiveCombatStats(F(side), u); return eff.qa ? 4 : eff.ta ? 3 : eff.da ? 2 : (u.card.atk_max || 1); } catch (e) { return u.card.atk_max || 1; }
+  };
+  const restandOp = (op) => {
+    if (!op || typeof op.run !== "function" || op._r42Restand) return op;
+    const orig = op.run;
+    op.run = function () {
+      const snap = [];
+      ["plr", "opp"].forEach(sd => core.fieldUnits(F(sd), true).forEach(x => { if (x.unit && x.unit.rested && !(x.unit.attacksLeft > 0)) snap.push({ u: x.unit, sd }); }));
+      if (!snap.length) return orig.apply(this, arguments);
+      const fix = () => snap.forEach(x => { if (!x.u.rested && !(x.u.attacksLeft > 0)) x.u.attacksLeft = maxAttacks(x.sd, x.u); });
+      const r = orig.apply(this, arguments);
+      if (r && typeof r.then === "function") return r.then(v => { fix(); return v; }, e => { fix(); throw e; });
+      fix();
+      return r;
+    };
+    op._r42Restand = true;
+    return op;
+  };
+  core.restandOp = restandOp;
+  Object.keys(OPS).forEach(name => restandOp(OPS[name]));
   // [Double / Triple / Quadruple Attack] stand the card again after its attack: a locked card stays rested after its first attack.
   const prevBattleEnd = ABX.fireBattleEnd;
   ABX.fireBattleEnd = function (attSide, units) {

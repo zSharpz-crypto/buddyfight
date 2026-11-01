@@ -1151,7 +1151,136 @@
   // "[Call Cost] [When a <Lost World> monster is put from your field into the drop zone, pay 2 gauge]" (#4941, #5013, #6440): the card can ONLY be called at that
   // timing, by paying the gauge. Offered right after one of your monsters of that world goes from the field to the drop zone.
   const TIMING_CALL = /\[Call Cost\]\s*\[When an? <([^>]+)> monster is put from your field into the drop zone,\s*pay (\d+) gauge\]/i;
-  ABX.timingCallInfo = (card) => { const m = card && TIMING_CALL.exec(String(card.cost || "") + " " + String(card.skill || "")); return m ? { world: m[1], gauge: Number(m[2]) } : null; };
+  // "[Call Cost] [When a «Genesis Dragon» monster on your field is put to drop zone, put three cards from your drop zone into its soul]" (#6145 Rightes, #6146 Leftes):
+  // same timing call, but the cost is cards from the drop zone into the new monster's soul; it may only be called on its own side, and while "Bigbang Dragon" is on the field.
+  const TIMING_SOUL = /\[Call Cost\]\s*\[When an? «([^»]+)» monsters? on your field is put (?:to|into) (?:the )?drop zone,\s*put (\w+) cards? from your drop zone into (?:its|this card's) soul\]/i;
+  const NUMW = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
+  const tribeKey = (s) => lc(s).replace(/[^a-z0-9]/g, "");
+  ABX.timingCallInfo = (card) => {
+    if (!card) return null;
+    const txt = String(card.cost || "") + " " + String(card.skill || "");
+    const m = TIMING_CALL.exec(txt);
+    if (m) return { world: m[1], gauge: Number(m[2]) };
+    const t = TIMING_SOUL.exec(txt);
+    if (!t) return null;
+    const pm = /you may only call this card on the (left|center|right)\b/i.exec(txt), nm = /\bif "([^"]+)" is on your field/i.exec(txt);
+    return { world: t[1], tribe: t[1], soulFromDrop: NUMW[lc(t[2])] || Number(t[2]) || 1, pos: pm ? lc(pm[1]) : null, needName: nm ? nm[1] : null };
+  };
+  // the cost part inside the brackets: "When a «T» monster on your field is put to drop zone, <cost>" -> the plain cost part (soul from drop zone ...)
+  const GEN_TIMING = /^when an? «([^»]+)» monsters? on your field is put (?:to|into) (?:the )?drop zone,?\s*(.+)$/i;
+  if (ABX.parseCostPart) {
+    const cpPrev = ABX.parseCostPart;
+    ABX.parseCostPart = function (p) {
+      const t = String(p || "").trim(), m = GEN_TIMING.exec(t);
+      if (m) { const inner = cpPrev.call(this, m[2]); if (inner && inner.ok) return Object.assign({}, inner, { text: t, timingTribe: m[1] }); }
+      return cpPrev.apply(this, arguments);
+    };
+    if (ABX.resetCaches) ABX.resetCaches();
+  }
+  /* ---- Duel Sieger: "[Call Cost] [When a <X> on your field is destroyed, nullify the [Lifelink] of <X> & Pay N gauge (& Put a "Y" from your drop zone into this monster's soul)]" ----
+   * #441 #442 #2013 #2689 #5939. Offered right after the destroyed monster (the unit's [Lifelink] / [Lifelink Lose] is nullified before it resolves). #6504: nullify + put on top (a normal call). */
+  const unq = (x) => { x = String(x || "").trim(); return /^".*"$/.test(x) ? x.slice(1, -1) : x; };
+  const DESTROY_SUBJ = /^when an? (.+?) on your (field|center|left|right) is destroyed( by your opponent's card)?,\s*/i;
+  ABX.destroyCallInfo = (card) => {
+    if (!card || (card.type !== "Monster" && card.type !== "Impact")) return null;
+    const CC = /\[Call Cost\]\s*\[(When an? .+? is destroyed[^,\n]*,[^\n]*?)\]\s*(?:\n|$)/i;   // (the card's "cost" field is cut at the first "]"; the skill text has the whole line)
+    const m = CC.exec(String(card.skill || "")) || CC.exec(String(card.cost || ""));
+    if (!m) return null;
+    const body = m[1], sm = DESTROY_SUBJ.exec(body); if (!sm) return null;
+    const gm = /pay (\d+|a|one|two|three|four|five) gauge/i.exec(body), dm = /put an? "(.+?)" from your drop zone into (?:this monster's|its|this card's) soul/i.exec(body);
+    const subj = sm[1], zm = /^size (\d+) (?:[«�]([^»�]+)[»�]|monster) with \[?lifelink\]?$/i.exec(subj);
+    const hm = /^monster with "(.+)" in its card name$/i.exec(subj) || /^\[(.+)\]$/.exec(subj), am = /^(?:monster|character)$/i.test(subj);
+    return { subject: subj, name: zm || hm || am ? null : unq(subj), nameHas: hm ? hm[1] : null, any: am, size: zm ? Number(zm[1]) : null, tribe: zm && zm[2] ? zm[2] : null, needLL: !!zm,
+      gauge: gm ? (NUMW[lc(gm[1])] || Number(gm[1])) : 0, soulName: dm ? dm[1] : null, pos: sm[2] === "field" ? null : lc(sm[2]), byOpp: !!sm[3],
+      nullLL: /\bnullify\b/i.test(body), soulTop: /put the top card of your deck into (?:this card's|its|this monster's) soul/i.test(body) };
+  };
+  const hasLL = (c) => !!(c && (c.ll > 0 || c.ll_lose));
+  const destroyMatches = (info, c) => {
+    if (!info || !c) return false;
+    if (info.name != null) return c.name === info.name;
+    if (info.nameHas) return String(c.name || "").toLowerCase().includes(info.nameHas.toLowerCase());
+    if (info.any) return true;
+    if (info.size != null && Number(c.size) !== info.size) return false;
+    if (info.tribe && !(c.attrs || []).some(a => tribeKey(a) === tribeKey(info.tribe))) return false;
+    return !info.needLL || hasLL(c);
+  };
+  const lbl = (info) => info.name != null ? `"${info.name}"` : info.subject;
+  // timingCallInfo is the "cannot be called from the hand in the main phase" check in game.js: these are destroy-timing calls too
+  const tciPrev = ABX.timingCallInfo;
+  ABX.timingCallInfo = (card) => tciPrev(card) || (ABX.destroyCallInfo(card) ? { world: "destroyed monster", destroyTiming: true } : null);
+  ABX.lifelinkLoseOff = (unit) => !!(unit && unit.abxLLNull);
+  const lloPrev = ABX.lifelinkOff;
+  ABX.lifelinkOff = function (side, card, unit) { return !!(unit && unit.abxLLNull) || (lloPrev ? lloPrev.apply(this, arguments) : false); };
+  const destroyCandidates = (side, unit) => {
+    const f = F(side), out = [];
+    f.hand.forEach((id, hi) => { const c = cardOf(id), info = c && ABX.destroyCallInfo(c); if (info && destroyMatches(info, unit.card) && (!info.pos || unit.abxDestroyedPos === info.pos) && (!info.byOpp || (unit.abxDestroyedBy && unit.abxDestroyedBy !== side))) out.push({ hi, c, info }); });
+    return out;
+  };
+  const dropHas = (f, name) => f.drop.some(id => { const c = cardOf(id); return c && c.name === name; });
+  const canDestroyCall = (side, x) => {
+    const f = F(side);
+    return f.gauge.length >= x.info.gauge && (!x.info.soulName || dropHas(f, x.info.soulName)) && (!x.info.soulTop || f.deck.length > 0) && ["center", "left", "right"].some(q => !f.monsters[q]);
+  };
+  // game.js (destroyed monster reached the drop zone, [Lifelink] about to resolve): offer the call first; paying the cost nullifies the [Lifelink] / [Lifelink Lose].
+  ABX.deferLifelink = function (side, card, unit, fn) {
+    try {
+      if (!unit || !unit.abxDestroyed || !destroyCandidates(side, unit).some(x => canDestroyCall(side, x))) return false;
+      ABX.queue(async () => {
+        try {
+          const f = F(side);
+          for (const x of destroyCandidates(side, unit)) {
+            if (!canDestroyCall(side, x)) continue;
+            const hi = f.hand.indexOf(x.c.id); if (hi < 0) continue;
+            const pos = ["center", "left", "right"].find(q => !f.monsters[q]);
+            let yes = true;
+            if (!isAuto({ side, auto: false })) {
+              const i = await ABX.ui.pickOption({ title: `Call "${x.c.name}"?`, subtitle: `${lbl(x.info)} was destroyed: nullify its [Lifelink]${x.info.gauge ? ` and pay ${x.info.gauge} gauge` : ""} to call it.`, options: [{ label: "✅ Call it" }, { label: "No" }] });
+              yes = i === 0;
+            }
+            if (!yes) continue;
+            const paid = []; for (let g = 0; g < x.info.gauge; g++) paid.push(f.gauge.pop());
+            const before = f.hand.length;
+            const isImp = x.c.type === "Impact" && typeof B.imCallFromZone === "function";   // Impact Monsters are placed by impact_monsters.js
+            B.abxFreeCall = true;
+            try { if (isImp) B.imCallFromZone(side, "hand", hi, {}, null); else B.completeMonsterCall(side, pos, hi, false, true); } finally { B.abxFreeCall = false; }
+            const nu = isImp ? null : f.monsters[pos];
+            if (f.hand.length === before || (!nu && !isImp)) { paid.forEach(g => f.gauge.push(g)); continue; }   // the call did not happen: refund
+            paid.forEach(g => f.drop.push(g));
+            if (x.info.nullLL) unit.abxLLNull = true;   // the destroyed monster's [Lifelink] / [Lifelink Lose] is nullified (part of the cost)
+            if (x.info.soulTop && nu && Array.isArray(nu.soul) && f.deck.length) nu.soul.push(f.deck.shift());
+            if (x.info.soulName) { const di = f.drop.findIndex(id => { const c = cardOf(id); return c && c.name === x.info.soulName; }); if (di >= 0 && Array.isArray(nu.soul)) nu.soul.push(f.drop.splice(di, 1)[0]); }
+            break;
+          }
+        } catch (e) { if (ABX.debug) console.error(e); }
+        fn();
+      });
+      return true;
+    } catch (e) { return false; }
+  };
+  // the older text-based effect resolver (game.js) also records whose card effect is destroying (for "destroyed by your opponent's card", #5202)
+  if (typeof B.executeCardAbilityEffect === "function" && !B.executeCardAbilityEffect._r41Eff) {
+    const eaePrev = B.executeCardAbilityEffect;
+    B.executeCardAbilityEffect = function (side) {
+      const prev = B.abxEffectSide; B.abxEffectSide = side;
+      try { return eaePrev.apply(this, arguments); } finally { B.abxEffectSide = prev; }
+    };
+    B.executeCardAbilityEffect._r41Eff = true;
+  }
+  // cost parts: the "When a <X> on your field is destroyed, nullify the Lifelink ..." trigger, "Put a "Y" from your drop zone into this monster's soul",
+  // and #6504's "Nullify the [Lifelink] of up to one <X> on your field. Then, put it on top of ..." (the covered monster becomes soul, so its [Lifelink] never triggers)
+  const cpPrev2 = ABX.parseCostPart;
+  ABX.parseCostPart = function (p) {
+    const t = String(p || "").trim().replace(/\.$/, "");
+    if (DESTROY_SUBJ.test(t)) return { ok: true, text: t, destroyTrigger: true };
+    let m = /^pay (\d+|a|one) gauge\.?\s*if you are not \[?transform\]?(?: into a card)?,\s*pay another (\d+|a|one) gauge$/i.exec(t);   // #1386 (the extra gauge is added in game.js parseCardCost)
+    if (m) return { ok: true, text: t, gauge: NUMW[lc(m[1])] || Number(m[1]), gaugeIfNotTransformed: NUMW[lc(m[2])] || Number(m[2]) };
+    m = /^put an? "(.+?)" from your drop zone into (?:this monster's|its|this card's) soul$/i.exec(t);
+    if (m) return { ok: true, text: t, destroyDropToSoul: m[1] };
+    m = /^nullify the \[?lifelink\]? of up to one .+? on your field\.?\s*then,?\s*(put (?:it|this card) on top of .+)$/i.exec(t);
+    if (m) { const inner = cpPrev2.call(this, m[1]); if (inner && inner.ok) return Object.assign({}, inner, { text: t, nullLL: true }); }
+    return cpPrev2.apply(this, arguments);
+  };
+  if (ABX.resetCaches) ABX.resetCaches();
   if (ABX.fireLeave) {
     const flPrev = ABX.fireLeave;
     ABX.fireLeave = function (side, card) {
@@ -1164,6 +1293,25 @@
             const worlds = card.worlds && card.worlds.length ? card.worlds : [card.world];
             for (let hi = 0; hi < f.hand.length; hi++) {
               const c = cardOf(f.hand[hi]); const info = c && ABX.timingCallInfo(c);
+              if (info && info.tribe) {   // soul-from-drop timing call (#6145 / #6146)
+                if (!(card.attrs || []).some(a => tribeKey(a) === tribeKey(info.tribe))) continue;
+                const spos = info.pos || ["center", "left", "right"].find(q => !f.monsters[q]);
+                if (!spos || f.monsters[spos]) continue;
+                if (info.needName && !["left", "center", "right"].some(q => f.monsters[q] && f.monsters[q].card && f.monsters[q].card.name === info.needName)) continue;
+                if (!ABX.canPayExtras(side, c, hi)) continue;
+                let ok = true;
+                if (!isAuto({ side, auto: false })) {
+                  const i = await ABX.ui.pickOption({ title: `Call "${c.name}"?`, subtitle: `A «${info.tribe}» monster was put into your drop zone: put ${info.soulFromDrop} cards from your drop zone into its soul to call it.`, options: [{ label: "✅ Call it" }, { label: "No" }] });
+                  ok = i === 0;
+                }
+                if (!ok) continue;
+                const before = f.hand.length;
+                B.abxFreeCall = true;
+                try { B.completeMonsterCall(side, spos, hi, false, true); } finally { B.abxFreeCall = false; }
+                if (f.hand.length !== before && f.monsters[spos]) await ABX.payExtras(side, c, f.monsters[spos]);
+                fresh();
+                return;
+              }
               if (!info || !worlds.includes(info.world) || f.gauge.length < info.gauge) continue;
               const pos = ["center", "left", "right"].find(q => !f.monsters[q]);
               if (!pos) return;

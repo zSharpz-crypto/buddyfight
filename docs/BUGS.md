@@ -128,3 +128,45 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [ ] Other 'If your flag is X ... instead' cards, not checked/fixed (different shapes): #5706, #5969, #6458 (handled r42 repeat), #6563
 - [x] tests/godclock_awaken.js 'owner can choose hand copy over field' was flaky (~7% of runs, not a code regression: same at every commit 0e4a2af..HEAD): the shuffled test deck is full of #6065, and the turn-start draw after the flip could draw one into hand while Wind Kronos pulled the dropped copy into soul. Test now removes 6065 from the deck (0/60 failures).
 
+
+- [x] #4625 Agonia (and 39 other monsters whose "look at the top N / search" line is a leave trigger, [Act], [Counter] or [Auto]): the legacy text prompt "Use ...'s Ability?" popped up when the card entered the field (game.js afterMonsterCallLanded fallback via parseDeckSearchCriteria). New guard `deckSearchIsNotEnterTimed`. Test: tests/dimension_dragon.js g6.
+
+- FIXED 2026-10-31: #2920 Vermolt destroyed on any enter (now center only). #402/#405/#2068 Fenrir/Managarmr were still locked by Gleipnir's "cannot attack" (immunity now applied in OPS.restrict, abilities_r42.js). Test: tests/catalog_cards.js
+
+- FIXED 2026-10-31: Dragon Ein deck rule only allowed Dragon Monsters/Items; now Dragon cards of every type (Spell, Impact too) + Generic. Dragon Zwei now allows Dragon Monsters + Impact monsters (no Items/Spells). Dragon Drei unchanged (sub-flag of Zwei). Test: tests/dragon_flags.js. Catalog: db.legalFor(969) / "legal: dragon ein|zwei".
+- FIXED 2026-10-31: #5341 REB00T (and #3825 Overkill) "end the turn" did nothing on the opponent's turn (OPS.endPhase final only ended your own turn, and only in the final phase), so the attacker could keep attacking. Now no more attacks, and the turn ends once the battle in progress is over (bot attackers stop and skip their final-phase Impact call). Test: tests/over_abilities.js #10.
+
+## [Set] Impacts (fixed 2026-11-01, test: tests/set_impacts.js)
+- [x] All 11 [Set] impacts (#290 #297 #1152 #1406 #1541 #3180 #3355 #4243 #6356 #6363 #6414) stay in the set zone after casting (never the drop zone).
+- [x] #3180 Death Count ~Requiem~ / #3355 ~Serenade~: "put the top card into this card's soul" sent the card to the DROP (mill op needed a unit) and the 3-soul check (selfSoul) was always false for set cards, so the win / life-1 never happened. mill -> soul and selfSoul now use the [Set] card's own soul; "put this card from the field into the drop zone" now resolves for set cards (their soul goes to the drop with them).
+- [x] #1541 World End: the Demon Lord attack clause ran once on cast and never again; now an `otherAttack` trigger that fires from the set zone (face-down soul). "At the end of your attack phase" (`phaseEnd`) was never fired by anything (also #1711); parser now keeps phase/who and game.js fires it when the attack phase ends (human, bot, effect-ended).
+- [x] #6356 Last Symphony -Epilogue-: set the opponent's life to 3 on the life check alone; now also needs 3 different «Dark Burial» [Set].
+- [x] #1152 New-Era Great Spell: ran once on cast; now "when you draw by a card effect" (new `effectDraw` event from OPS.draw), once per turn.
+- [x] #297 Super Lethal Formation: "All Ninja +1000/+1000" was a one-shot temp boost on cast; now continuous while set. #4243 Tempest Thunder Knights Formation!: the "size reduced by 1" never applied (spell-kind one-shot); now continuous.
+- [x] #290 / Secret Swords (#291-#293...): cards in a [Set] card's soul never fired their "if this card is in the soul of ..." triggers (e.g. #293 when the opponent casts an impact); set cards are now trigger sources for their soul cards. Casting a Secret Sword from the soul (#293 #294 #295 #1616 #2615) now pays its [Cast Cost] (it was free, "you may cast it" without "by paying" parsed as pay:false); with too little gauge it stays in the soul.
+- [x] #1406 There are no Places for You to Run!: now inherits the named "Thunder Mine" triggers of cards in its soul (soulShareNamed for set cards).
+- [x] #6414 Mirrors Space: [Counter][Act] "call a Super Warrior from this card's soul" found no candidates ("Super Warrior" monsters are Impact Monsters, the call op only knew type Monster, and a set card had no soul host). New op r42MirrorsCall calls them through the impact-monster engine, paying their call cost, once per turn.
+- Verified working as-is: #6363 Curse Count (damage -1 with a Curse Dragon; top 2 cards of the opponent's deck under their flag).
+
+## #3619 Abygale [Overturn] (fixed 2026-11-01, test: tests/abygale.js)
+- Parsed as an auto trigger: the opponent's turn ended at its start with no activation and no cost. Now an [Act] (your main phase, pay 1 gauge, once per game): the opponent's next turn ends at its start and your cards cannot attack during your following turn.
+- game.js: the generic "Unleash [Overturn]" button is hidden for cards whose [Overturn] is owned by ABX.
+- Still open: other [Overturn] acts (e.g. #3629) do not charge their printed gauge cost via ABX.useAct.
+
+## Stand-by-ability re-attack + ability-only equips (fixed 2026-11-01, test: tests/restand.js)
+- A unit that had attacked out (rested, attacksLeft 0) and was stood by an ability (#2371 / #6521 Great Demonic End Dragon [Counter][Act], any [Stand] op) stayed unable to attack. Now its attacks are restored (Double Attack = 2). abilities_r42.js `restandOp`.
+- "You may not equip this card other than by the ability of ..." (#942, #2020, #4175 Aqulta Gwaneff swords) was ignored: they could be equipped from hand. Now blocked for hand/banner/bot (`equipOnlyByAbility` in game.js); Azi Dahaka's ability equips still work.
+
+## Aqulta Gwaneff counters + Soulguard (fixed 2026-11-01, test: tests/gwaneff.js)
+- #942 [Counter][Act] had no condition (usable against link attacks too): now only when the attack is NOT a link attack.
+- #4175 [Counter][Act] had no condition: now only while being link attacked (discard 1 + pay 1 life, then nullify).
+- #942 "nullify the [Soulguard] of monsters this card attacks" did nothing: a monster it destroys in battle ignores [Soulguard] (no soul spent, any soul count). game.js `sgNullified` in destroyMonster.
+
+## #1094 Twin Demon Dragon, Zahhak (fixed 2026-11-01, test: tests/zahhak.js)
+- Search used substring name matching, so it also fetched #6526 Demonic Demise Dragon, Azi Dahaka "Re:B". Quoted names are now exact (`filter.namesExact`, abilities_engine.js matchFilter). Pay 2 life / Azi Dahaka / Dragon Throne fetch verified.
+
+## Audit sweep: suspicious cards (2026-11-01, tests: tests/overcost.js)
+- ~50 [Overturn]/[Overkill]/[Overthrow] acts never charged their printed activation cost (pay N gauge / pay N life / discard-drop a hand card). Now added generically in abilities_r42.js (cards whose op already pays: #6512, #4115). game.js Unleash button hidden for ABX-owned ones.
+- #3824 Overturn Ice Emperor, Miserea was a dead static: now an [Overturn] act (pay 2 gauge, main phase): nullify field abilities, all other cards back to both decks, shuffle, draw 6, 2 to gauge.
+- Bare quoted names ("Dragon Throne") are now exact when such a card exists (113 filters, abilities_r42.js); `with "X" in its name` stays substring.
+- Still open (audit): #3902 Shining Dragoner Jackknife and #5161 El Quixote [Overturn] are dead statics (need a nullify-card-used counter / "drop a Knight from hand then equip two Knight items"); #3747/#5163 run through the generic text executor; timing of "when ... would" Overturns (#3595, #3822, #3843, #4163) is not enforced.

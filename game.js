@@ -681,7 +681,7 @@ function getFlagConfig(flagCard) {
       hand: 4,
       gauge: 2,
       maxSize: 3,
-      ruleSummary: "Life: 12 • Hand: 4 • Gauge: 2 • «Dragon» Monsters & Items only (no Spells / Impacts)"
+      ruleSummary: "Life: 12 • Hand: 4 • Gauge: 2 • «Dragon» cards (Monsters, Items, Spells, Impacts) + Generic"
     };
   }
   if (n.includes("dragon zwei")) {
@@ -692,7 +692,7 @@ function getFlagConfig(flagCard) {
       hand: 4,
       gauge: 2,
       maxSize: 3,
-      ruleSummary: "Life: 20 • Hand: 4 • Gauge: 2 • «Dragon» Monsters only (no Items / Spells / Impacts) + Dragon Drei"
+      ruleSummary: "Life: 20 • Hand: 4 • Gauge: 2 • «Dragon» Monsters & Impact Monsters only (no Items / Spells) + Dragon Drei"
     };
   }
   if (n.includes("dragon drei")) {
@@ -909,11 +909,13 @@ function checkCardLegalityForFlag(card, flagCard, editingLostDeck = false, buddy
 
   let nativeMatch = false;
 
-  // Dragon Ein: only Monsters and Items that have "Dragon" in their name, world or tribe (no Spells, no Impacts, no Generic).
-  // Dragon Zwei: same, but Monsters only (no Items). Dragon Drei is allowed as a sub-flag above.
+  // Dragon Ein: cards with "Dragon" in their name, world or tribe (Monster, Item, Spell, Impact) + <Generic> cards.
+  // Dragon Zwei: Dragon Monsters and Impact monsters only (no Items / Spells / Generic). Dragon Drei is allowed as a sub-flag above.
   if (cfg.key === "dragon_ein" || cfg.key === "dragon_zwei") {
-    const allowedTypes = cfg.key === "dragon_ein" ? ["Monster", "Item"] : ["Monster"];
-    const ok = (allowedTypes.includes(card.type) && hasDragonInCard(card)) || (cfg.key === "dragon_ein" && card.type === "Spell" && /flag is "Dragon Ein"/i.test(card.skill || ""));
+    const allowedTypes = cfg.key === "dragon_ein" ? ["Monster", "Item", "Spell", "Impact"] : ["Monster", "Impact"];
+    const ok = (allowedTypes.includes(card.type) && hasDragonInCard(card))
+      || (cfg.key === "dragon_ein" && isTrueGenericCard(card))
+      || (cfg.key === "dragon_ein" && card.type === "Spell" && /flag is "Dragon Ein"/i.test(card.skill || ""));
     if (ok) return { allowed: true, maxCopies: 4 };
   } else if (cfg.key === "chaos") {
     nativeMatch = attrs.some(a => a.includes("chaos")) || nameLower.includes("chaos") || isTrueGenericCard(card);
@@ -1017,6 +1019,9 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
     const soulLine = sm && sm[2].length > line.length && sm[2].startsWith(line) ? sm[2] : line;
     const gMatch = line.match(/Pay\s+(\d+)\s+gauge/i);
     if (gMatch) gauge = parseInt(gMatch[1], 10);
+    // "If you are not [Transform] into a card, pay another N gauge" (#1386): only a fighter with a [Transform] item on the field pays the base cost
+    const ntMatch = String(skillStr || line).match(/\[(?:Call|Cast|Equip) Cost\][^\n]*?If you are not \[Transform\][^,]*,\s*pay another (\d+) gauge/i);
+    if (ntMatch && !(fighter && getEquippedItems(fighter).some(x => x.unit.card.tr || x.unit.isTransformed))) gauge += parseInt(ntMatch[1], 10);
     const lMatch = line.match(/Pay\s+(\d+)\s+life/i);
     if (lMatch) life = parseInt(lMatch[1], 10);
     const sMatch = soulLine.match(/Put\s+(?:the\s+)?top\s+(?:(one|two|three|\d+)\s+)?cards?\s+of\s+your\s+deck\s+into\s+(?:this\s+(?:card|monster)'s\s+|its\s+)?soul/i);
@@ -1482,6 +1487,21 @@ function checkReleaseClause(clause, fighter) {
 }
 
 // { has, met, reasons, parts } for a card's release condition (has=false when the card has none)
+// "You may not equip this card other than by the ability of "<Name>"" -> the card can't be equipped from hand normally (only by card effects).
+function equipOnlyByAbility(card) {
+  const m = String(card && card.skill || "").match(/you (?:may not|cannot|can't) equip this card(?: other than| except)? by the abilit(?:y|ies) of ("[^"]+"(?:\s*(?:,|or)\s*"[^"]+")*)|you (?:may not|cannot|can't) equip this card other than by the abilit(?:y|ies) of ("[^"]+")/i);
+  return m ? (m[1] || m[2]) : null;
+}
+
+// An ability may equip an "only by the ability of X" item only when its source card is X (or shares X's name after the comma, e.g. any "..., Azi Dahaka").
+function abilityMayEquip(card, srcCard) {
+  const only = equipOnlyByAbility(card);
+  if (!only) return true;
+  if (!srcCard) return false;
+  const tail = (n) => String(n || "").split(",").pop().replace(/[\s"]+/g, " ").trim().toLowerCase();
+  return (only.match(/"[^"]+"/g) || []).some(q => { const t = tail(q.replace(/"/g, "")); return t && tail(srcCard.name).includes(t); });
+}
+
 function getReleaseConditionStatus(card, fighter) {
   const text = getReleaseConditionText(card);
   if (!text || !fighter) return { has: false, met: true, reasons: [], parts: [] };
@@ -1684,6 +1704,13 @@ function canUseMove(side, unit) {
 }
 
 /* ==================== UNIVERSAL DECK SEARCH & TOP-DECK LOOK PARSER ==================== */
+// The matched "look at the top N / search" line belongs to a non-enter ability (e.g. "When this card is put from the field into the drop zone", [Act], [Counter]),
+// so it must not pop up when the card enters the field.
+function deckSearchIsNotEnterTimed(card) {
+  const crit = parseDeckSearchCriteria(card);
+  return !!(crit && /when this card (?:is put from|is destroyed|leaves|is put into|is discarded)|\[(?:act|counter|auto)\]/i.test(crit.rawText || ""));
+}
+
 function parseDeckSearchCriteria(card) {
   if (!card || !card.skill) return null;
   const s = card.skill || "";
@@ -5624,11 +5651,15 @@ const battle = {
 
     this.phase = "start";
     this.phase = "main";
-    this.setPrompt(`🔄 Turn ${this.turnCount}: ${f.name}'s Start Phase — Drawing 1 card from Deck...`);
+    // First Round Rule: the first player does not draw on Turn 1 (they can only Charge & Draw).
+    const firstRound = this.turnCount === 1;
+    this.setPrompt(firstRound
+      ? `🔄 Turn 1: ${f.name}'s Start Phase — First Round: no draw this turn (you can only Charge & Draw).`
+      : `🔄 Turn ${this.turnCount}: ${f.name}'s Start Phase — Drawing 1 card from Deck...`);
     this.renderBattle();
 
     const gen = this.matchGen;
-    this.drawCardsWithAnimation(side, 1, () => {
+    this.drawCardsWithAnimation(side, firstRound ? 0 : 1, () => {
       if (gen !== this.matchGen || this.matchOver) return;
       if (side === "plr" || !f.isBot) {
         this.setPrompt("Main Phase: Click any card for its Detail Banner, Call, Equip, Cast, Search Deck, [Move] to Center, or Charge & Draw!");
@@ -5665,6 +5696,7 @@ const battle = {
       if (ABX.fireTurnEvent) ABX.fireTurnEvent("phaseStart", "attack");
       this.renderBattle();
     } else if (this.phase === "attack") {
+      this.fireAttackPhaseEnd(this.activeSide);
       this.phase = "final";
       this.setPrompt("🔥 Final Phase: Cast an Impact card to finish the fight, or click End Turn!");
       this.renderBattle();
@@ -5694,6 +5726,7 @@ const battle = {
     // If the player clicked End Turn directly from Main or Attack Phase without entering Final Phase,
     // fire Final Phase start triggers first so cards that return/come to hand at the start of Final Phase still trigger!
     if (this.phase !== "final") {
+      if (this.phase === "attack") this.fireAttackPhaseEnd(endingSide);
       this.phase = "final";
     }
     if (this.imTurnEnd) this.imTurnEnd(endingSide);
@@ -6079,6 +6112,8 @@ const battle = {
         const bEq = document.createElement("button");
         bEq.className = "primary-cta-btn";
         const relSt = getReleaseConditionStatus(card, f);
+        const onlyBy = equipOnlyByAbility(card);
+        if (onlyBy) { relSt.met = false; relSt.reasons = [`Only by the ability of ${onlyBy}`]; }
         bEq.textContent = relSt.met ? `🗡️ Equip Item (${cost.gauge} Gauge)` : `🔒 ${relSt.reasons[0]}`;
         bEq.disabled = !relSt.met;
         bEq.onclick = () => {
@@ -6264,7 +6299,7 @@ const battle = {
         });
       }
 
-      if ((card.ot || card.ok || card.oth) && !f.overturnUsed) {
+      if ((card.ot || card.ok || card.oth) && !f.overturnUsed && !(window.ABX && ABX.actAbilities && ABX.actAbilities(card).some(a => (a.tags || []).some(t => /(?:^|:)(overturn|overkill|overthrow)/.test(t))))) {
         const tag = card.ot ? "Overturn" : card.ok ? "Overkill" : "Overthrow";
         const bSpec = document.createElement("button");
         bSpec.className = "primary-cta-btn";
@@ -7738,7 +7773,7 @@ const battle = {
       if (window.ABX && ABX.fireOtherEnter) ABX.fireOtherEnter(side, unit);
       if (window.ABX && ABX.ownsEnter && ABX.ownsEnter(c)) {
         ABX.fireEnter(side, c, unit);
-      } else if (s.includes("when this card enters the field") || parseDeckSearchCriteria(c)) {
+      } else if (s.includes("when this card enters the field") || (parseDeckSearchCriteria(c) && !deckSearchIsNotEnterTimed(c))) {
         this.promptOptionalAbility(side, c, unit);
       }
     }
@@ -7761,6 +7796,11 @@ const battle = {
     }
 
     // [Release Condition!] (Dragon Force ...) must be met to equip
+    const onlyBy = equipOnlyByAbility(c);
+    if (onlyBy) {
+      if (!f.isBot) alert(`"${c.name}" cannot be equipped normally — only by the ability of ${onlyBy}.`);
+      return;
+    }
     const rel = getReleaseConditionStatus(c, f);
     if (!rel.met) {
       if (!f.isBot) alert(`Cannot ${modeLabel.toLowerCase()} "${c.name}" yet:\n• ${rel.reasons.join("\n• ")}`);
@@ -8402,9 +8442,13 @@ const battle = {
   },
 
   // "End the attack phase" (ABX): move the attacker to the Final Phase once the current battle is over.
+  // "At the end of your attack phase" triggers (ABX phaseEnd), e.g. [Set] #1541 World End
+  fireAttackPhaseEnd(side) { if (window.ABX && ABX.fireTurnEvent) ABX.fireTurnEvent("phaseEnd", "attack", side); },
+
   abxCheckEndAttack(attSide) {
     if (!(window.ABX && ABX.attackPhaseEnded && ABX.attackPhaseEnded())) return false;
     if (this.activeSide !== attSide || this.phase !== "attack") return false;
+    this.fireAttackPhaseEnd(attSide);
     this.phase = "final";
     if (!this.getFighter(attSide).isBot) this.setPrompt("🛑 Your attack phase was ended by a card effect — Final Phase.");
     return true;
@@ -8821,9 +8865,9 @@ const battle = {
         defenderSurvived = true;
         this.setPrompt(`🛡️ "${defender.card.name}" prevented destruction by card effect and remained on the field!`);
       } else {
-        this._destroyByAttack = true;
+        this._destroyByAttack = true; this._attackersNow = attUnits.map(x => x.unit);
         let destroyed;
-        try { destroyed = this.destroyMonster(defSide, targetPos); } finally { this._destroyByAttack = false; }
+        try { destroyed = this.destroyMonster(defSide, targetPos); } finally { this._destroyByAttack = false; this._attackersNow = null; }
         destroyedFlag = !!destroyed;
         defenderSurvived = !destroyed;
         if ((targetPos === "center" || targetPos === "center2") && anyPenetrate && destroyed) {
@@ -8891,7 +8935,9 @@ const battle = {
     // "The next time this card would be destroyed this turn, it remains on the field" (ABX saveOnce)
     if (window.ABX && ABX.core && ABX.core.useSave && ABX.core.useSave(ownerSide, m)) { this.renderBattle(); return false; }
     const abxSG = !!(window.ABX && ABX.staticBonus && ABX.staticBonus(ownerFighter, m).sg);
-    if ((m.card.sg || m.tempSG || abxSG) && !(window.ABX && ABX.kwLost && ABX.kwLost(m, "soulguard")) && m.soul && m.soul.length > 0) {
+    // #942 Demonic Demise Sword, Aqulta Gwaneff: nullify the [Soulguard] of monsters this card attacks (no soul is spent, the monster is destroyed)
+    const sgNullified = !!this._destroyByAttack && (this._attackersNow || []).some(u => u && u.card && /nullify the \[soulguard\] of monsters this card attacks/i.test(u.card.skill || ""));
+    if (!sgNullified && (m.card.sg || m.tempSG || abxSG) && !(window.ABX && ABX.kwLost && ABX.kwLost(m, "soulguard")) && m.soul && m.soul.length > 0) {
       const discardedSoul = m.soul.pop();
       const wasFaceDown = isSoulEntryFaceDown(discardedSoul);
       const soulCardId = getSoulCardId(discardedSoul);
@@ -8934,6 +8980,8 @@ const battle = {
     }
 
     if (this.imOnDestroyedUnit && window.IMX && IMX.isUnit(m)) this.imOnDestroyedUnit(ownerSide, m);
+    m.abxDestroyed = true; m.abxDestroyedPos = pos;
+    m.abxDestroyedBy = this._destroyByAttack ? (side === "plr" ? "opp" : "plr") : (this.abxEffectSide || null);   // side of the attacker / of the card effect that destroyed it   // (Duel Sieger call costs: only a destroyed monster may be answered by a call)
     this.sendMonsterToDropWithAnimation(side, pos, false);
     if (window.ABX && ABX.fireLeave) ABX.fireLeave(ownerSide, m.card, !!this._destroyByAttack);
     if (window.ABX && ABX.fireOtherDestroyed) ABX.fireOtherDestroyed(ownerSide, m.card, m, pos);
@@ -8981,16 +9029,24 @@ const battle = {
         }
       });
 
-      if (isRetire) {
-        // [Lifelink] only triggers when the monster is destroyed.
-      } else if (deadCard.ll_lose) {
-        ownerFighter.life = 0;
-        this.checkWinCondition();
-      } else if (deadCard.ll > 0 && !(window.ABX && ABX.lifelinkOff && ABX.lifelinkOff(ownerSide, deadCard))) {   // "nullify the [Lifelink] of this card"
-        ownerFighter.life -= deadCard.ll;
-        this.setPrompt(`💔 [Lifelink ${deadCard.ll}] "${deadCard.name}" left the field — ${ownerFighter.name} took ${deadCard.ll} damage!`);
-        this.checkWinCondition();
-      }
+      const applyLifelink = () => {
+        if (isRetire) {
+          // [Lifelink] only triggers when the monster is destroyed.
+        } else if (deadCard.ll_lose) {
+          if (!(window.ABX && ABX.lifelinkLoseOff && ABX.lifelinkLoseOff(m))) {   // Duel Sieger call costs: "nullify the [Lifelink] of ..."
+            ownerFighter.life = 0;
+            this.checkWinCondition();
+          }
+        } else if (deadCard.ll > 0 && !(window.ABX && ABX.lifelinkOff && ABX.lifelinkOff(ownerSide, deadCard, m))) {   // "nullify the [Lifelink] of this card"
+          ownerFighter.life -= deadCard.ll;
+          this.setPrompt(`💔 [Lifelink ${deadCard.ll}] "${deadCard.name}" left the field — ${ownerFighter.name} took ${deadCard.ll} damage!`);
+          this.checkWinCondition();
+        }
+        this.renderBattle();
+      };
+      // a hand card may be called now by nullifying this [Lifelink]: resolve that choice first
+      if (!isRetire && window.ABX && ABX.deferLifelink && ABX.deferLifelink(ownerSide, deadCard, m, applyLifelink)) { /* runs after the call decision */ }
+      else applyLifelink();
       this.renderBattle();
     });
   },
@@ -9122,7 +9178,7 @@ const battle = {
       if (!stillThisMatch()) return;
       const itemIdx = bot.hand.findIndex(cid => {
         const c = CARD_MAP.get(cid);
-        return c && c.type === "Item" && parseCardCost(c.cost, c.skill, bot, c).gauge <= bot.gauge.length && getReleaseConditionStatus(c, bot).met;
+        return c && c.type === "Item" && !equipOnlyByAbility(c) && parseCardCost(c.cost, c.skill, bot, c).gauge <= bot.gauge.length && getReleaseConditionStatus(c, bot).met;
       });
       if (itemIdx !== -1 && !bot.item) {  // (bot.item is also set while its Endruler flag is active)
         this.equipCardFromHand("opp", itemIdx, "Equip");
@@ -9190,10 +9246,11 @@ const battle = {
             step = 0;
             this.setPrompt("⚔️ Rival gets an extra Attack Phase!");
           }
-          if (this.activeSide === "opp" && step >= attackers.length && !botImpactTried && this.imBotCall) {
+          if (this.activeSide === "opp" && step >= attackers.length && !botImpactTried && this.imBotCall && !(window.ABX && ABX.turnEnded && ABX.turnEnded())) {
             // Final Phase: the bot may call one Impact Monster, and it may attack right away.
             botImpactTried = true;
             const prevPhase = this.phase;
+            if (prevPhase === "attack") this.fireAttackPhaseEnd("opp");
             this.phase = "final";
             const zone = this.imBotCall(bot);
             if (zone) { attackers.push(zone); this.renderBattle(); setTimeout(runNextBotAttack, 700); return; }
