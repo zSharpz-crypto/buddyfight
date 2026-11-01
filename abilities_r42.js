@@ -1865,4 +1865,61 @@
   OV42.push([4062, /if a card with .sword of the king. in its card name other than/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP('a card with "Sword of the King" in its card name on your field'), byOpp: false }, conds: [], steps: SAVE_STEPS() })]);
   OV42.push([4194, /if a .toilet. would leave your field by your opponent's card effects/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP("a «Toilet» on your field"), byOpp: true }, conds: [], steps: SAVE_STEPS() })]);
   OV42.push([5561, /if an originally size 3 .evil demonic dragon. would leave your field/i, () => ({ kind: "triggered", trigger: { event: "wouldLeaveOther", np: ABX.parseNP("an originally size 3 «Evil Demonic Dragon» on your field"), byOpp: false }, conds: [], steps: SAVE_STEPS() })]);
+
+  /* ---- [r42] dead statics batch 3: attack-through (#5612 #6494 #6523 #2118 #5374), nullify [Penetrate] (#2972), unreducible (#6494), #4681, #3076 ---- */
+  const prevCAT2 = ABX.canAttackThrough;
+  ABX.canAttackThrough = function (side, unit, which) {
+    if (prevCAT2 && prevCAT2.apply(this, arguments)) return true;
+    try {
+      if (which === "own" || !unit || !unit.card) return false;
+      const f = F(side);
+      if (!(monsList(f).includes(unit) || equippedItems(f).includes(unit))) return false;
+      if (fieldHas(f, 6523)) return true;                                                                              // #6523 all cards on your field
+      if (hasTribe(unit.card, "SkullWarrior") && fieldHas(f, 6494)) return true;                                       // #6494
+      if (hasTribe(unit.card, "Idol") && fieldHas(f, 5612) && core.fieldUnits(f, true).some(x => x.unit && /syoko hoshi/i.test(x.unit.card.name || ""))) return true;   // #5612
+      if ((unit.soul || []).includes(2118)) return true;                                                               // #2118 in the soul of a monster
+      if (/hello, happy world/i.test((unit.card.attrs || []).join(" ")) || hasTribe(unit.card, "HelloHappyWorld")) {
+        if (core.fieldUnits(f, true).some(x => x.unit && x.unit.card.id === 5374 && x.unit.abxNullified !== B.turnCount) ||
+          core.fieldUnits(f, true).some(x => x.unit && (x.unit.soul || []).includes(5374))) return true;               // #5374
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  const prevKL = ABX.kwLost;
+  ABX.kwLost = function (u, kw) {
+    if (prevKL && prevKL.apply(this, arguments)) return true;
+    try {
+      if (kw === "penetrate" && u) {
+        const side = ["plr", "opp"].find(sd => onFieldU(F(sd), u));
+        if (side && equippedItems(F(otherSide(side))).some(x => x.card.id === 2972 && x.abxNullified !== B.turnCount)) return true;   // #2972 nullify [Penetrate] of all cards on your opponent's field
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  const prevAR2 = ABX.attackUnreducible;
+  ABX.attackUnreducible = function (attSide, units) {
+    if (prevAR2 && prevAR2.apply(this, arguments)) return true;
+    try {
+      const f = F(attSide), us = (units || []).map(x => (x && x.unit) || x).filter(Boolean);
+      if (us.length === 1 && hasTribe(us[0].card, "SkullWarrior") && fieldHas(f, 6494)) return true;                   // #6494
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  // #4681: with an «Electrodeity» soul, this card cannot leave the field by your opponent's card effects
+  PROT42[4681] = (E, S) => E.byOpp && !E.byAtk && E.unit === S.unit && (KD(E.kind) || KRET(E.kind) || E.kind === "put into the drop zone" || E.kind === "leave the field" || E.kind === "put to other areas") &&
+    (S.unit.soul || []).some(sid => { const c = core.cardOf(sid); return c && hasTribe(c, "Electrodeity"); });
+  // #3076: during the attack phase, if this card is destroyed and put into the drop zone, return this card to hand
+  const prevFOD3 = ABX.fireOtherDestroyed;
+  ABX.fireOtherDestroyed = function (side, card, unit, pos) {
+    const r = prevFOD3.apply(this, arguments);
+    try {
+      if (card && card.id === 3076 && B.phase === "attack" && unit && unit.abxNullified !== B.turnCount) {
+        ABX.queue(() => {
+          const f = F(side), k = f.drop.lastIndexOf(3076);
+          if (k >= 0) { f.drop.splice(k, 1); f.hand.push(3076); if (B.setPrompt) B.setPrompt(`↩ "${card.name}" returned to your hand!`); fresh(); }
+        });
+      }
+    } catch (e) { /* ignore */ }
+    return r;
+  };
 })(typeof window !== "undefined" ? window : globalThis);

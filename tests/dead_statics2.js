@@ -72,5 +72,18 @@ const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "
   ck("5012 opp monster-effect draw blocked", val(`return battle.opp.hand.length===h0`), val(`return [battle.opp.hand.length,h0,rr]`));
   run(`fresh(); globalThis.h0=battle.opp.hand.length; globalThis.rr=ABX.OPS.draw.run({op:'draw',who:'you',n:1},{side:'opp',f:battle.opp,e:battle.plr,card:card(45),bind:{chosen:[]}});`); await settle();
   ck("5012 absent: draw works", val(`return battle.opp.hand.length===h0+1`), val(`return [battle.opp.hand.length,h0]`));
+  // ---- batch 3 ----
+  run(`fresh(); put('plr','center',6523); globalThis.a=put('plr','left',45); put('opp','center',45);`); ck("6523 all cards attack through center", val(`return ABX.canAttackThrough('plr',a,'opp')`));
+  run(`fresh(); globalThis.a=put('plr','left',45); put('opp','center',45);`); ck("no 6523: blocked", val(`return !ABX.canAttackThrough('plr',a,'opp')`));
+  const swk = val(`const c=window.BUDDYFIGHT_CARDS.find(x=>x.type==='Monster'&&(x.attrs||[]).some(t=>/^skullwarrior$/i.test(t))&&x.id!==6494); return c?c.id:0`);
+  run(`fresh(); put('plr','center',6494); globalThis.a=put('plr','left',${swk}); put('opp','center',45);`); ck("6494 Skull Warrior attacks through", val(`return ABX.canAttackThrough('plr',a,'opp')`)); ck("6494 alone: damage unreducible", val(`return ABX.attackUnreducible('plr',[a])`));
+  run(`fresh(); globalThis.a=put('plr','left',45); put('plr','right',2118); battle.plr.monsters.left.soul=[2118]; put('opp','center',45);`); ck("2118 in soul: host attacks through", val(`return ABX.canAttackThrough('plr',a,'opp')`));
+  run(`fresh(); battle.opp.item=mk(2972); globalThis.a=put('plr','center',${swk}); a.tempPen=true;`); ck("2972 nullifies Penetrate on opp cards", val(`return !st(a).pen`), val(`return st(a)`));
+  run(`fresh(); globalThis.u=put('plr','center',4681,[${"0"}]); u.soul=[${val(`return tid(/^electrodeity$/i)`)}];`.replace('${"0"}','1')); ck("4681 with Electrodeity soul: cannot be returned by opp", val(`return ABX.core.isProtected(u,'plr','returned to hand',{side:'opp'})`));
+  run(`fresh(); globalThis.u=put('plr','center',4681,[1]);`); ck("4681 no Electrodeity soul: can be returned", val(`return !ABX.core.isProtected(u,'plr','returned to hand',{side:'opp'})`));
+  run(`fresh(); battle.phase='attack'; put('plr','left',3076); battle.destroyMonster('plr','left');`); await settle();
+  ck("3076 destroyed in attack phase: back to hand", val(`return battle.plr.hand.includes(3076) && !battle.plr.drop.includes(3076)`), val(`return [battle.plr.hand,battle.plr.drop]`));
+  run(`fresh(); battle.phase='main'; put('plr','left',3076); battle.destroyMonster('plr','left');`); await settle();
+  ck("3076 destroyed in main phase: stays in drop", val(`return battle.plr.drop.includes(3076)`));
   console.log(`pass ${pass} fail ${fail}`); process.exit(fail ? 1 : 0);
 })();

@@ -242,3 +242,6 @@ Damage: #343 #4971 (pay gauge to reduce) #3186 #5722 #5838 (reductions) #3480 #4
 Stats: #1124 #2040 #2369 #2382 #2755 #3205 #4433 #4508 #4887 #5470 #5507(2+ Idol part) #5870 #6243 #3945(crit-1). Sizes: #2218 #2307 #2314 #2443 #3605 #4508 #5310 #5836 #6379.
 Restrictions: #1436 #2112 #3311 (opp monsters can't move/return), #335 (no link attack), #3945 (no left/right attacks), #5461 (can't attack w/o Kirari), #5012, #2684, #6260 (cast block, untested), no-[Counter] #3530 #3946 #5468 #5870 #6243. Replacements: #3235 #4062 #4194 #5561.
 Leftover dead statics: "gets all abilities of impact monsters in soul" (#2562 #2608 #4436 #5269 #6477), equip rules (#2553 #3676 #3869 #5346 #4175 #2020 #2661 #2789), attack-through (#5649 #5612 #6494 #6523 #2118), #3328 #4192 #5249 #5507(buddy part) #5374 #5380 #6014 #6398 #6518 #3076 #3854 #5395 #5695 #4681 #2521 #3874 #6433 #6445 #6230 #6237 #6287 #942 #5483 #2972 #1158 #6494(unreducible part).
+
+## Dead statics batch 3 (r42, tests/dead_statics2.js)
+Attack-through #5612 #6494 #6523 #2118 #5374; nullify [Penetrate] #2972 (via ABX.kwLost); unreducible #6494; #4681 (Electrodeity soul protection); #3076 (return to hand when destroyed in attack phase).
