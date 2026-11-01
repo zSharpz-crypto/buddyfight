@@ -1419,4 +1419,57 @@
     } catch (e) { /* ignore */ }
     return prevAD3.apply(this, arguments);
   };
+
+  /* ---- [r42] "attack cannot be nullified / damage cannot be reduced" with conditions: #2453 #2462 #3065 #3234 #3254 #4234 #5646 #6245 #6252 #6351 #6482 (+ #349 vs "Shield" cards) ---- */
+  // rule(u, us, side, f) -> { nu: attack can't be nullified, nr: damage can't be reduced } | null; u = attacking unit, us = all attacking units
+  const nameOnField = (fighter, re) => core.fieldUnits(fighter, true).some(x => x.unit && re.test(x.unit.card.name || ""));
+  const UN42 = {
+    2453: (u, us) => us.length > 1 ? { nu: true } : null,
+    4234: (u, us) => us.length === 1 ? { nu: true } : null,
+    6245: (u, us) => us.length === 1 ? { nu: true, nr: true } : null,
+    5646: (u, us, side, f) => us.length === 1 && nameOnField(f, /natsuki kimura/i) ? { nu: true, nr: true } : null,
+    6351: (u, us, side, f) => us.length === 1 && (f.setSpells || []).filter(c => c && hasTribe(c, "DarkBurial")).length >= 3 ? { nu: true, nr: true } : null,
+    6482: (u, us, side, f) => us.length === 1 && f.drop.length >= 20 ? { nu: true, nr: true } : null,
+    3254: (u, us) => us.length === 1 && (u.soul || []).length >= 3 ? { nu: true } : null,
+    6252: (u, us) => us.length === 2 && us.some(o => o !== u && hasTribe(o.card, "Medabot")) ? { nu: true } : null
+  };
+  // cards in the soul of the attacker: 2462 (impact monster "Jackknife"), 3065 («Neodragon»)
+  const SOULUN = {
+    2462: (u, us) => us.length === 1 && /jackknife/i.test(u.card.name || "") && isImpactC(u.card),
+    3065: (u, us) => us.length === 1 && hasTribe(u.card, "Neodragon")
+  };
+  const unRes = (side, us, bc) => {
+    const f = F(side); let nu = false, nr = false;
+    for (const u of us) {
+      if (!u || !u.card || u.abxNullified === B.turnCount) continue;
+      const r = UN42[u.card.id] && UN42[u.card.id](u, us, side, f);
+      if (r) { nu = nu || !!r.nu; nr = nr || !!r.nr; }
+      (u.soul || []).forEach(id => { if (SOULUN[id] && SOULUN[id](u, us)) nu = true; });
+    }
+    // #3234: when a «Disaster» on your field attacks a monster, that attack cannot be nullified
+    if (bc && bc.defUnit && us.some(u => u && hasTribe(u.card, "Disaster")) && core.fieldUnits(f, true).some(x => x.unit && x.unit.card.id === 3234 && x.unit.abxNullified !== B.turnCount)) nu = true;
+    return { nu, nr };
+  };
+  const prevAU = ABX.attackUnnullifiable;
+  ABX.attackUnnullifiable = function (bc) {
+    if (prevAU && prevAU.apply(this, arguments)) return true;
+    try { return unRes(bc.attSide, bc.attUnits || [], bc).nu; } catch (e) { return false; }
+  };
+  const prevAR = ABX.attackUnreducible;
+  ABX.attackUnreducible = function (attSide, units) {
+    if (prevAR && prevAR.apply(this, arguments)) return true;
+    try { return unRes(attSide, (units || []).map(x => (x && x.unit) || x).filter(Boolean), ABX.battleCtx).nr; } catch (e) { return false; }
+  };
+  // #349 Excalibur: if it is the only card attacking, its attack cannot be nullified by a card with "Shield" in its name
+  const nullRunPrev = OPS.nullifyAttack.run;
+  OPS.nullifyAttack.run = function (s, ctx) {
+    try {
+      const bc = ABX.battleCtx;
+      if (bc && bc.active && (bc.attUnits || []).length === 1 && bc.attUnits[0].card && bc.attUnits[0].card.id === 349 && bc.attUnits[0].abxNullified !== B.turnCount && /shield/i.test((ctx.card && ctx.card.name) || "")) {
+        if (B.setPrompt) B.setPrompt("⚠️ That attack cannot be nullified!");
+        return false;
+      }
+    } catch (e) { /* ignore */ }
+    return nullRunPrev.apply(this, arguments);
+  };
 })(typeof window !== "undefined" ? window : globalThis);

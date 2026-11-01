@@ -219,3 +219,7 @@ Leftover: #6226 double Impact Transform / equip Super Warrior without Gemclone; 
 ## Conditional protections (r42 PROT42, tests/cond_protections.js)
 Fixed (rule table + destroyMonster wrap for attack destruction + stat/damage parts): #367 #403 #841 #983 #1258 #1271 #1676(items) #2213 #2733 #3046 #3254(rest) #3283 #3619 #4156 #4690 #5158 #6107 #6315 #6360 #6430 #6477 #6482 #6503 #6504 #6509 #6532.
 Leftover: "attack cannot be nullified if attacking alone" family (#349 #2453 #2462 #3065 #3234 #3254(attack part) #4234 #5646 #6245 #6252 #6351), #6274 ("event effects"), #3941 flag, #6532 stat bonus only when on center (not when in a Prism Dragon's soul), #6477 gained impact abilities.
+
+## Attack cannot be nullified / damage cannot be reduced (r42 UN42, tests/attack_unnull.js)
+Fixed: #349 (vs "Shield" cards) #2453 #2462 #3065 #3234 #3254 #4234 #5646 #6245 #6252 #6351 #6482. Hooks: ABX.attackUnnullifiable / ABX.attackUnreducible / OPS.nullifyAttack wraps.
+Note: #2453 text is contradictory ("link attack ... attacking alone"); implemented as unnullifiable on link attacks.
