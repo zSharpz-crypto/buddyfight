@@ -116,6 +116,7 @@
 
   const TRIG_OK = {
     enter: t => t.self, attack: t => t.self && !(t.target && t.target.junk), dealsDamage: t => t.self || !!t.np, damaged: () => true, attackDestroys: t => t.self, attackOutcome: t => t.self, attacked: t => t.self, link: t => t.self, discardedFromHand: t => t.self, otherAttack: t => !!t.np, oppAttack: () => true, battleEnd: () => true, flagReversal: () => true,
+    monsterLeaves: () => true,
     turnStart: () => true, turnEnd: () => true, phaseStart: t => ["start", "draw", "main", "attack", "final", "turn"].includes(t.phase),
     otherEnter: t => !!t.np, otherDestroyed: t => !!t.np && !t.np.self, youCast: () => true, oppCast: () => true, leave: t => t.self && !t.byOpp,
     lifeGain: () => true, equipped: t => t.self, soulEmpty: t => t.self, hostAttack: t => !t.np || !t.np.junk, hostDealsDamage: t => !t.np || !t.np.junk, hostDestroys: t => !t.np || !t.np.junk, stoodByEffect: t => t.self,
@@ -1228,7 +1229,12 @@
   })();
 
   // "When this card is destroyed / leaves the field": the card is already gone, so run with no unit.
+  ABX.fireMonsterLeaves = function (side, card) {
+    return ABX.queue(() => fireTriggers((t, src, s) => t.event === "monsterLeaves" && s === side && src.card !== card &&
+      (!t.phase || B.phase === t.phase) && (!t.ownTurn || B.activeSide === side), { name: "monsterLeaves" })).catch(() => {});
+  };
   ABX.fireLeave = function (side, card, byAttack, notDestroyed) {   // notDestroyed: retired / put into the drop zone by an effect or cost
+    if (card && card.type === "Monster") ABX.fireMonsterLeaves(side, card);
     return ABX.queue(async () => {
       for (const ab of abilitiesOf(card, a => (a.kind === "triggered" || (a.kind === "modal" && a.trigger && a.trigger.event)) && a.trigger && ((a.trigger.event === "leave" && a.trigger.self && !a.trigger.byOpp && !(a.trigger.byEffect && byAttack) && !(a.trigger.byAttackOnly && !byAttack) && !(notDestroyed && a.trigger.destroyedOnly)) || (a.trigger.event === "attack" && a.trigger.also === "leave")) && ABX.isExecutable(a))) {
         const f = F(side);
