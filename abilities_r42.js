@@ -1075,4 +1075,125 @@
     } catch (e) { /* ignore */ }
     return prevApplyDamage.apply(this, arguments);
   };
+  /* ---- [r42] new trigger events: soulInto ("When a soul is put into ...") and restedByEffect ("When a card on your opponent's field is [Rest] by your card effects") ---- */
+  Object.assign(ABX.TRIG_OK, { soulInto: () => true, restedByEffect: () => true });
+  const soulSnap = new WeakMap();
+  let soulScanning = false;
+  const fieldSources = (side) => {
+    const f = F(side), out = [];
+    core.fieldUnits(f, true).forEach(x => { if (x.unit) out.push({ card: x.unit.card, unit: x.unit, host: null }); });
+    (f.setSpells || []).forEach(c => out.push({ card: c, unit: null, host: null }));
+    return out;
+  };
+  const soulSources = (side) => {
+    const out = [];
+    core.fieldUnits(F(side), true).forEach(x => { if (x.unit) (x.unit.soul || []).forEach((id, idx) => { const c = core.cardOf(id); if (c) out.push({ card: c, unit: null, host: x.unit, idx, id }); }); });
+    return out;
+  };
+  // run the abilities with trigger.event === ev on the given sources; `test(t, src)` decides whether the trigger matches
+  async function fireNew(side, ev, test, srcs) {
+    const f = F(side);
+    for (const src of srcs) {
+      for (const ab of core.abilitiesOf(src.card, a => a.kind === "triggered" && a.trigger && a.trigger.event === ev && ABX.isExecutable(a))) {
+        if ((src.unit && src.unit.abxNullified === B.turnCount) || (src.host && src.host.abxNullified === B.turnCount)) continue;
+        if (!test(ab.trigger, src)) continue;
+        const holder = src.unit || src.host;
+        if (core.onceUsed(f, src.card, ab, holder)) continue;
+        const selfRef = src.host ? { k: "soul", side, unit: src.host, idx: Math.max(0, src.host.soul.indexOf(src.id)), id: src.id, card: src.card } : null;
+        const probe = { side, f, e: F(otherSide(side)), card: src.card, unit: src.unit || null, ab, soulHost: src.host || null, hostArea: src.host ? "soul" : "field", selfRef, bind: { chosen: src.host ? [{ k: "unit", side, unit: src.host, card: src.host.card, id: src.host.card.id }] : [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [] };
+        if (!(ab.conds || []).every(c => core.evalCond(c, probe))) continue;
+        core.markOnce(f, src.card, ab, holder);
+        await core.runAbility(side, src.card, ab, src.unit || null, { event: { name: ev }, hostArea: src.host ? "soul" : "field", soulHost: src.host || null, selfRef });
+        if (B.matchOver) return;
+      }
+    }
+  }
+  const hostOK = (t, host, side, f) => (!t.np || core.matchFilter(host.card, t.np.filter || {}, { unit: host, side }, { f })) && (!t.hostKw || lc(host.card.skill || "").includes("[" + t.hostKw + "]"));
+  async function scanSouls() {
+    if (soulScanning) return;
+    soulScanning = true;
+    try {
+      const added = [];
+      ["plr", "opp"].forEach(side => core.fieldUnits(F(side), true).forEach(x => {
+        const u = x.unit; if (!u) return;
+        const n = (u.soul || []).length, prev = soulSnap.get(u);
+        soulSnap.set(u, n);
+        if (prev !== undefined && n > prev) added.push({ side, unit: u });
+      }));
+      for (const a of added) {
+        const f = F(a.side);
+        await fireNew(a.side, "soulInto", (t, src) => (t.self ? src.unit === a.unit : true) && hostOK(t, a.unit, a.side, f), fieldSources(a.side));
+      }
+    } catch (e) { /* ignore */ } finally { soulScanning = false; }
+  }
+  core.scanSouls = scanSouls;
+  const prevRunAbility = core.runAbility;
+  core.runAbility = async function () {
+    if (!soulScanning) await scanSouls();
+    const r = await prevRunAbility.apply(this, arguments);
+    if (!soulScanning) await scanSouls();
+    return r;
+  };
+  if (ABX.firePutIntoSoul) {
+    const pis = ABX.firePutIntoSoul;
+    ABX.firePutIntoSoul = function () { const p = pis.apply(this, arguments); ABX.queue(() => scanSouls()); return p; };
+  }
+  // "[Rest] by card effects": hooked on the [Rest] op (attacking rests the attacker as a rule, not an effect)
+  if (OPS.rest && OPS.rest.run && !OPS.rest._r42) {
+    const restRun = OPS.rest.run;
+    OPS.rest.run = async function (s, ctx) {
+      const before = [];
+      ["plr", "opp"].forEach(sd => core.fieldUnits(F(sd), true).forEach(x => { if (x.unit && !x.unit.rested) before.push({ sd, unit: x.unit }); }));
+      const r = await restRun.apply(this, arguments);
+      try {
+        const rested = before.filter(b => b.unit.rested);
+        for (const b of rested) {
+          const side = ctx.side, f = F(side);
+          const srcs = fieldSources(side).concat(soulSources(side));
+          await fireNew(side, "restedByEffect", (t, src) => {
+            if (t.targetOpp !== undefined && (t.targetOpp ? b.sd === side : b.sd !== side)) return false;
+            if (t.np && !core.matchFilter(b.unit.card, t.np.filter || {}, { unit: b.unit, side: b.sd }, { f: F(b.sd) })) return false;
+            if (t.hostNp && src.host && !core.matchFilter(src.host.card, t.hostNp.filter || {}, { unit: src.host, side }, { f })) return false;
+            return true;
+          }, srcs);
+        }
+      } catch (e) { /* ignore */ }
+      return r;
+    };
+    OPS.rest._r42 = true;
+  }
+  const NEO2 = () => Object.assign(np({ tribes: ["Neodragon"] }, null, null, "you"), { zone: null, raw: "your «Neodragon»" });
+  OV42.push([4481, /when a soul is put into this card, you gain 1 life/i, () => ({ kind: "triggered", trigger: { event: "soulInto", self: true }, conds: [], steps: [{ op: "life", who: "you", n: 1, src: "you gain 1 life" }] })]);
+  OV42.push([5558, /when a soul is put into this card, draw two cards/i, () => ({ kind: "triggered", trigger: { event: "soulInto", self: true }, once: "turn", conds: [], steps: [{ op: "draw", who: "you", n: 2, src: "draw two cards" }] })]);
+  OV42.push([3996, /when a soul goes into your .neodragon., draw a card/i, () => ({ kind: "triggered", trigger: { event: "soulInto", np: NEO2() }, once: "turn", conds: [], steps: [{ op: "draw", who: "you", n: 1, src: "draw a card" }] })]);
+  OV42.push([5203, /when a soul is put into your \[criminal\], you gain 2 life and draw a card/i, () => ({ kind: "triggered", trigger: { event: "soulInto", np: Object.assign(np({ tribes: ["Criminal"] }, null, null, "you"), { zone: null, raw: "your [Criminal]" }) }, once: "turn", conds: [], steps: [{ op: "life", who: "you", n: 2 }, { op: "draw", who: "you", n: 1 }] })]);
+  OV42.push([6022, /when a soul is put into your originally size 3 .time dragon., draw two cards/i, () => ({ kind: "triggered", trigger: { event: "soulInto", np: Object.assign(np({ tribes: ["Time Dragon"], size: { n: 3, cmp: "eq" } }, null, null, "you"), { zone: null, raw: "your originally size 3 «Time Dragon»" }) }, once: "turn", conds: [], steps: [{ op: "draw", who: "you", n: 2 }] })]);
+  OV42.push([6299, /when a soul is put into your .super robot., put the top card of your deck into your gauge, and draw a card/i, () => ({ kind: "triggered", trigger: { event: "soulInto", np: Object.assign(np({ tribes: ["Super Robot"] }, null, null, "you"), { zone: null, raw: "your «Super Robot»" }) }, once: "turn", conds: [], steps: [{ op: "mill", who: "you", n: 1, to: "gauge" }, { op: "draw", who: "you", n: 1 }] })]);
+  OV42.push([6431, /when a soul is put into your card with \[d-share\], draw a card/i, () => ({ kind: "triggered", trigger: { event: "soulInto", hostKw: "d-share" }, once: "turn", conds: [], steps: [{ op: "draw", who: "you", n: 1 }] })]);
+  OV42.push([5605, /when a soul is put into your .neodragon., look at the top three cards/i, () => ({ kind: "triggered", trigger: { event: "soulInto", np: NEO2() }, once: "turn", conds: [], steps: [{ op: "r42MiracleVision" }] })]);
+  OPS.r42MiracleVision = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const top = f.deck.splice(0, 3); if (!top.length) return false;
+      let gaugeId = top[0], handId = top.length > 1 ? top[1] : null;
+      if (!ABX.autoPlay && top.length > 1) {
+        const cands = top.map((id, i) => ({ k: "zone", side, area: "deck", idx: i, id, card: core.cardOf(id) }));
+        const g = await core.pick(cands, { qty: { n: 1 }, raw: "one from among them into your gauge", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - put one into your gauge` });
+        if (g && g[0]) gaugeId = g[0].id;
+        const rest = cands.filter(c => c.id !== gaugeId || c.idx !== g[0].idx);
+        const h = await core.pick(rest, { qty: { n: 1 }, raw: "one from among them into your hand", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - put one into your hand` });
+        handId = h && h[0] ? h[0].id : rest[0].id;
+      }
+      const left = top.slice(); left.splice(left.indexOf(gaugeId), 1); f.gauge.push(gaugeId);
+      if (handId != null) { const i = left.indexOf(handId); if (i >= 0) { left.splice(i, 1); f.hand.push(handId); } }
+      f.drop.push(...left);   // "drop the rest or put it into the soul of a monster": the soul option is not offered yet
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([2773, /when a card on your opponent's field is \[rest\] by the effects of your cards, if this card is in the soul/i, () => ({ kind: "triggered", trigger: { event: "restedByEffect", targetOpp: true, hostNp: Object.assign(np({ names: ["zodiac"] }, null, null, "you"), { zone: null, raw: 'a monster with "Zodiac" in its card name' }) }, once: "turn", conds: [], steps: [{ op: "draw", who: "you", n: 1 }] })]);
+  OV42.push([2775, /when a card on your opponent's field is \[rest\] by an effect from your card, you may pay 1 life/i, () => ({ kind: "triggered", trigger: { event: "restedByEffect", targetOpp: true }, conds: [], steps: [
+    { op: "pay", life: 1, cost: true, optional: true, src: "pay 1 life" },
+    { op: "destroy", np: Object.assign(np({ types: ["item", "spell"] }, "field", null, "opp"), { raw: "an item or spell on your opponent's field" }), gate: "ifYouDo", src: "destroy an item or spell on your opponent's field" }] })]);
+  OV42.push([4193, /when a card on your opponent's field is \[rest\] by card effects, if this card is in the soul of a .neodragon./i, () => ({ kind: "triggered", trigger: { event: "restedByEffect", targetOpp: true, hostNp: NEO2() }, once: "turn", conds: [], steps: [{ op: "mill", who: "you", n: 1, to: "gauge" }, { op: "damage", who: "opp", n: 1 }] })]);
+  OV42.push([5471, /when a character or item on your opponent's field is \[rest\] by your card effects, deal 1 damage/i, () => ({ kind: "triggered", trigger: { event: "restedByEffect", targetOpp: true, np: Object.assign(np({ types: ["monster", "item"] }, null, null, "opp"), { zone: null, raw: "a character or item on your opponent's field" }) }, conds: [], steps: [{ op: "damage", who: "opp", n: 1, src: "deal 1 damage to your opponent" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
