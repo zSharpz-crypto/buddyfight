@@ -432,6 +432,52 @@
     } catch (e) { return null; }
   };
 
+  /* ---- "cannot be nullified" / Jackknife soul cards: #2462 Jackarms J Galaxion, #3997 Jackarms J. Arsenal, #3234 Death Dragon Knight, Davide ---- */
+  const soulIdOf = (x) => (typeof root.getSoulCardId === "function" ? root.getSoulCardId(x) : x);
+  const hasSoulCard = (u, id) => !!u && (u.soul || []).some(x => Number(soulIdOf(x)) === id);
+  const isJackknife = (u) => !!(u && u.card && /jackknife/i.test(u.card.name || ""));
+  // their second abilities were parsed as on-enter junk; the real effects are the hooks below
+  OV42.push([2462, /cannot be nullified/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+  OV42.push([3234, /cannot be nullified/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+  OV42.push([3997, /dragoners' armory/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+  const unnullPrev42 = ABX.attackUnnullifiable;
+  ABX.attackUnnullifiable = function (bc) {
+    if (unnullPrev42 && unnullPrev42.apply(this, arguments)) return true;
+    try {
+      const us = (bc && bc.attUnits) || [];
+      // #2462: your impact monster with "Jackknife" in its name and this card in its soul attacks alone
+      if (us.length === 1 && isJackknife(us[0]) && isImpactC(us[0].card) && hasSoulCard(us[0], 2462)) return true;
+      // #3234: a «Disaster» on your field attacks a monster
+      if (bc && bc.defUnit && us.some(u => u && u.card && attrHas(u.card, /^disaster$/i))) {
+        const f = F(bc.attSide);
+        if (core.fieldUnits(f, false).some(x => x.unit.card.id === 3234 && x.unit.abxNullified !== B.turnCount)) return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  // #3997 "Dragoners' Armory": when the attack of a "Jackknife" monster with this card in its soul is nullified, it gets [Double Attack] this turn (once per turn)
+  if (typeof B.executeAttackResolution === "function") {
+    const earJ = B.executeAttackResolution;
+    B.executeAttackResolution = function (attSide, attackerZones, targetPos, attackNullified) {
+      const f = this.getFighter(attSide);
+      const units = (attackerZones || []).map(z => z === "item" ? f.item : f.monsters[z]).filter(Boolean);
+      const r = earJ.apply(this, arguments);
+      try {
+        if (attackNullified && ABX.enabled !== false) {
+          for (const u of units) {
+            if (!isJackknife(u) || !hasSoulCard(u, 3997) || u.abxNullified === B.turnCount) continue;
+            if (f.armoryUsed === B.turnCount) continue;   // "only activates once per turn"
+            f.armoryUsed = B.turnCount;
+            u.tempDA = true; ABX.grantAttacks(u, 2);
+            if (B.setPrompt) B.setPrompt(`⚔️ "Dragoners' Armory": "${u.card.name}" gets [Double Attack] this turn!`);
+            fresh();
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return r;
+    };
+  }
+
   // Mission Cards (#213 #1169 #1415): Set spells that collect the top card of the deck in their soul, then cash in at N cards.
   const missionDrop = (f, card) => { const i = (f.setSpells || []).indexOf(card); if (i < 0) return false; f.setSpells.splice(i, 1); f.drop.push(card.id); return true; };
   OPS.r42MissionAdd = {
