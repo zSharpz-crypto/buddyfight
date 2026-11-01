@@ -211,7 +211,7 @@
   OPS.r40AziDahakaDestroy867 = {
     async run(s, ctx) {
       const f = ctx.f;
-      const isGwaneff = (id) => { const c = cardOf(id); return c && (c.id === 2020 || nameHas(c, "Aqulta Gwaneff")); };
+      const isGwaneff = (id) => { const c = cardOf(id); return !!c && c.name === "Demonic Demise Sword, Aqulta Gwaneff"; };   // text: a "Demonic Demise Sword, Aqulta Gwaneff" (exact name)
       let area = "hand", idx = f.hand.findIndex(isGwaneff);
       if (idx < 0) {
         area = "deck";

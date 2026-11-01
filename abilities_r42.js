@@ -863,4 +863,128 @@
     } catch (e) { /* ignore */ }
     return prevBattleEnd.apply(this, arguments);
   };
+  // [r42] "This card cannot attack the left or right" (#1220 / #3115 Armordeity): a continuous static the engine parsed (noAttackPos) but never enforced.
+  // true = this unit may not attack a monster on targetPos (its own static, not nullified, conditions met).
+  core.noAttackPosBlocked = function (unit, targetPos) {
+    if (!unit || !unit.card || (targetPos !== "left" && targetPos !== "right") || unit.abxNullified === B.turnCount) return false;
+    const side = ["plr", "opp"].find(sd => core.fieldUnits(F(sd), true).some(x => x.unit === unit));
+    if (!side) return false;
+    for (const ab of ABX.get(unit.card).abilities) {
+      if (ab.kind !== "static" || (ab.unparsed && ab.unparsed.length)) continue;
+      for (const st of ab.steps || []) {
+        if (!(st.op === "static" && st.kind === "noAttackPos") || !(st.pos || []).includes(targetPos)) continue;
+        const ctx = { side, f: F(side), e: F(otherSide(side)), card: unit.card, unit, bind: { chosen: [] } };
+        if ((ab.conds || []).every(c => ABX.condExecutable(c) && core.evalCond(c, ctx))) return true;
+      }
+    }
+    return false;
+  };
+  // [r42] #4174 Mark of Transgression "SYS": "When this card is destroyed, you may pay 1 life. If you do, equip up to a total of two items with 'Aqulta Gwaneff' in their card names
+  // from your hand and deck. If you looked in your deck, shuffle it." The generic parse paid the life but never equipped.
+  OPS.r42TransgressionEquip = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      if (!(f.life > 1)) return false;
+      if (OPS.pay && OPS.pay.run) { const ok = await OPS.pay.run({ op: "pay", life: 1, optional: true, cost: true }, ctx); if (!ok) return false; } else f.life -= 1;
+      const isG = (c) => !!c && c.type === "Item" && /aqulta gwaneff/i.test(c.name || "");
+      const cands = [];
+      f.hand.forEach((id, i) => { const c = core.cardOf(id); if (isG(c)) cands.push({ k: "zone", side, area: "hand", idx: i, id, card: c }); });
+      f.deck.forEach((id, i) => { const c = core.cardOf(id); if (isG(c)) cands.push({ k: "zone", side, area: "deck", idx: i, id, card: c }); });
+      let picked = cands.slice(0, 2);
+      if (cands.length > 2 && !ABX.autoPlay) picked = (await core.pick(cands, { qty: { n: 2, upTo: true }, raw: "up to two items with Aqulta Gwaneff in their card names", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - equip up to two Aqulta Gwaneff items` }) || []).slice(0, 2);
+      if (picked.length === 2 && picked[0].id === picked[1].id && picked[0].area === picked[1].area && picked[0].idx === picked[1].idx) picked = picked.slice(0, 1);
+      const fromDeck = picked.some(x => x.area === "deck");
+      f.abxItemCap = 2;
+      try { for (const x of picked) if (ABX.equipFrom) ABX.equipFrom(side, x.area, x.id, false); } finally { delete f.abxItemCap; }
+      if ((fromDeck || f.deck.length) && B.shuffleFighterDeck) B.shuffleFighterDeck(side);
+      fresh();
+      return picked.length > 0;
+    },
+    check: () => true
+  };
+  OV42.push([4174, /when this card is destroyed, you may pay 1 life/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true, destroyedOnly: true }, conds: [], steps: [{ op: "r42TransgressionEquip" }] })]);
+  // [r42] #4153 Mark of Atonement "SYS": "When this card is destroyed, draw a card. Then, if your flag is 'Dragon Zwei', put up to one 'Dragon Drei' from your hand or deck on top of your flag,
+  // and shuffle your deck. If you do, you gain 5 life!" The generic parse gained the 5 life whether or not a Drei was found and never put it on the flag.
+  OPS.r42AtonementDrei = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      if (OPS.draw && OPS.draw.run) await OPS.draw.run({ op: "draw", who: "you", n: 1 }, ctx);
+      const fl = core.cardOf(f.flagId);
+      if (!fl || fl.name !== "Dragon Zwei") return true;
+      let area = "hand", idx = f.hand.findIndex(id => id === 2789);
+      if (idx < 0) { area = "deck"; idx = f.deck.findIndex(id => id === 2789); }
+      if (B.shuffleFighterDeck) B.shuffleFighterDeck(side);
+      if (idx < 0) { return true; }
+      const arr = f[area]; const at = arr.indexOf(2789); if (at < 0) return true;
+      arr.splice(at, 1);
+      f.flagId = 2789; f.flagCard = core.cardOf(2789); f.maxSize = 3;
+      await OPS.life.run({ op: "life", who: "you", n: 5 }, ctx);
+      fresh();
+      return true;
+    },
+    check: () => true
+  };
+  OV42.push([4153, /put up to one .dragon drei. from your hand or deck/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true, destroyedOnly: true }, conds: [], steps: [{ op: "r42AtonementDrei" }] })]);
+  // [r42] «Dragonarms» soul triggers that read "When your «Neodragon» with this card in its soul attacks and deals damage / destroys a monster" (#1242 #1308 #1774):
+  // they were parsed as dead statics / "enter" triggers / triggers of the soul card itself, so they never fired. New host events, fired from the attack outcome.
+  const NEO = () => Object.assign(np({ tribes: ["Neodragon"] }, null, null, "you"), { raw: "your «Neodragon»", zone: null });
+  OV42.push([1242, /when that .neodragon. deals damage to your opponent, destroy an item/i, () => ({ kind: "triggered", trigger: { event: "hostDealsDamage", np: NEO() }, conds: [], steps: [
+    { op: "destroy", np: Object.assign(np({ types: ["item"] }, "field", null, "opp"), { raw: "an item on your opponent's field" }), src: "destroy an item on your opponent's field" }] })]);
+  OV42.push([1308, /attacks and destroys your opponent's monster, deal 1 damage/i, () => ({ kind: "triggered", trigger: { event: "hostDestroys", np: NEO() }, conds: [], steps: [{ op: "damage", who: "opp", n: 1, src: "deal 1 damage to your opponent" }] })]);
+  OV42.push([1774, /attacks and deals damage to your opponent, put the top card of your deck into your gauge, or you gain 1 life/i, () => ({ kind: "triggered", trigger: { event: "hostDealsDamage", np: NEO() }, conds: [], steps: [{ op: "r42GaugeOrLife" }] })]);
+  OPS.r42GaugeOrLife = {
+    async run(s, ctx) {
+      const f = ctx.f; let gauge = true;
+      if (!ABX.autoPlay && f.deck.length && core.askChoice) { try { gauge = (await core.askChoice(ctx, `${ctx.card.name}`, ["Put the top card of your deck into your gauge", "Gain 1 life"])) === 0; } catch (e) { gauge = true; } }
+      if (gauge && f.deck.length) f.gauge.push(f.deck.shift());
+      else await OPS.life.run({ op: "life", who: "you", n: 1 }, ctx);
+      fresh(); return true;
+    }, check: () => true
+  };
+  const ofo = ABX.fireAttackOutcome;
+  ABX.fireAttackOutcome = function (attSide, units, defSide, outcome) {
+    const p = ofo.apply(this, arguments);
+    ABX.queue(async () => {
+      const f = F(attSide);
+      const evs = []; if (outcome && outcome.dealtDamage) evs.push("hostDealsDamage"); if (outcome && outcome.destroyedMonster) evs.push("hostDestroys");
+      if (!evs.length) return;
+      for (const x of units || []) {
+        const host = x && x.unit; if (!host || !(host.soul || []).length) continue;
+        for (const id of host.soul.slice()) {
+          const c = core.cardOf(id); if (!c) continue;
+          for (const ab of core.abilitiesOf(c, a => a.kind === "triggered" && a.trigger && evs.includes(a.trigger.event) && ABX.isExecutable(a))) {
+            if (ab.trigger.np && !core.matchFilter(host.card, ab.trigger.np.filter || {}, { unit: host, side: attSide }, { f })) continue;
+            if (host.abxNullified === B.turnCount || core.onceUsed(f, c, ab, host)) continue;
+            const idx = host.soul.indexOf(id); if (idx < 0) continue;
+            const selfRef = { k: "soul", side: attSide, unit: host, idx, id, card: c };
+            const probe = { side: attSide, f, e: F(otherSide(attSide)), card: c, unit: null, ab, soulHost: host, hostArea: "soul", selfRef, bind: { chosen: [{ k: "unit", side: attSide, unit: host, card: host.card, id: host.card.id }], revealed: [], looked: [] }, lastDone: true, auto: true, log: [] };
+            if (!(ab.conds || []).every(cd => core.evalCond(cd, probe))) continue;
+            core.markOnce(f, c, ab, host);
+            await core.runAbility(attSide, c, ab, null, { event: { name: "attack" }, hostArea: "soul", soulHost: host, selfRef });
+            if (B.matchOver) return;
+          }
+        }
+      }
+    }).catch(() => {});
+    return p;
+  };
+  // [r42] #2470 Dragonarms, Debrisweeper: "If this card is in the soul of your «Neodragon», your opponent cannot call monsters from his or her drop zone." (was a dead static)
+  OV42.push([2470, /your opponent cannot call monsters from his or her drop zone/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r31", tag: "r42NoOppDropCall" }] })]);
+  const dropCallLocked = (side) => {
+    try {
+      const foe = F(otherSide(side));
+      return core.fieldUnits(foe, true).some(x => x.unit && x.unit.abxNullified !== B.turnCount && (x.unit.soul || []).some(id => id === 2470) && core.matchFilter(x.unit.card, { tribes: ["Neodragon"] }, { unit: x.unit, side: otherSide(side) }, { f: foe }));
+    } catch (e) { return false; }
+  };
+  core.dropCallLocked = dropCallLocked;
+  if (ABX.placeFromZone) {
+    const pfz42 = ABX.placeFromZone;
+    ABX.placeFromZone = function (side, area, id, opts) {
+      const c = core.cardOf(id);
+      if (area === "drop" && c && c.type === "Monster" && dropCallLocked(side)) return Promise.resolve(null);
+      return pfz42.apply(this, arguments);
+    };
+  }
+  // [r42] #2303 Meteorarms, Pisca Pisca: "When you put this card from the field, deck, or drop zone into the soul of a size 3 «Neodragon», put the top card of your deck into your gauge." (was an "enter" trigger)
+  OV42.push([2303, /into the soul of a size 3/i, () => ({ kind: "triggered", trigger: { event: "putIntoSoul", self: true, fromAreas: ["field", "deck", "drop zone"], hostNp: Object.assign(np({ tribes: ["Neodragon"], size: { n: 3, cmp: "eq" } }, null, null, "you"), { zone: null, raw: "a size 3 «Neodragon»" }) }, conds: [], steps: [{ op: "mill", who: "you", n: 1, to: "gauge", src: "put the top card of your deck into your gauge" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);

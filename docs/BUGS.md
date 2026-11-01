@@ -192,3 +192,9 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 ## Bot AI (2026-11-02)
 - [x] Rival now plans attacks (bot_ai.js): link attacks to break high-Defense monsters, any target (not only center), lethal first, avoids [Counterattack] walls and pointless attacks, calls its strongest monsters, uses [Act]s and useful spells. tests/bot_ai.js
 - [x] #3149 Chained Strikes Warlock, Rabukh: after it attacked and destroyed a monster, [Double Attack] set attacksLeft to 2 (3 attacks in total) and left it rested. Same pattern in the boost op and r22/r36/r39/r40/r41 grants (~50 cards: 973, 1477, 1514 ...). Now ABX.grantAttacks (abilities_ops.js) counts attacks used this turn (unit.atkUsed) -> N total, stands again. Test tests/da_on_destroy.js
+
+## Armordeity / Azi Dahaka SYS / Dragonarms fixes (2026-11-01)
+- [x] #1220 Dynamis / #3115 Energeia "cannot attack the left or right" was never enforced (core.noAttackPosBlocked, r42 + game.js). Test: tests/armordeity.js
+- [x] #4174 Mark of Transgression paid life but never equipped; #4153 Mark of Atonement gained 5 life without putting Dragon Drei on the flag; #867/#2019/#6526 equipped any Aqulta Gwaneff item (now only "Demonic Demise Sword, Aqulta Gwaneff"). Test: tests/azi_sys.js
+- [x] #1242 #1308 #1774 Dragonarms host triggers (hostDealsDamage/hostDestroys), #2470 drop-call lock, #2303 put-into-soul trigger. Test: tests/dragonarms.js
+- [ ] Unchecked Dragonarms/Neodragon dead abilities: #1687 #1734 #1802 #2029 #2072 #2302 #2462 #2465 #2573 #2773 #2775 #3065 #3110 #3996 #3997 #4193 #5605 #5683

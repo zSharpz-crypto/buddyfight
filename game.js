@@ -8519,6 +8519,12 @@ const battle = {
       this.renderBattle();
       return;
     }
+    if (window.ABX && ABX.core && ABX.core.noAttackPosBlocked && units.some(u => ABX.core.noAttackPosBlocked(u, targetPos))) {
+      this.pendingAction = null; this.linkAttackers = [];
+      this.setPrompt("✖ That card cannot attack the left or right (card effect).");
+      this.renderBattle();
+      return;
+    }
 
     this.pendingAction = null;
     this.linkAttackers = [];
