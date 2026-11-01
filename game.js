@@ -8530,6 +8530,11 @@ const battle = {
       const abm = ABX.core.attackBlocked(attSide, units, defSide, targetPos);
       if (abm) { this.pendingAction = null; this.linkAttackers = []; this.setPrompt("✖ " + abm + " (card effect)."); this.renderBattle(); return; }
     }
+    if (window.ABX && ABX.core && ABX.core.attackTax) {   // "Duel Law": link attacking a Duel Dragon costs 2 gauge
+      const tax = ABX.core.attackTax(attSide, units, defSide, targetPos);
+      if (tax && tax.blocked) { this.pendingAction = null; this.linkAttackers = []; this.setPrompt(tax.msg); this.renderBattle(); return; }
+      if (tax && tax.msg) this.setPrompt(tax.msg);
+    }
     if (window.ABX && ABX.core && ABX.core.noAttackPosBlocked && units.some(u => ABX.core.noAttackPosBlocked(u, targetPos))) {
       this.pendingAction = null; this.linkAttackers = [];
       this.setPrompt("✖ That card cannot attack the left or right (card effect).");

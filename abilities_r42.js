@@ -372,6 +372,66 @@
     { op: "r40StructuredExec", text: "you may discard as many cards as you like from your hand." },
     { op: "destroy", gate: "ifYouDo", np: Object.assign(np({ types: [] }, "field", null, "opp"), { qty: { n: 1, upTo: true, all: false, any: false, each: false, fromLast: true } }) }
   ] })]);
+  /* ---- counter-timing cards: #124 Duel Law, #176 Demongodol Ark, #311 Yukishiro, #5741 Siegsabre ---- */
+  const XCx = ABX.extraCond = ABX.extraCond || {};
+  const attrHas = (c, re) => !!c && (c.attrs || []).some(a => re.test(a));
+  XCx.xAttackerAttr = (c, ctx) => { const b = ABX.battleCtx; return !!(b && b.active && (b.attUnits || []).length && (b.attUnits || []).some(u => u && u.card && attrHas(u.card, new RegExp(c.attr, "i")))); };
+  XCx.xAttackerWeapon = (c, ctx) => { const b = ABX.battleCtx; return !!(b && b.active && (b.attUnits || []).some(u => u && u.card && u.card.type === "Item" && attrHas(u.card, /^weapon$/i))); };
+  XCx.xTargetFighter = (c, ctx) => { const b = ABX.battleCtx; return !!(b && b.active && (b.targetPos ? b.targetPos === "fighter" : !b.defUnit)); };
+  ["xAttackerAttr", "xAttackerWeapon", "xTargetFighter"].forEach(t => ABX.COND_OK.add(t));
+  // #5741 Messiah Arms, Siegsabre: "[Counter] [Act] When a card with "Dragon" in its attribute attacks you alone, nullify the attack."
+  OV42.push([5741, /attacks you alone/i, () => ({ kind: "act", trigger: null, tags: ["counter", "act"], counter: true, conds: [{ t: "xLinkAttack", v: false }, { t: "xAttackerAttr", attr: "dragon" }, { t: "xTargetFighter" }], steps: [{ op: "nullifyAttack", src: "nullify the attack" }] })]);
+  // #176 Demongodol Ark: "[Counter] [Act] When your opponent attacks with a Weapon, you may discard 1 card from your hand. If you do, destroy that Weapon."
+  OPS.r42WeaponBreak = {
+    async run(s, ctx) {
+      const f = ctx.f, bc = ABX.battleCtx;
+      if (!f.hand.length || !bc) return false;
+      const weapons = (bc.attUnits || []).filter(u => u && u.card && u.card.type === "Item" && attrHas(u.card, /^weapon$/i));
+      if (!weapons.length) return false;
+      let hi = 0;
+      if (!ABX.autoPlay && !f.isBot && f.hand.length > 1) {
+        const idxs = await ABX.ui.pickCards({ title: `${ctx.card.name} - discard 1 card from your hand`, subtitle: "Then the attacking Weapon is destroyed.", cards: f.hand.map(id => ({ card: core.cardOf(id), badge: "Hand" })), min: 1, max: 1 });
+        hi = (idxs && idxs.length) ? idxs[0] : 0;
+      }
+      f.drop.push(f.hand.splice(hi, 1)[0]);
+      const att = F(bc.attSide);
+      for (const w of weapons) {
+        if (att.item !== w) continue;
+        await core.moveRefs([{ k: "item", side: bc.attSide, pos: "item", unit: w, card: w.card, id: w.card.id }], { area: "drop zone", owner: "opp" }, ctx);
+      }
+      if ((bc.attUnits || []).length === weapons.length) bc.nullified = true;   // its only attacker is gone
+      fresh();
+      return true;
+    }, check: () => true
+  };
+  OV42.push([176, /attacks with a weapon/i, () => ({ kind: "act", trigger: null, tags: ["counter", "act"], counter: true, conds: [{ t: "xAttackerWeapon" }, { t: "hand", who: "you", n: 1, cmp: "ge" }], steps: [{ op: "r42WeaponBreak" }] })]);
+  // #311 Runaway Female Ninja, Yukishiro: "[Counter] [Act] When your opponent cast a spell on his or her main phase, you may put this card into the drop zone, and pay 1 gauge. If you do, nullify the spell."
+  OPS.r42YukishiroNullify = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      if (!ctx.unit || f.gauge.length < 1) return false;
+      await OPS.moveSelf.run({ op: "moveSelf", to: { area: "drop zone" } }, ctx);
+      if (core.posOfUnit(f, ctx.unit) !== null) return false;   // could not leave the field
+      f.drop.push(f.gauge.pop());
+      return true;
+    }, check: () => true
+  };
+  OV42.push([311, /cast a spell on his or her main phase/i, () => ({ kind: "triggered", tags: ["counter", "act"], trigger: { event: "oppCast", np: { raw: "a spell", qty: { n: 1 }, filter: { types: ["spell"] }, zone: null } }, conds: [{ t: "phase", phase: "main", who: "opp" }, { t: "gauge", who: "you", n: 1, cmp: "ge" }], steps: [{ op: "r42YukishiroNullify" }, { op: "nullifyCast", what: "spell", gate: "ifYouDo" }] })]);
+  // #124 Duel Law: "When your opponent Link Attacks your Duel Dragon, he or she may pay 2 gauge. If he or she does not, nullify the attack."
+  // Settled when the attack is declared (game.js calls core.attackTax): the attacker pays 2 gauge if they can; otherwise the attack does not go through.
+  OV42.push([124, /link attacks your duel dragon/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+  core.attackTax = function (attSide, units, defSide, targetPos) {
+    try {
+      const df = F(defSide), af = F(attSide);
+      if (!units || units.length < 2) return null;
+      const tgt = ["left", "center", "right"].includes(targetPos) ? df.monsters[targetPos] : null;
+      if (!tgt || !attrHas(tgt.card, /^duel ?dragon$/i)) return null;
+      if (!(df.setSpells || []).some(c => c.id === 124)) return null;
+      if (af.gauge.length >= 2) { af.drop.push(af.gauge.pop(), af.gauge.pop()); return { msg: `💰 "Duel Law": ${af.name || "attacker"} paid 2 gauge to link attack your Duel Dragon.` }; }
+      return { blocked: true, msg: `✖ "Duel Law": you must pay 2 gauge to link attack a Duel Dragon` };
+    } catch (e) { return null; }
+  };
+
   // Mission Cards (#213 #1169 #1415): Set spells that collect the top card of the deck in their soul, then cash in at N cards.
   const missionDrop = (f, card) => { const i = (f.setSpells || []).indexOf(card); if (i < 0) return false; f.setSpells.splice(i, 1); f.drop.push(card.id); return true; };
   OPS.r42MissionAdd = {

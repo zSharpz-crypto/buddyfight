@@ -1,33 +1,58 @@
-// [Counter] [Act] that says "during your opponent's turn" must not work on your own turn (#1086 Damage Control).
-const { createEnv } = require("./headless.js");
+// Counter-timing cards: #124 Duel Law, #176 Demongodol Ark, #311 Yukishiro, #5741 Messiah Arms Siegsabre
+const { createEnv } = require("./headless");
 const env = createEnv();
-const val = (c) => env.run(c);
-let pass = 0, fail = 0;
-const ck = (n, ok) => { ok ? pass++ : fail++; console.log((ok ? "PASS " : "FAIL ") + n); };
-val(`ABX.fast=true; ABX.autoPlay=true; battle.start('hotseat', generateFlagDeck(447,'T',571,true), generateFlagDeck(447,'O',571,true)); battle.renderBattle=function(){};
- globalThis.mku=(card)=>({card,rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0});
- globalThis.setupFor=function(c,active,phase){ const F=battle.plr, E=battle.opp; battle.matchOver=false; battle.activeSide=active; battle.turn=active; battle.phase=phase; battle.turnCount=4; battle.pendingDefenseContext=null;
-   [F,E].forEach(f=>{ ['left','center','right'].forEach(p=>f.monsters[p]=null); f.item=null; f.setSpells=[]; f.isBot=false; f.timeStoppedThisTurn=false; f.timeStoppedThisBattle=false; });
-   const pool=ALL_CARDS.filter(x=>x.type==='Monster' && (x.size||0)<=2).map(x=>x.id);
-   F.deck=pool.slice(0,30); F.gauge=pool.slice(30,36); F.hand=pool.slice(36,42); F.drop=pool.slice(42,50); F.life=10;
-   E.deck=pool.slice(50,80); E.gauge=pool.slice(80,84); E.hand=pool.slice(84,88); E.drop=[]; E.life=10;
-   F.monsters.center=mku(CARD_MAP.get(pool[90])); E.monsters.center=mku(CARD_MAP.get(pool[92]));
-   F.setSpells=[c]; };
- globalThis.snap=()=>JSON.stringify({hand:battle.plr.hand.length,drop:battle.plr.drop.length,keys:Object.keys(battle.plr).filter(k=>/shield|reduce|prevent/i.test(k)&&battle.plr[k])});`);
-const settle = async () => { for (let i = 0; i < 30; i++) { env.flush(); await new Promise(r => setImmediate(r)); } };
+const { run, flush } = env;
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+let passed = 0, failed = 0;
+const ok = (c, m) => { if (c) { passed++; console.log("  PASS: " + m); } else { failed++; console.error("  FAIL: " + m); } };
+const J = (js) => JSON.parse(run(`JSON.stringify(${js})`));
+const tick = async () => { for (let i = 0; i < 14; i++) { flush(); await wait(15); } };
+run(`ABX.fast=true; ABX.autoPlay=true;`);
+// defender = battle.opp (has the card), attacker = battle.plr
+const base = (js) => run(`(function(){
+  const mon = ALL_CARDS.find(x=>x.type==='Monster'&&x.size===1&&!x.skill);
+  battle.start('hotseat', generateFlagDeck(5957,'T',6065,false), generateFlagDeck(5957,'O',6065,false)); battle.renderBattle=function(){}; battle.showCutin=function(){}; battle.setPrompt=function(){};
+  const att=battle.plr, def=battle.opp; ['left','center','right'].forEach(p=>{att.monsters[p]=null;def.monsters[p]=null;});
+  att.item=null; def.item=null; def.setSpells=[]; def.hand=[]; def.gauge=def.deck.splice(0,3); att.gauge=att.deck.splice(0,3); att.drop=[]; def.drop=[];
+  const mk=(c)=>({card:c,rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0});
+  battle.turn='plr'; battle.activeSide='plr'; battle.phase='attack'; battle.turnCount=6;
+  ${js}; return 1; })()`);
+const defOpts = () => J(`battle.getAvailableDefenseCards('opp',false,'fighter',[battle.plr.monsters.center||battle.plr.item]).filter(x=>x.fieldKey).map(x=>x.card.id)`);
 (async () => {
-  for (const phase of ["main", "attack"]) {
-    val(`setupFor(CARD_MAP.get(1086),'plr','${phase}')`);
-    ck(`1086 is not an act option on my own turn (${phase})`, val(`ABX.actAbilities(CARD_MAP.get(1086)).every(a=>ABX.canUseAct('plr',CARD_MAP.get(1086),a,null).reason==='Timing / condition not met')`));
-    ck(`1086 is not a free field counter on my own turn (${phase})`, val(`ABX.freeFieldCounterOptions('plr').every(o=>o.card.id!==1086)`));
-    const before = val(`snap()`);
-    val(`ABX.useAct('plr', CARD_MAP.get(1086), null)`); await settle();
-    ck(`1086 forced through useAct on my own turn (${phase}) changes nothing`, val(`snap()`) === before);
-  }
-  val(`setupFor(CARD_MAP.get(1086),'opp','main')`);
-  ck("1086 is an act option on the opponent's turn", val(`ABX.actAbilities(CARD_MAP.get(1086)).some(a=>ABX.canUseAct('plr',CARD_MAP.get(1086),a,null).ok)`));
-  val(`globalThis.__info={attUnits:[battle.opp.monsters.center],targetPos:'fighter'}`);
-  ck("1086 is offered in the defense window on the opponent's attack", val(`ABX.fieldCounterOptions('plr',__info).some(o=>o.card.id===1086)`));
-  console.log(`\npass ${pass} fail ${fail}`);
-  process.exit(fail ? 1 : 0);
+  // #5741: Dragon-attribute card attacks you alone
+  const dragon = J(`ALL_CARDS.find(x=>x.type==='Monster'&&(x.attrs||[]).some(a=>/dragon/i.test(a))&&!x.skill).id`);
+  base(`def.item=mk(CARD_MAP.get(5741)); att.monsters.center=mk(CARD_MAP.get(${dragon}));`);
+  ok(defOpts().includes(5741), "#5741 offered vs a Dragon attacking alone");
+  base(`def.item=mk(CARD_MAP.get(5741)); att.monsters.center=mk(mon);`);
+  ok(!defOpts().includes(5741), "#5741 not offered vs a non-Dragon");
+  // #176: Weapon attacks
+  const weapon = J(`ALL_CARDS.find(x=>x.type==='Item'&&(x.attrs||[]).includes('Weapon')&&!x.skill).id`);
+  base(`def.monsters.center=mk(CARD_MAP.get(176)); def.hand=[mon.id,mon.id]; att.item=mk(CARD_MAP.get(${weapon}));`);
+  ok(defOpts().includes(176), "#176 offered vs a Weapon attack with a card in hand");
+  base(`def.monsters.center=mk(CARD_MAP.get(176)); def.hand=[mon.id]; att.monsters.center=mk(mon);`);
+  ok(!defOpts().includes(176), "#176 not offered vs a non-Weapon attack");
+  base(`def.monsters.center=mk(CARD_MAP.get(176)); def.hand=[]; att.item=mk(CARD_MAP.get(${weapon}));`);
+  ok(!defOpts().includes(176), "#176 not offered with an empty hand");
+  // #311: opponent casts a spell on their main phase
+  const spell = J(`ALL_CARDS.find(x=>x.type==='Spell'&&!x.set&&!x.cnt).id`);
+  base(`def.monsters.left=mk(CARD_MAP.get(311)); battle.phase='main';`);
+  const optsMain = J(`ABX.responseOptions('opp', CARD_MAP.get(${spell}), 'spell').map(o=>o.card.id)`);
+  ok(optsMain.includes(311), "#311 offered when the opponent casts a spell in their main phase");
+  base(`def.monsters.left=mk(CARD_MAP.get(311)); battle.phase='main'; def.gauge=[];`);
+  ok(!J(`ABX.responseOptions('opp', CARD_MAP.get(${spell}), 'spell').map(o=>o.card.id)`).includes(311), "#311 not offered without gauge");
+  base(`def.monsters.left=mk(CARD_MAP.get(311)); battle.phase='main';`);
+  const g0 = J(`battle.opp.gauge.length`);
+  run(`(async()=>{ ABX.castCtx=null; globalThis.__r = await ABX.castWindow('plr', CARD_MAP.get(${spell}), 'spell'); })()`); await tick();
+  ok(J(`globalThis.__r`) === true && !J(`!!battle.opp.monsters.left`) && J(`battle.opp.drop.includes(311)`) && J(`battle.opp.gauge.length`) === g0 - 1, "#311 nullifies the spell, goes to drop, pays 1 gauge");
+  // #124 Duel Law: link attack on a Duel Dragon costs 2 gauge
+  const duel = J(`ALL_CARDS.find(x=>x.type==='Monster'&&(x.attrs||[]).includes('DuelDragon')&&!x.skill).id`);
+  const tax = (extra) => { base(`def.setSpells=[Object.assign({},CARD_MAP.get(124),{soul:[]})]; def.monsters.center=mk(CARD_MAP.get(${duel})); att.monsters.left=mk(mon); att.monsters.right=mk(mon); ${extra}`);
+    return J(`ABX.core.attackTax('plr',[battle.plr.monsters.left,battle.plr.monsters.right],'opp','center')`); };
+  let r = tax(``);
+  ok(r && !r.blocked && J(`battle.plr.gauge.length`) === 1, "#124 link attack on a Duel Dragon: attacker pays 2 gauge");
+  r = tax(`att.gauge=att.gauge.slice(0,1);`);
+  ok(r && r.blocked, "#124 cannot pay 2 gauge: attack does not go through");
+  base(`def.setSpells=[Object.assign({},CARD_MAP.get(124),{soul:[]})]; def.monsters.center=mk(CARD_MAP.get(${duel})); att.monsters.left=mk(mon);`);
+  ok(J(`ABX.core.attackTax('plr',[battle.plr.monsters.left],'opp','center')`) === null, "#124 single attack: no tax");
+  console.log(`\npass ${passed} fail ${failed}`); process.exit(failed ? 1 : 0);
 })();
