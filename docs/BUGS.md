@@ -223,3 +223,7 @@ Leftover: "attack cannot be nullified if attacking alone" family (#349 #2453 #24
 ## Attack cannot be nullified / damage cannot be reduced (r42 UN42, tests/attack_unnull.js)
 Fixed: #349 (vs "Shield" cards) #2453 #2462 #3065 #3234 #3254 #4234 #5646 #6245 #6252 #6351 #6482. Hooks: ABX.attackUnnullifiable / ABX.attackUnreducible / OPS.nullifyAttack wraps.
 Note: #2453 text is contradictory ("link attack ... attacking alone"); implemented as unnullifiable on link attacks.
+
+## Wrong-trigger cards, wave A: zone-change events (r42, tests/wrong_trigger_a.js)
+New events (snapshot diff around the outermost ability run) + `TG()` table: deckToDrop #2849 #2902 #2960 #3968 #2624 #2659 #3425 #5038 #3964(deck->drop half only), fieldToHand #1889 #1892 #1916 #3251 #3267 #4500 #4752, handDiscard #2745 #3942, gaugeUp #1397 #5102.
+Not covered: #6499 (drop gauge until 2), #3964 "returned from drop zone into deck" half; events only detected for effect-driven moves (not game-rule moves).

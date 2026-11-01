@@ -1472,4 +1472,85 @@
     } catch (e) { /* ignore */ }
     return nullRunPrev.apply(this, arguments);
   };
+
+  /* ---- [r42] zone-change events + data-driven trigger table (wrong-trigger cards: text parsed as "enter" or a heuristic text executor) ----
+   * Events detected by before/after snapshots around the outermost ability run: deckToDrop, fieldToHand, handDiscard, gaugeUp.
+   * Trigger fields: owner ("you"|"opp": whose zone changed), by ("you": caused by my card effect), turn ("you"|"opp"), other (not this card), np (filter of the moved card). */
+  Object.assign(ABX.TRIG_OK, { deckToDrop: () => true, fieldToHand: () => true, handDiscard: () => true, gaugeUp: () => true });
+  const esc = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const TG = (id, snippet, trigger, effect, opts) => OV42.push([id, new RegExp(esc(snippet), "i"), (ab) => {
+    const p2 = ABX.parseSentenceSteps(effect, {});
+    if (!p2 || (p2.unparsed && p2.unparsed.length) || !p2.steps.length) return null;
+    return { kind: "triggered", trigger, conds: (opts && opts.conds) || [], once: opts && opts.once, steps: p2.steps };
+  }]);
+  const msDiff = (a, b) => { const m = new Map(); a.forEach(x => m.set(x, (m.get(x) || 0) + 1)); b.forEach(x => m.set(x, (m.get(x) || 0) - 1)); const out = []; m.forEach((v, k) => { for (let j = 0; j < v; j++) out.push(k); }); return out; };
+  const inter = (a, b) => { const m = new Map(); b.forEach(x => m.set(x, (m.get(x) || 0) + 1)); const out = []; a.forEach(x => { const v = m.get(x) || 0; if (v > 0) { out.push(x); m.set(x, v - 1); } }); return out; };
+  const snapSide = (side) => {
+    const f = F(side);
+    return { hand: f.hand.slice(), drop: f.drop.slice(), deck: f.deck.slice(), gauge: f.gauge.length,
+      field: core.fieldUnits(f, true).filter(x => x.unit).map(x => x.unit.card.id).concat((f.setSpells || []).filter(Boolean).map(c => c.id)) };
+  };
+  async function fire42(ev, data) {
+    for (const side of ["plr", "opp"]) {
+      const rel = data.owner === side ? "you" : "opp";
+      await fireNew(side, ev, (t) => {
+        if ((t.owner || "you") !== "any" && (t.owner || "you") !== rel) return false;
+        if (t.by === "you" && data.actor !== side) return false;
+        if (t.turn === "you" && B.activeSide !== side) return false;
+        if (t.turn === "opp" && B.activeSide === side) return false;
+        if (t.np && !(data.cards || []).some(c => c && core.matchFilter(c, t.np.filter || {}, null, { f: F(side) }))) return false;
+        return true;
+      }, fieldSources(side));
+      if (B.matchOver) return;
+    }
+  }
+  async function zoneEvents(actor, before) {
+    const evs = [];
+    ["plr", "opp"].forEach(owner => {
+      const b = before[owner], a = snapSide(owner);
+      const dropGain = msDiff(a.drop, b.drop), d2d = inter(msDiff(b.deck, a.deck), dropGain);
+      if (d2d.length) evs.push(["deckToDrop", { owner, actor, cards: d2d.map(core.cardOf) }]);
+      const disc = inter(msDiff(b.hand, a.hand), msDiff(dropGain, d2d));
+      if (disc.length) evs.push(["handDiscard", { owner, actor, cards: disc.map(core.cardOf) }]);
+      const back = inter(msDiff(b.field, a.field), msDiff(a.hand, b.hand));
+      if (back.length) evs.push(["fieldToHand", { owner, actor, cards: back.map(core.cardOf) }]);
+      if (a.gauge > b.gauge) evs.push(["gaugeUp", { owner, actor, cards: [] }]);
+    });
+    for (const [ev, data] of evs) { await fire42(ev, data); if (B.matchOver) return; }
+  }
+  let zdepth = 0;
+  const prevRA2 = core.runAbility;
+  core.runAbility = async function (side) {
+    if (zdepth > 0) return prevRA2.apply(this, arguments);
+    zdepth++;
+    const before = { plr: snapSide("plr"), opp: snapSide("opp") };
+    let r;
+    try { r = await prevRA2.apply(this, arguments); } finally { zdepth--; }
+    try { await zoneEvents(side, before); } catch (e) { if (ABX.debug) console.error(e); }
+    return r;
+  };
+  // deck -> drop
+  TG(2849, "when a card is put from your deck into your drop zone", { event: "deckToDrop", owner: "you", turn: "you" }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(2902, "when a card is put from your deck into your drop zone", { event: "deckToDrop", owner: "you", turn: "you" }, "for this turn, this card gets [Double Attack], and deal 1 damage to your opponent", { once: "turn" });
+  TG(2960, "when a card is put from your deck into your drop zone", { event: "deckToDrop", owner: "you", turn: "you" }, "for this turn, this card gets power+2000", { once: "turn" });
+  TG(3968, "when a card is put from your deck into the drop zone", { event: "deckToDrop", owner: "you" }, "draw a card", { once: "turn" });
+  TG(2624, "when you put a card from your opponent's deck", { event: "deckToDrop", owner: "opp", by: "you" }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(2659, "when you put a card from your opponent's deck", { event: "deckToDrop", owner: "opp", by: "you" }, "you gain 1 life", { once: "turn" });
+  TG(3425, "when a card is put from your opponent's deck", { event: "deckToDrop", owner: "opp", by: "you" }, "put the top two cards of your opponent's deck into his or her drop zone", { once: "turn" });
+  TG(5038, "when a card from your opponent's deck is dropped", { event: "deckToDrop", owner: "opp", by: "you" }, "put the top two cards of your deck into your gauge", { once: "turn" });
+  TG(3964, "when a card is returned from the drop zone into the deck", { event: "deckToDrop", owner: "you", by: "you" }, "destroy a monster with 3000 defense or less on your opponent's field", { once: "turn" });
+  // field -> hand
+  TG(1889, "when another card returns to the hand from the field", { event: "fieldToHand", owner: "you" }, "put the top card of your deck into your gauge", { once: "turn" });
+  TG(1892, "when another card returns to the hand from the field", { event: "fieldToHand", owner: "you" }, "you gain 1 life", { once: "turn" });
+  TG(1916, "whenever a card returns to the hand from the field", { event: "fieldToHand", owner: "you" }, "you gain 1 life", { once: "turn" });
+  TG(3251, "when another card on your field returns to your hand", { event: "fieldToHand", owner: "you" }, "you may return this card to your hand");
+  TG(3267, "when a card on your field is returned from your field to hand", { event: "fieldToHand", owner: "you" }, "for this turn, a card on your field gets power+1000 and defense+1000");
+  TG(4500, "when a «superhero» or «superheroine» on your field is returned to hand", { event: "fieldToHand", owner: "you", np: { filter: { tribes: ["Superhero", "Superheroine"] } } }, "you gain 2 life, and draw a card", { once: "turn" });
+  TG(4752, "when cards on your opponent's field are returned to hand by your card effects", { event: "fieldToHand", owner: "opp", by: "you" }, "your opponent chooses and drops a hand card", { once: "turn" });
+  // hand discards
+  TG(2745, "when a card is discarded from your hand", { event: "handDiscard", owner: "you" }, "you gain 1 life, and for this turn, this card gets critical+1", { once: "turn" });
+  TG(3942, "when a card is discarded from your hand", { event: "handDiscard", owner: "you" }, "return up to two cards on your opponent's field to the hand", { once: "turn" });
+  // opponent gauge
+  TG(1397, "when a card is put into your opponent's gauge", { event: "gaugeUp", owner: "opp" }, "deal 1 damage to your opponent", { once: "turn" });
+  TG(5102, "when a card is put into your opponent's gauge by card effects", { event: "gaugeUp", owner: "opp", by: "you", turn: "you" }, "you gain 2 life, and draw a card", { once: "turn" });
 })(typeof window !== "undefined" ? window : globalThis);
