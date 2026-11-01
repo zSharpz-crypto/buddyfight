@@ -170,3 +170,6 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - #3824 Overturn Ice Emperor, Miserea was a dead static: now an [Overturn] act (pay 2 gauge, main phase): nullify field abilities, all other cards back to both decks, shuffle, draw 6, 2 to gauge.
 - Bare quoted names ("Dragon Throne") are now exact when such a card exists (113 filters, abilities_r42.js); `with "X" in its name` stays substring.
 - Still open (audit): #3902 Shining Dragoner Jackknife and #5161 El Quixote [Overturn] are dead statics (need a nullify-card-used counter / "drop a Knight from hand then equip two Knight items"); #3747/#5163 run through the generic text executor; timing of "when ... would" Overturns (#3595, #3822, #3843, #4163) is not enforced.
+
+## Gargantua Slash Wyvern #5767 / #6066 (2026-11-01, tests: tests/wyvern.js)
+- [G.BOOST-Will-] "for this turn ... at the end of battle / when a monster attacks" paid its life/damage immediately at attack-phase start (#5767 also ignored the "another Deity Dragon Tribe" check, #6066 gained 2 life unconditionally). Now the condition is checked on resolve and the life/damage pays out at end of each battle (#5767: +1 life, 1 dmg) / on each monster attack (#6066: +2 life); abilities_r42.js.

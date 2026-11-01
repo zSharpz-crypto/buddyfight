@@ -153,6 +153,9 @@
 
     /* ---- wave 2: single-card fixes ---- */
     [5538, /for this turn, the critical of all/i, (ab) => ({ kind: "spell", steps: [clone(ab.steps[0]), { op: "r42SectorCollapse" }] })],
+    /* ---- #5767 / #6066 Gargantua Slash Wyvern: the [G.BOOST-Will-] "for this turn ..." clause is checked when it resolves, then pays out later ---- */
+    [5767, /at the end of the battles/i, (ab) => ({ kind: "triggered", steps: [clone(ab.steps[0]), clone(ab.steps[1]), { op: "r42WyvernWill", when: "battleEnd", life: 1, dmg: 1 }] })],
+    [6066, /when a monster on your field attacks/i, (ab) => ({ kind: "triggered", steps: [clone(ab.steps[0]), clone(ab.steps[1]), { op: "r42WyvernWill", when: "attack", life: 2, dmg: 0, monsterOnly: true }] })],
     [5757, /put into the drop zone from your hand or the field/i, () => ({
       kind: "triggered", trigger: { event: "leave", self: true }, conds: [has({ tribes: ["Legend Dragon"] })],
       steps: [{ op: "destroy", np: np({ types: ["spell", "item"] }, "field", null, "opp") }]
@@ -486,6 +489,46 @@
       }
     } catch (e) { /* ignore */ }
     return origFireAttackReb.apply(this, arguments);
+  };
+
+  // #5767 / #6066: "if another <<Deity Dragon Tribe>> is on your field, for this turn, ..." -> checked now, pays out on each attack / end of battle
+  OPS.r42WyvernWill = {
+    run(s, ctx) {
+      const f = ctx.f || F(ctx.side);
+      const flt = s.monsterOnly ? { tribes: ["Deity Dragon Tribe"], types: ["monster"] } : { tribes: ["Deity Dragon Tribe"] };
+      const other = core.fieldUnits(f, false).some(r => r.unit !== ctx.unit && r.card && (ctx.unit || r.card.id !== (ctx.card && ctx.card.id)) && core.matchFilter(r.card, flt, { unit: r.unit, side: ctx.side }, { f }));
+      if (other) { f.abxWyvernWill = { turn: battle.turnCount, when: s.when, life: s.life, dmg: s.dmg }; }
+      return true;
+    }, check: () => true
+  };
+  const wyvernPay = (side, units, perUnit) => {
+    const f = F(side), w = f && f.abxWyvernWill;
+    if (!w || w.turn !== battle.turnCount) return null;
+    const n = perUnit ? Math.max(1, (units || []).filter(u => u && u.unit && u.unit.card && u.unit.card.type === "Monster").length) : 1;
+    const card = core.cardOf(5767), steps = [];
+    if (w.life) steps.push({ op: "life", who: "you", n: w.life * n });
+    if (w.dmg) steps.push({ op: "damage", who: "opp", n: w.dmg * n });
+    return steps.length ? { card, ab: { kind: "spell", steps } } : null;
+  };
+  const prevAttackW = ABX.fireAttack;
+  ABX.fireAttack = function (attSide, units, defSide, targetPos) {
+    const r = prevAttackW.apply(this, arguments);
+    try {
+      const w = F(attSide) && F(attSide).abxWyvernWill;
+      const p = w && w.when === "attack" && wyvernPay(attSide, units, true);
+      if (p) return ABX.queue(async () => { await r; await ABX.runAbility(attSide, p.card, p.ab, null, { preApproved: true }); });
+    } catch (e) { /* ignore */ }
+    return r;
+  };
+  const prevBattleEndW = ABX.fireBattleEnd;
+  ABX.fireBattleEnd = function (attSide, units) {
+    const r = prevBattleEndW.apply(this, arguments);
+    try {
+      const w = F(attSide) && F(attSide).abxWyvernWill;
+      const p = w && w.when === "battleEnd" && wyvernPay(attSide, units, false);
+      if (p) return ABX.queue(async () => { await r; await ABX.runAbility(attSide, p.card, p.ab, null, { preApproved: true }); });
+    } catch (e) { /* ignore */ }
+    return r;
   };
 
   // #5538: remember that Sector Collapse is active this turn (the attack hook below applies it)
