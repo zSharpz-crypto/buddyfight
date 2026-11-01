@@ -205,3 +205,5 @@ Open: Belost is still activated via the game's draw/hand-click prompt rather tha
 - [x] tests/time_ruler_attack.js: 4 failures were a stale test, not a bug. Its target #1445 Second Omni Demon Lord may pay to prevent leaving the field and the test accepted the prompt; target is now a vanilla monster (#45).
 
 - [x] Items "can attack even if X is on your center": #872 ("in the center"), #4867 (typo "his card"), #5913 / #6398 ("characters/monsters are on your center") did not parse -> abilities_parser.js + own-center detection in abilities_engine.js. Sweep test: tests/item_center_attack.js (76 items)
+- [x] Dead continuous statics: #3831 / #1970 / #3151 / #5939 size reductions, #1641 / #2711 stats from souls, #2808 center protection on opp turn, #2196 / #1676 no damage from opponent effects (abilities_r42.js). Test: tests/partly_statics.js
+- [ ] Still dead (r40Static text, ~170 abilities): re-run the audit (node script in the 2026-11-02 session) - big groups left: "when a soul is put into your X" (event missing), "when a card on opp field is [Rest] by your effect", "if you are [transform] into this card", "if you have this card equipped, ..."

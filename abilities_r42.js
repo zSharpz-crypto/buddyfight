@@ -1016,4 +1016,63 @@
   }
   // [r42] #2303 Meteorarms, Pisca Pisca: "When you put this card from the field, deck, or drop zone into the soul of a size 3 «Neodragon», put the top card of your deck into your gauge." (was an "enter" trigger)
   OV42.push([2303, /into the soul of a size 3/i, () => ({ kind: "triggered", trigger: { event: "putIntoSoul", self: true, fromAreas: ["field", "deck", "drop zone"], hostNp: Object.assign(np({ tribes: ["Neodragon"], size: { n: 3, cmp: "eq" } }, null, null, "you"), { zone: null, raw: "a size 3 «Neodragon»" }) }, conds: [], steps: [{ op: "mill", who: "you", n: 1, to: "gauge", src: "put the top card of your deck into your gauge" }] })]);
+  /* ---- [r42] dead continuous statics (parsed as r40Static text): #3831 #1970 #3151 #5939 (size), #1641 #2711 (stats from souls), #2808 (center protection), #2196 #1676 (no effect damage) ---- */
+  const sideOfF = (fighter) => B.plr === fighter ? "plr" : B.opp === fighter ? "opp" : null;
+  const fieldSoulCount = (fighter) => {
+    let n = 0;
+    ["left", "center", "right", "center2"].forEach(p => { const u = fighter.monsters && fighter.monsters[p]; if (u && Array.isArray(u.soul)) n += u.soul.length; });
+    ["item", "item2"].forEach(k => { const u = fighter[k]; if (u && Array.isArray(u.soul)) n += u.soul.length; });
+    return n;
+  };
+  const centerIs = (fighter, id) => { const c = fighter.monsters && fighter.monsters.center; return !!c && c.card.id === id && c.abxNullified !== B.turnCount; };
+  const prevSizeDelta = ABX.sizeDelta;
+  ABX.sizeDelta = function (fighter, card, unit) {
+    let d = prevSizeDelta.apply(this, arguments);
+    try {
+      if (!card || !fighter || !sideOfF(fighter)) return d;
+      if (unit && unit.abxNullified === B.turnCount) return d;
+      const onField = !!unit && ["left", "center", "right", "center2"].some(p => fighter.monsters[p] === unit);
+      if (card.id === 3831 && onField && fighter.monsters.center) d -= 1;   // "If you have monsters on your center, the size of this card on the field is reduced by 1"
+      if (card.id === 1970 && onField) d -= fieldSoulCount(fighter);        // "For each card in the souls of cards on your field, the size of this card on your field is reduced by 1"
+      if (onField && (fighter.monsters.left === unit || fighter.monsters.right === unit)) {
+        if (centerIs(fighter, 3151) && (card.attrs || []).some(a => /^disaster$/i.test(a))) d -= 1;   // #3151: the size of the «Disaster» on your left and right is reduced by 1
+        if (centerIs(fighter, 5939) && card.size === 3) d -= 3;                                         // #5939: all originally size 3 monsters on your left and right are reduced by 3
+      }
+    } catch (e) { /* ignore */ }
+    return d;
+  };
+  if (ABX.staticBonus) {
+    const prevSB = ABX.staticBonus;
+    ABX.staticBonus = function (fighter, unit) {
+      const sb = prevSB.apply(this, arguments);
+      try {
+        if (!unit || !unit.card || !sb || unit.abxNullified === B.turnCount) return sb;
+        if (unit.card.id === 1641 && fieldSoulCount(fighter) >= 3) sb.crit += 2;   // "If three or more cards are in the souls of cards on your field, this card gets critical+2!"
+        if (unit.card.type === "Monster" || unit.card.type === "Item") {
+          const n = (unit.soul || []).filter(id => id === 2711).length;   // #2711 Cerberus "A" in the soul of a «Weapon»: critical+1 per card in its soul, [Penetrate] with three or more souls
+          if (n && (unit.card.attrs || []).some(a => /^weapon$/i.test(a))) { sb.crit += (unit.soul || []).length; if ((unit.soul || []).length >= 3) sb.pen = true; }
+        }
+      } catch (e) { /* ignore */ }
+      return sb;
+    };
+  }
+  // #2808 Athora: "If this card is on your center, this card cannot be destroyed by card effects during your opponent's turn."
+  OV42.push([2808, /if this card is on your center, this card cannot be destroyed by card effects during your opponent's turn/i, () => ({ kind: "static", conds: [{ t: "selfPos", pos: "center" }, { t: "turn", who: "opp" }], steps: [{ op: "static", kind: "protect", kinds: ["destroyed"], self: true, byOpp: true }] })]);
+  // #2196 (while on your center) / #1676: "you cannot be dealt damage by effects from your opponent's cards"
+  const noEffDmg = (fighter) => {
+    const side = sideOfF(fighter); if (!side) return false;
+    if (centerIs(fighter, 2196)) return true;
+    return core.fieldUnits(fighter, true).some(x => x.unit && x.unit.card.id === 1676 && x.unit.abxNullified !== B.turnCount);
+  };
+  const prevApplyDamage = core.applyDamage;
+  core.applyDamage = function (side, n, src) {
+    try {
+      if (src && src.kind === "effect" && n > 0 && !src.unreducible) {
+        const f = F(side);
+        const own = src.sourceSide ? src.sourceSide === side : (src.card ? [f.hand, f.drop, f.gauge].some(a => a.includes(src.card.id)) || core.fieldUnits(f, true).some(x => x.unit && (x.unit.card.id === src.card.id || (x.unit.soul || []).includes(src.card.id))) : B.activeSide === side);
+        if (!own && noEffDmg(f)) return 0;
+      }
+    } catch (e) { /* ignore */ }
+    return prevApplyDamage.apply(this, arguments);
+  };
 })(typeof window !== "undefined" ? window : globalThis);
