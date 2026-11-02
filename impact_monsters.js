@@ -1107,7 +1107,7 @@
     imTurnStart(side) {
       [this.plr, this.opp].forEach(fighter => {
         fighter.impactCalledThisTurn = false;
-        fighter.impactTransformedThisTurn = false;
+        fighter.impactTransformedThisTurn = false; fighter.impactTransformCount = 0;
         getAllFieldUnits(fighter).forEach(u => { u.imUsed = {}; u._imDa = u._imTa = u._imQa = false; u.canAttackFinal = false; });
       });
     },
@@ -1199,7 +1199,7 @@
       if (!d || !d.impactTransform) return { ok: false, reasons: ["No [Impact Transform]"], d };
       if (this.phase !== "final") reasons.push("Final Phase only");
       if (this.turnCount === 1) reasons.push("Impact cards can't be used on Turn 1");
-      if (f.impactTransformedThisTurn) reasons.push("Once per turn");
+      if ((f.impactTransformCount || 0) >= ((f.item && f.item.card && f.item.card.id === 6226 && f.item.isTransformed && f.item.abxNullified !== this.turnCount) ? 2 : 1)) reasons.push("Once per turn");
       if (f.item && f.item.isEndrulerFlag) reasons.push("Your Flag/Item slot is held by the Endruler Flag");
       const cost = d.impactTransform.cost;
       if (f.gauge.length < cost.gauge) reasons.push(`Needs ${cost.gauge} Gauge`);
@@ -1236,7 +1236,7 @@
       f.item = { card, rested: false, attacksLeft: card.atk_max || 1, soul, isTransformed: true, canAttackFinal: true, imUsed: {}, tempPower: 0, tempDef: 0, tempCrit: 0 };
       const eff = getUnitEffectiveCombatStats(f, f.item);
       f.item.attacksLeft = eff.qa ? 4 : eff.ta ? 3 : eff.da ? 2 : (card.atk_max || 1);
-      f.impactTransformedThisTurn = true;
+      f.impactTransformedThisTurn = true; f.impactTransformCount = (f.impactTransformCount || 0) + 1;
       this.showCutin("IMPACT TRANSFORM!", card.name, card.img);
       this.setPrompt(`💥 [Impact Transform] "${card.name}" — it can attack during the Final Phase!`);
       this.renderBattle();

@@ -52,5 +52,18 @@ const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "
     run(`fresh(); battle.plr.setSpells=[card(4499)]; globalThis.u=tr('plr',${caard}); globalThis.l0=battle.plr.life; ABX.fireEquipped('plr',card(${caard}),u);`); await settle();
     ck("4499 transform into Caardian: +1 life, pen", val(`return battle.plr.life===l0+1 && !!getUnitEffectiveCombatStats(battle.plr,u).pen`), val(`return [battle.plr.life,l0]`));
   } else ck("caardian transform card exists", false);
-  console.log(`pass ${pass} fail ${fail}`); process.exit(fail ? 1 : 0);
+    // 6226: [Impact Transform] twice per turn (once otherwise)
+  const itm = val(`const w=window.BUDDYFIGHT_CARDS.find(c=>IMX.get(c)&&IMX.get(c).impactTransform&&c.id!==6226); return w?w.id:0`);
+  if (itm) {
+    run(`fresh(); battle.phase='final'; battle.turnCount=6; battle.plr.gauge=Array(8).fill(46); globalThis.u=tr('plr',6226); battle.plr.impactTransformCount=1; battle.plr.impactTransformedThisTurn=true;`);
+    ck("6226: second Impact Transform allowed", !val(`return battle.imTransformInfo('plr',card(${itm})).reasons.includes('Once per turn')`));
+    run(`battle.plr.impactTransformCount=2;`); ck("6226: third blocked", val(`return battle.imTransformInfo('plr',card(${itm})).reasons.includes('Once per turn')`));
+    run(`fresh(); battle.phase='final'; battle.turnCount=6; battle.plr.gauge=Array(8).fill(46); globalThis.u=tr('plr',4527); battle.plr.impactTransformCount=1;`);
+    ck("other transform: second blocked", val(`return battle.imTransformInfo('plr',card(${itm})).reasons.includes('Once per turn')`));
+  }
+  // 6208: attacks and destroys -> [Stand]
+  run(`fresh(); battle.activeSide='plr'; battle.phase='attack'; battle.turnCount=6; globalThis.u=tr('plr',6208); globalThis.v=put('opp','center',149); u.rested=true; battle.executeAttackResolution('plr',['item'],'center');`);
+  await settle(); await settle();
+  ck("6208: destroys a monster -> stands", val(`return !battle.opp.monsters.center && u.rested===false`));
+console.log(`pass ${pass} fail ${fail}`); process.exit(fail ? 1 : 0);
 })();
