@@ -2277,4 +2277,35 @@
       });
     } catch (e) { /* ignore */ }
   };
+
+  /* ---- [r42] batch 5: "this card gets all abilities of <cards> in its soul" (#2562 #2608 #6477 #4436 #5269) ---- */
+  (function () {
+    const SK = new Set(["cost", "keyword", "reminder", "rule"]);
+    const isIM = (c) => !!(c && window.IMX && IMX.isImpactMonster(c));
+    const RULES = {
+      2562: (c) => isIM(c) && !/gemclone/i.test(c.name || ""),
+      2608: (c) => isIM(c) && !/gemclone/i.test(c.name || ""),
+      6477: (c) => isIM(c) && !/gemclone/i.test(c.name || ""),
+      4436: (c) => (c.size || 0) === 5 && (c.attrs || []).some(a => /^battleship$/i.test(a)),
+      5269: (c) => (c.size || 0) <= 2 && (c.attrs || []).some(a => /^dangerous ?veggies$/i.test(a))
+    };
+    const prevGet5 = ABX.get;
+    ABX.get = function (card) {
+      const r = prevGet5.apply(this, arguments);
+      try {
+        if (!r || !card || !RULES[card.id] || typeof B === "undefined" || !B.plr || !B.opp) return r;
+        const rule = RULES[card.id], extra = [], seen = new Set();
+        ["plr", "opp"].forEach(sd => core.fieldUnits(F(sd), true).forEach(x => {
+          const u = x.unit; if (!u || u.card !== card || u.abxNullified === B.turnCount) return;
+          (u.soul || []).forEach(id => {
+            if (seen.has(id)) return; const c = core.cardOf(id);
+            if (!c || c.id === card.id || !rule(c)) return; seen.add(id);
+            ((prevGet5.call(ABX, c) || {}).abilities || []).forEach(a => { if (!SK.has(a.kind)) extra.push(Object.assign({}, a, { borrowedFrom: c.id })); });
+          });
+        }));
+        return extra.length ? Object.assign({}, r, { abilities: r.abilities.concat(extra) }) : r;
+      } catch (e) { return r; }
+    };
+    if (ABX.resetCaches) ABX.resetCaches();
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
