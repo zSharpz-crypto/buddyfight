@@ -819,7 +819,7 @@
           u.abxRebTurn = B.turnCount;
           u.abxAttackAllOpp = B.turnCount; u.abxAttackAllFighter = true;
           u.tempPower = (u.tempPower || 0) + 10000;
-          if (!u.tempTA) { u.tempTA = true; u.attacksLeft = (u.attacksLeft || 0) + 2; }
+          u.tempTA = true; ABX.grantAttacks(u, 3);   // 3 attacks in total this turn; stands again if the first attack had already rested it
         }
       }
     } catch (e) { /* ignore */ }
