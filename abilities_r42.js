@@ -2133,4 +2133,63 @@
   TG(5656, "when your opponent draws cards from their card effects", { event: "draw", owner: "opp", by: "oppEffect", minDifferent: { get filter() { return ABX.parseNP("an Idol card").filter; }, n: 3 } }, "your opponent chooses and drops a hand card");
   TG(5771, "when the number of cards in your opponent's hand increases", { event: "handUp", owner: "opp" }, "your opponent chooses and drops a hand card");
   OV42.push([6499, /when a card is put into your opponent's gauge/i, () => ({ kind: "triggered", trigger: { event: "gaugeUp", owner: "opp" }, steps: [{ op: "r42GaugeTo2" }] })]);
+
+  /* ---- Dragonarms / Neodragon audit (tests/dragonarms_audit.js) ---- */
+  const hostOf42 = (ctx) => ctx.soulHost || ((ctx.bind && ctx.bind.chosen) || []).map(r => r.unit).find(Boolean) || null;
+  // "put this card from the soul of your «Neodragon» into the drop zone" as an optional cost of the ability
+  OPS.r42SoulSelfToDrop = { run(s, ctx) { const h = hostOf42(ctx), id = ctx.card.id; if (!h) return false; const i = (h.soul || []).findIndex(x => Number(soulIdOf(x)) === id); if (i < 0) return false; h.soul.splice(i, 1); ctx.f.drop.push(id); fresh(); return true; }, check: () => true };
+  // "put up to one «X» from your drop zone into this card's soul" (only when it entered in one of s.pos)
+  OPS.r42DropToSoul = {
+    async run(s, ctx) {
+      const u = ctx.unit, f = ctx.f; if (!u) return false;
+      if (s.pos && !s.pos.includes(core.posOfUnit(f, u))) return false;
+      const norm = (x) => lc(x).replace(/\s+/g, "");
+      const cands = f.drop.map((id, i) => ({ id, i, c: core.cardOf(id) })).filter(x => x.c && (!s.attr || (x.c.attrs || []).some(a => norm(a) === norm(s.attr))));
+      if (!cands.length) return false;
+      let pick = cands[0];
+      if (!(ABX.autoPlay || f.isBot) && cands.length > 0) {
+        const idxs = await ABX.ui.pickCards({ title: `${ctx.card.name} — put into its soul`, subtitle: "Choose up to one, or none.", cards: cands.map(x => ({ card: x.c, badge: "Drop" })), min: 0, max: 1 });
+        if (!idxs || !idxs.length) return false;
+        pick = cands[idxs[0]];
+      }
+      f.drop.splice(f.drop.indexOf(pick.id), 1); u.soul = u.soul || []; u.soul.push(pick.id);
+      if (ABX.firePutIntoSoul) ABX.firePutIntoSoul(ctx.side, pick.c, u, "drop");
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([1734, /when this card enters on your left/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42DropToSoul", pos: ["left"], attr: "Dragonarms" }] })]);
+  // #5683 Penero Theus [Counter][Act]: you may drop this card from a Neodragon's soul; if you do, [Rest] the chosen card
+  OV42.push([5683, /choose a card on your opponent's field/i, (ab) => {
+    const st = clone(ab.steps || []), ch = st.find(x => x.op === "choose"), rs = st.find(x => x.op === "rest");
+    if (!ch || !rs) return null;
+    delete rs.cond; rs.gate = "ifYouDo";
+    return { kind: ab.kind, steps: [ch, { op: "r42SoulSelfToDrop", optional: true }, rs] };
+  }]);
+  // #1802 Force Liberate: pay 1 gauge -> the Neodragon (host) is not destroyed the next time this turn
+  OPS.r42SaveHost = { run(s, ctx) { const h = hostOf42(ctx); if (!h) return false; h.tempIndestructible = true; h.abxSaveOnceTurn = B.turnCount; fresh(); return true; }, check: () => true };
+  OV42.push([1802, /force liberate/i, (ab) => {
+    const st = clone(ab.steps || []), pay = st.find(x => x.op === "pay");
+    if (!pay) return null;
+    return { kind: ab.kind, steps: [pay, { op: "r42SaveHost", gate: "ifYouDo" }] };
+  }]);
+  // #2573 Castnetter: the chosen opposing monster does not [Stand] during your opponent's next stand phase
+  OV42.push([2573, /does not \[?stand\]?/i, (ab) => {
+    const st = clone(ab.steps || []), i = st.findIndex(x => x.op === "r40StructuredExec");
+    if (i < 0) return null;
+    st[i] = { op: "restrict", np: { ref: "chosen", qty: { n: 1 }, filter: {}, raw: "chosen" }, kinds: ["stand"], duration: "next", gate: "ifYouDo" };
+    return { kind: ab.kind, trigger: ab.trigger, steps: st };
+  }]);
+  // #3065 Bigger Brave: the «Neodragon» with this card in its soul attacking alone: cannot be nullified; at the end of that battle the card drops
+  OV42.push([3065, /at the end of the battle/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+  const unnull3065 = ABX.attackUnnullifiable;
+  ABX.attackUnnullifiable = function (bc) {
+    if (unnull3065 && unnull3065.apply(this, arguments)) return true;
+    try { const us = (bc && bc.attUnits) || []; if (us.length === 1 && attrHas(us[0].card, /^neodragon$/i) && hasSoulCard(us[0], 3065)) return true; } catch (e) { /* ignore */ }
+    return false;
+  };
+  const be3065 = ABX.fireBattleEnd;
+  ABX.fireBattleEnd = function (attSide, units) {
+    try { (units || []).forEach(x => { const u = x && x.unit; if (u && hasSoulCard(u, 3065)) { const i = u.soul.findIndex(e => Number(soulIdOf(e)) === 3065); if (i >= 0) { u.soul.splice(i, 1); F(attSide).drop.push(3065); } } }); } catch (e) { /* ignore */ }
+    return be3065.apply(this, arguments);
+  };
 })(typeof window !== "undefined" ? window : globalThis);

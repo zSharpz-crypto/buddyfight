@@ -558,9 +558,11 @@
       return ref.card.id;
     }
     if (ref.k === "soul") {
-      const i = (ref.host.soul || []).indexOf(ref.id);
+      const hostU = ref.host || ref.unit;   // acts / counters built their own soul selfRef with `unit` (not `host`): both name the host monster
+      if (!hostU) return null;
+      const i = (hostU.soul || []).indexOf(ref.id);
       if (i < 0) return null;
-      ref.host.soul.splice(i, 1);
+      hostU.soul.splice(i, 1);
       return ref.id;
     }
     return null;
@@ -801,6 +803,8 @@
     ABX.stats.runs++;
     const f = F(side), e = F(otherSide(side));
     const ctx = { side, f, e, card, unit: unit || null, ab, bind: { chosen: [], revealed: [], looked: [] }, lastDone: true, event: opts.event || null, auto: !!opts.auto, log: [], hostArea: opts.hostArea || (unit ? "field" : null), soulHost: opts.soulHost || null, selfRef: opts.selfRef || null, preApproved: !!opts.preApproved };
+    // an [Act] / [Counter] used from a monster's soul: "that card" / "that «Neodragon»" is the host monster
+    if (opts.soulHost && opts.soulHost.card && !ctx.bind.chosen.length) ctx.bind.chosen = [{ k: "unit", side, unit: opts.soulHost, card: opts.soulHost.card, id: opts.soulHost.card.id }];
     // "When a monster enters your opponent's field ... [Rest] that monster": the entering monster is "that monster"
     if (ctx.event && ctx.event.name === "otherEnter" && ctx.event.unit) {
       const eu = ctx.event.unit, es = ctx.event.enterSide || side;

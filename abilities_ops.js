@@ -566,6 +566,7 @@
         const dest = /\binto (?:your |his or her )?gauge\b/i.test((s.hostNP && s.hostNP.selfTail) || s.src || "") ? "gauge" : /\binto (?:your |his or her )?hand\b/i.test((s.hostNP && s.hostNP.selfTail) || s.src || "") ? "hand" : "drop";
         for (let i = 0; i < cnt; i++) { f[dest].push(u.soul.pop()); n++; }
       }
+      ctx.lastCount = n;   // "If you do / draw a card for each" (#3441 Soul Reset) read the count
       fresh(); return n > 0;
     },
     check: (s) => !!s.hostNP && !s.host
