@@ -2525,4 +2525,58 @@
       return r;
     };
   })();
+
+  /* ---- [r42] batch 9: #6058 Galaxy F.DG no-[Rest] part (the stat bullets of #5132 / #6058 already parse as conditional statics), #4982 (souls undroppable), #2465 (opponent locked out during their final phase) ---- */
+  (function () {
+    const itemsOf = (f) => (typeof getEquippedItems === "function" ? getEquippedItems(f).map(x => x.unit) : [f.item, f.item2].filter(Boolean));
+    // #5132 [Galaxy F]: the center already gets its own bonuses; the left / right «Astrodragon» and the «Astrodragon» item get theirs here
+    const isAstro = (c) => !!c && (c.attrs || []).some(a => /^astrodragon$/i.test(a));
+    const prevSB = ABX.staticBonus;
+    if (prevSB) ABX.staticBonus = function (fighter, unit) {
+      const out = prevSB.apply(this, arguments);
+      try {
+        const cen = fighter && fighter.monsters && fighter.monsters.center;
+        if (!out || !unit || !unit.card || !cen || cen === unit || cen.card.id !== 5132 || cen.abxNullified === B.turnCount) return out;
+        if (unit === fighter.monsters.left && isAstro(unit.card)) out.defense += 10000;
+        if (unit === fighter.monsters.right && isAstro(unit.card)) out.crit += 2;
+        if (itemsOf(fighter).includes(unit) && itemsOf(fighter).some(it => isAstro(it.card))) out.power += 10000;
+      } catch (e) { /* ignore */ }
+      return out;
+    };
+    // #6058: with an item equipped, your cards cannot be [Rest] by the opponent's card effects
+    const prevProt = core.isProtected;
+    core.isProtected = function (unit, side, kind, ctx) {
+      if (prevProt.apply(this, arguments)) return true;
+      try {
+        const f = F(side);
+        if (unit && unit.card && ctx && ctx.side !== side) {
+          // #4982: souls in the «Dragonblood Sect» with this card in its soul cannot be dropped by your opponent's card effects
+          if (/souls? dropped|drop.*soul/i.test(String(kind || "")) && (unit.soul || []).includes(4982)) return true;
+          // #6058 Galaxy F.DG
+          if (/rest/i.test(String(kind || "")) && f.monsters && f.monsters.center && f.monsters.center.card.id === 6058 && f.monsters.center.abxNullified !== B.turnCount && itemsOf(f).length) return true;
+        }
+      } catch (e) { /* ignore */ }
+      return false;
+    };
+    // #2465: while in the soul of a «Zodiac» monster, during the opponent's final phase they cannot use or cast cards from hand, nor use an [Act]
+    const lockedBy2465 = (fighter) => {
+      try {
+        if (!fighter || B.phase !== "final") return false;
+        const side = fighter === B.plr ? "plr" : "opp", other = F(otherSide(side));
+        if (B.activeSide !== side) return false;
+        return core.fieldUnits(other, true).some(x => x.unit.abxNullified !== B.turnCount && (x.unit.soul || []).includes(2465) && /zodiac/i.test(x.unit.card.name || ""));
+      } catch (e) { return false; }
+    };
+    const prevCB = core.castBlock;
+    core.castBlock = function (fighter, card) {
+      const r = prevCB ? prevCB.apply(this, arguments) : null;
+      if (r) return r;
+      return lockedBy2465(fighter) ? `"Dragoneraser, Hind Lance" prevents you from using cards from your hand during your final phase` : null;
+    };
+    const prevCUA = ABX.canUseAct;
+    ABX.canUseAct = function (side, card, ab, unit) {
+      if (lockedBy2465(F(side))) return { ok: false, reason: "Dragoneraser, Hind Lance: you cannot use [Act]s during your final phase" };
+      return prevCUA.apply(this, arguments);
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
