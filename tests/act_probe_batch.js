@@ -34,5 +34,11 @@ run(`globalThis.mk=(id,soul)=>({card:CARD_MAP.get(id),rested:false,attacksLeft:1
   const noOT = J(`battle.imCallInfo('plr',CARD_MAP.get(4154)).reasons`);
   run(`battle.plr.overturnUsed=true; battle.plr.overUsed={overturn:true}`); const OT = J(`battle.imCallInfo('plr',CARD_MAP.get(4154)).reasons`);
   ck("#4154: 1 gauge is not enough normally, enough after Overturn", noOT.some(r => /Needs 3 Gauge/.test(r)) && OT.length === 0, [noOT, OT]);
+  // 5171: [Counter] from the soul of a monster -> call this card from the soul
+  run(`fresh(); battle.plr.monsters.center=mk(149,[5171]); globalThis.host=battle.plr.monsters.center;`);
+  const sa = J(`ABX.soulActs('plr',host).map(x=>x.card.id)`);
+  ck("#5171: soul [Counter] is offered on its host", sa.includes(5171), sa);
+  run(`(async()=>{const x=ABX.soulActs('plr',host).find(x=>x.card.id===5171); await ABX.useSoulAct('plr',host,x.card,x.ab)})()`); await settle();
+  ck("#5171: called from the soul onto the field", J(`["left","right","center2"].some(z=>battle.plr.monsters[z]&&battle.plr.monsters[z].card.id===5171) && !host.soul.includes(5171)`), J(`[host.soul,Object.entries(battle.plr.monsters).map(([k,v])=>[k,v&&v.card.id])]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

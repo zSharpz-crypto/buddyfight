@@ -2753,4 +2753,10 @@
       return out;
     };
   })();
+
+  /* ---- [r42] batch 15: #5171 Here Comes the Event! Garga "SD": [Counter] from the soul of a monster: call this card from the soul (once per turn) ---- */
+  OV42.push([5171, /here comes the event/i, () => {
+    const pc = ABX.parseCard({ id: -5171, name: "x", type: "Monster", size: 1, attrs: [], skill: "[Counter] [Act] Call this card from the soul of a monster on your field. You may only use this ability once per turn." }).abilities.find(a => a.kind === "act");
+    return pc ? { kind: "act", steps: pc.steps, tags: pc.tags || ["counter", "act"], counter: true, once: "turn", conds: pc.conds || [] } : null;
+  }]);
 })(typeof window !== "undefined" ? window : globalThis);
