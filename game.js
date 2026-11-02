@@ -1026,8 +1026,17 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
     // "If you are not [Transform] into a card, pay another N gauge" (#1386): only a fighter with a [Transform] item on the field pays the base cost
     const ntMatch = String(skillStr || line).match(/\[(?:Call|Cast|Equip) Cost\][^\n]*?If you are not \[Transform\][^,]*,\s*pay another (\d+) gauge/i);
     if (ntMatch && !(fighter && getEquippedItems(fighter).some(x => x.unit.card.tr || x.unit.isTransformed))) gauge += parseInt(ntMatch[1], 10);
-    const lMatch = soulLine.match(/Pay\s+(\d+)\s+life/i);
+    const lMatch = soulLine.match(/Pay\s+(\d+)\s+life/i) || soulLine.match(/[&,]\s*(\d+)\s+life\b/i);   // "Pay 2 gauge & 1 life" (#127, #1869, #4711, #4926)
     if (lMatch) life = parseInt(lMatch[1], 10);
+    // "If you do not have a Demon Lord on the field / a monster with "Drum" in its card name on your field, pay another N gauge|life" (#211, #454)
+    const dnm = String(skillStr || line).match(/\[(?:Call|Cast|Equip) Cost\][^\n]*?If you do not have (?:a|an) (.+?) on (your|the) field,\s*pay another (\d+) (gauge|life)/i);
+    if (dnm && fighter) {
+      const what = dnm[1].replace(/[«»]/g, "").trim(), nm = (what.match(/with "([^"]+)" in its card name/i) || [])[1];
+      const units = getAllFieldUnits(fighter).concat(dnm[2].toLowerCase() === "the" && typeof battle !== "undefined" && battle.plr ? getAllFieldUnits(battle.plr === fighter ? battle.opp : battle.plr) : []);
+      const norm = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const has = units.some(u => u && u.card && (nm ? String(u.card.name || "").toLowerCase().includes(nm.toLowerCase()) : (u.card.attrs || []).some(a => norm(a) === norm(what))));
+      if (!has) { if (dnm[4].toLowerCase() === "life") life += parseInt(dnm[3], 10); else gauge += parseInt(dnm[3], 10); }
+    }
     const sMatch = soulLine.match(/Put\s+(?:the\s+)?top\s+(?:(one|two|three|\d+)\s+)?cards?\s+of\s+your\s+deck\s+into\s+(?:this\s+(?:card|monster)'s\s+|its\s+)?soul/i);
     if (sMatch) {
       const word = (sMatch[1] || "1").toLowerCase();

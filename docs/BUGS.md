@@ -267,3 +267,9 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - [x] Batch 12 (tests/act_probe_batch.js): #3874 search on equip (card text was split across lines), #3854 Magni Act (options now attached via r42Magni); #2762 and #4154 verified working.
 - [x] Batch 13 (tests/glasses.js): #5474 Glasses.
 - [x] Batch 14 (tests/glasses.js): #2079 Ride critical, #2520 Hero World foreign impact monsters legal with it as buddy.
+
+## Unbuilt-class batch (tests/unbuilt_classes.js)
+- [x] Call restrictions on the card ("cannot enter the field other than by the [Act] of X", "can only be called by X effects", "cannot be called", "only if your flag is Dragon Drei"): blocked from hand, allowed by effects (#950 #2107 #2108 #2136 #2151 #2569 #2601 #2641 #2790 #3183 #3826 #4147 #4873 #4885 #4886 #4967 #4971 #5866 #5870 #5872 #5873).
+- [x] "Pay N gauge & 1 life" costs (#127 #1869 #4711 #4926); conditional "pay another" costs (#211, #454).
+- [x] Soul-from-zone cost variants: "Pay N gauge. Then put up to N / all «X» from drop zone into soul", "You may put ... from hand/drop zone" (#2300 #2690 #4158 #4805 #5846 #2691 #835 #604 #660 #650 #665 #1221 #1492).
+- [ ] Still unbuilt: life-would-become-0 saves (#1448 #2675), "put on top of a Jackknife/Neodragon monster" (#1676 #1691), field-to-soul costs (#1121 #3175), when-no-monsters pay (#3728 #4759), #5127 reduced cost, #4962 "any 2 gauge", #349 #456 #1197 #2466 #4762, #523 (shout, no effect).

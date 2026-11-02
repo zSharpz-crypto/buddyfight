@@ -2759,4 +2759,34 @@
     const pc = ABX.parseCard({ id: -5171, name: "x", type: "Monster", size: 1, attrs: [], skill: "[Counter] [Act] Call this card from the soul of a monster on your field. You may only use this ability once per turn." }).abilities.find(a => a.kind === "act");
     return pc ? { kind: "act", steps: pc.steps, tags: pc.tags || ["counter", "act"], counter: true, once: "turn", conds: pc.conds || [] } : null;
   }]);
+
+  /* ---- [r42] call restrictions written on the card: "cannot enter the field other than by the [Act] of X" / "can only be called by X effects" / "cannot be called" / "can only enter the field if your flag is X" ---- */
+  (function () {
+    const BT = () => (typeof battle !== "undefined" ? battle : root.battle);
+    const prevEcc = root.evaluateCardConditions;
+    if (typeof prevEcc !== "function") return;
+    const restriction = (card) => {
+      const t = String(card && card.skill || "");
+      if (/^\s*this card cannot be called\.?\s*$/im.test(t)) return { kind: "never" };
+      if (/^\s*this card cannot enter the field other than by\b/im.test(t) || /^\s*this card can only be called by .+ effects?\.?\s*$/im.test(t)) return { kind: "effect" };
+      const fm = t.match(/^\s*this card can only enter the field if your flag is "([^"]+)"/im);
+      return fm ? { kind: "flag", flag: fm[1] } : null;
+    };
+    ABX.callRestriction = restriction;
+    root.evaluateCardConditions = function (card, fighter, enemy, isAbilityCall) {
+      const r = prevEcc.apply(this, arguments);
+      try {
+        if (r && r.met !== false && card && card.type === "Monster" && fighter) {
+          const rs = restriction(card);
+          const viaEffect = isAbilityCall || ABX.curEffectCard || (BT() && BT().abxFreeCall);
+          let why = null;
+          if (rs && rs.kind === "never" && !viaEffect) why = `"${card.name}" cannot be called`;
+          else if (rs && rs.kind === "effect" && !viaEffect) why = `"${card.name}" can only enter the field by a card effect`;
+          else if (rs && rs.kind === "flag" && String(fighter.world || "").toLowerCase() !== rs.flag.toLowerCase() && String((fighter.flagCard && fighter.flagCard.name) || "").toLowerCase() !== rs.flag.toLowerCase()) why = `"${card.name}" can only enter the field if your flag is "${rs.flag}"`;
+          if (why) { const reasons = (r.reasons || []).concat([why]); return Object.assign({}, r, { met: false, reasons, summary: `⚠️ ${reasons[0]}` }); }
+        }
+      } catch (e) { if (ABX.debug) console.error(e); }
+      return r;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);

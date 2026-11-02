@@ -1387,6 +1387,23 @@
         out.push({ soulFrom: { area: mZ[2].toLowerCase(), n: 1, np: { raw: what, qty: { n: 1 }, filter: flt } }, text: txt });
         return;
       }
+      // [r42] soul-cost variants: "Pay 2 gauge. Then, put up to one card / two cards / all «Deep» / up to four «A» or «B» from your drop zone into this card's soul", "You may put a card with "X" in its card name from your hand into this card's soul"
+      const mZ2 = !p.soulFrom && txt.match(/^(?:pay \d+ gauge[.,]?\s*)?(?:then,?\s*)?(you may )?put (up to )?(a|an|one|two|three|four|five|\d+|all|as many)\s+(.+?)(?: as you like)? from your (drop zone|hand)(?: with "([^"]+)" in its card name)? into (?:this (?:monster|card)'s|this card|its) soul\.?\]?$/i);
+      if (mZ2) {
+        const NW = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
+        const q = mZ2[3].toLowerCase(), many = q === "all" || q === "as many";
+        let what = mZ2[4].trim().replace(/^as many\s+/i, ""), flt = {};
+        const nm = mZ2[6] || (what.match(/with "([^"]+)" in its card name/i) || [])[1] || (what.match(/^"([^"]+)"$/) || [])[1];
+        if (nm) flt.names = [lc(nm)];
+        else if (!/^cards?$/i.test(what)) {
+          const ts = what.replace(/[«»]/g, "").split(/\s+or\s+/i).map(t => t.trim().replace(/s$/i, m => m)).filter(Boolean);
+          if (!ts.length || ts.some(t => !/^[\w' -]+$/.test(t))) return;
+          flt.tribes = ts;
+        }
+        const n = many ? 99 : (NW[q] || parseInt(q, 10) || 1);
+        out.push({ soulFrom: { area: mZ2[5].toLowerCase() === "hand" ? "hand" : "drop zone", n, upTo: !!(mZ2[1] || mZ2[2] || many), np: { raw: what, qty: { n }, filter: flt } }, text: txt });
+        return;
+      }
       // [Cast Cost] [Put a hand card on the bottom of your deck] (#6190 -Damuna-): needs that many OTHER hand cards, goes to the bottom of the deck
       const mBottom = txt.match(/^put (a|an|one|two|three|\d+) hand cards? on the bottom of your deck\.?$/i);
       if (mBottom) {
