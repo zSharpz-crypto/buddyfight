@@ -1,0 +1,20 @@
+// Equip/enter rules: #3676 (needs Blade Beast), #2661 (3 different Caardian in drop), #3869 (+7000 / unnullifiable alone with Shield), #4175/#2020 (equip only by ability)
+const { createEnv } = require("./headless.js");
+const env = createEnv(); const run = env.run; const J = (c) => { const r = run(`JSON.stringify(${c})`); return (r === undefined || r === "undefined") ? undefined : JSON.parse(r); };
+let pass = 0, fail = 0; const ck = (n, ok, x) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : JSON.stringify(x ?? "")); };
+run(`globalThis.mk=(id)=>({card:CARD_MAP.get(id),rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0});
+ globalThis.fresh=()=>{battle.start('hotseat',generateFlagDeck(447,'T',571,true),generateFlagDeck(447,'O',571,true));battle.renderBattle=function(){};const p=battle.plr;["left","center","right"].forEach(z=>{p.monsters[z]=null});p.item=null;p.item2=null;p.hand=[];p.drop=[];battle.turnCount=6;};
+ globalThis.met=(id)=>evaluateCardConditions(CARD_MAP.get(id),battle.plr,battle.opp).met;`);
+const bb = J(`[...CARD_MAP.values()].find(c=>c.type==="Monster"&&(c.attrs||[]).some(a=>/blade ?beast/i.test(a))).id`);
+run(`fresh()`); ck("#3676 blocked without Blade Beast", J(`met(3676)`) === false);
+run(`battle.plr.monsters.center=mk(${bb})`); ck("#3676 allowed with Blade Beast", J(`met(3676)`) === true);
+const cds = J(`[...new Map([...CARD_MAP.values()].filter(c=>/caardian/i.test(c.name)&&c.id!==2661).map(c=>[c.name,c.id])).values()].slice(0,4)`);
+run(`fresh(); battle.plr.drop=[${cds[0]},${cds[1]},${cds[0]}]`); ck("#2661 blocked with 2 different (3 cards)", J(`met(2661)`) === false);
+run(`battle.plr.drop=[${cds[0]},${cds[1]},${cds[2]}]`); ck("#2661 allowed with 3 different", J(`met(2661)`) === true);
+run(`fresh(); battle.plr.item=mk(3869)`); const base = J(`getUnitEffectiveCombatStats(battle.plr,battle.plr.item).power`);
+run(`battle.plr.item2=mk(3870)`); const withS = J(`getUnitEffectiveCombatStats(battle.plr,battle.plr.item).power`);
+ck("#3869 +7000 with Shield of Glory", withS === base + 7000, { base, withS });
+ck("#3869 unnullifiable alone with shield", J(`ABX.attackUnnullifiable({attSide:'plr',attUnits:[battle.plr.item]})`) === true);
+run(`battle.plr.item2=null`); ck("#3869 no shield -> nullifiable", J(`!!ABX.attackUnnullifiable({attSide:'plr',attUnits:[battle.plr.item]})`) === false);
+ck("#4175/#2020 equip only by ability", !!J(`equipOnlyByAbility(CARD_MAP.get(4175))`) && !!J(`equipOnlyByAbility(CARD_MAP.get(2020))`));
+console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);

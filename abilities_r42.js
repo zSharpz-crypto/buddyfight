@@ -2308,4 +2308,24 @@
     };
     if (ABX.resetCaches) ABX.resetCaches();
   })();
+
+  /* ---- [r42] batch 5b: #3869 Sword of Glory with "Shield of Glory, Order Guard" equipped: power+7000, unnullifiable when attacking alone ---- */
+  (function () {
+    const shieldOn = (f) => !!f && core.fieldUnits(f, true).some(x => x.unit && x.unit.card.id === 3870 && x.unit.abxNullified !== B.turnCount) ||
+      (typeof getEquippedItems === "function" && getEquippedItems(f).some(x => x.unit && x.unit.card && x.unit.card.id === 3870));
+    const prevSB = ABX.staticBonus;
+    if (prevSB) ABX.staticBonus = function (fighter, unit) {
+      const sb = prevSB.apply(this, arguments);
+      try { if (sb && unit && unit.card && unit.card.id === 3869 && unit.abxNullified !== B.turnCount && shieldOn(fighter)) sb.power += 7000; } catch (e) { /* ignore */ }
+      return sb;
+    };
+    const prevAU = ABX.attackUnnullifiable;
+    ABX.attackUnnullifiable = function (bc) {
+      if (prevAU && prevAU.apply(this, arguments)) return true;
+      try {
+        const us = (bc && bc.attUnits) || [];
+        return us.length === 1 && us[0] && us[0].card && us[0].card.id === 3869 && us[0].abxNullified !== B.turnCount && shieldOn(F(bc.attSide));
+      } catch (e) { return false; }
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);

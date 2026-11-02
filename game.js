@@ -1558,6 +1558,16 @@ function evaluateCardConditions(card, fighter, enemy, isAbilityCall = false) {
     if (ffc && checkCardLegalityForFlag(card, ffc, false).allowed) reasons.push(`Your flag is face down: you cannot use "${card.name}".`);
   }
 
+  // "You may only equip this card if you have a <X> on your field" (#3676 Blade Beast)
+  { const om = sLower.match(/you may only equip this card if you have an? ([^.\n,]+?) on your field/); 
+    if (om && card.type === "Item" && !fighterHasFieldCardMatching(fighter, om[1].trim())) reasons.push(`You may only equip "${card.name}" if you have a ${om[1].trim()} on your field.`); }
+  // "cannot enter the field if you do not have N or more different cards with "X" in their card names in your drop zone" (#2661 Caardian)
+  { const dm = sLower.match(/cannot enter the field if you do not have (\w+) or more different cards with "([^"]+)" in their card names in your drop zone/);
+    const NUMW = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+    if (dm && card.type === "Monster") { const need = NUMW[dm[1]] || Number(dm[1]) || 0, key = dm[2].toLowerCase();
+      const have = new Set((fighter.drop || []).map(id => CARD_MAP.get(id)).filter(c => c && (c.name || "").toLowerCase().includes(key)).map(c => c.name)).size;
+      if (have < need) reasons.push(`"${card.name}" cannot enter the field unless you have ${need}+ different "${dm[2]}" cards in your drop zone.`); } }
+
   // [Equip/Call Cost] that only applies "when you have no monsters on your field" (Laevateinn #3728, #4759): cannot be used otherwise
   if (costNeedsNoMonsters(card, fighter)) reasons.push(`You can only use "${card.name}" when you have no monsters on your field.`);
 
