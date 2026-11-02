@@ -192,7 +192,7 @@
     /* "different" Dragod counts */
     [5748, /two or more «?dragod»? with different card names/i, () => null],
     [5759, /two or more different «?dragod»?/i, () => null],
-    [5532, /choose and use one of the following two/i, (ab) => ({ kind: "modal", steps: ab.steps, options: clone(ab.options).map(o => { walk(o.steps, x => { if (x.t === "count" && x.np && x.np.filter && x.np.filter.tribes) x.np.filter.distinct = true; }); return o; }) })]
+    [5532, /choose and use one of the following two/i, (ab) => ({ kind: "modal", steps: ab.steps, options: clone(ab.options).map(o => { walk(o.steps, x => { if (x.t === "count" && x.np && x.np.filter && x.np.filter.tribes) x.np.filter.distinct = true; }); return o; }) })],
     [6494, /deals damage to your opponent, you may destroy that card/i, () => ({ kind: "rule", steps: [] })],   // handled by the [r42] "To Darkness" outcome hook
     [4788, /attacks and deals damage to your opponent, you may destroy that card/i, () => ({ kind: "rule", steps: [] })],
   ];
