@@ -264,3 +264,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - [x] Batch 9 (tests/dead_statics9.js): #5132 left/right/item Galaxy F bonuses, #6058 no-rest, #4982 soul undroppable, #2465 final-phase lockout.
 - [x] Batch 10 (tests/dead_statics9.js): #6433 nullify in opp attack phase (its Counterattack text already works via the built-in one), #6274 Kuwagata vs spell effects. #6445 item Counterattack semantics unclear, left as is.
 - [x] Batch 11: #5877 Buster Borr unreducible; [D-Share] sharing of [D] abilities and stat boosts between D-Share cards on a field (tests/d_share.js) incl. #5041 [D] Act. Not shared yet: [D] abilities that are triggered/continuous with non-self targets.
+- [x] Batch 12 (tests/act_probe_batch.js): #3874 search on equip (card text was split across lines), #3854 Magni Act (options now attached via r42Magni); #2762 and #4154 verified working.

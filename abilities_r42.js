@@ -2688,4 +2688,24 @@
       return out;
     };
   })();
+
+  /* ---- [r42] batch 12: #3874 (the card text is split across lines), #3854 Magni (the two options were never attached to the act) ---- */
+  OV42.push([3874, /when you equip this card, you may discard a card from your hand/i, () => {
+    const pc = ABX.parseCard({ id: -3874, name: "x", type: "Item", attrs: [], skill: 'When you equip this card, you may discard a card from your hand. If you do, put up to one item with "Sword of the King" in its card name from your deck into your hand, and shuffle your deck.' }).abilities.find(a => a.kind === "triggered");
+    return pc ? { kind: "triggered", trigger: pc.trigger, steps: pc.steps, conds: pc.conds || [] } : null;
+  }]);
+  OPS.r42Magni = {
+    async run(s, ctx) {
+      const u = ctx && ctx.unit; if (!u) return false;
+      let i = 0;
+      if (!(ctx.auto || (F(ctx.side) && F(ctx.side).isBot) || ABX.autoPlay) && ABX.ui && ABX.ui.pickOption) i = await ABX.ui.pickOption({ title: `${ctx.card.name} — choose one`, options: ["[Stand] this card", "For this turn, the next time this card would be destroyed, nullify the destruction"] });
+      if (i < 0) return false;
+      if (i === 0) u.rested = false; else u.abxSaveOnceTurn = B.turnCount;
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([3854, /you may discard a card from your hand\. if you do, choose and use one of the follow/i, (ab) => ({
+    kind: "act", tags: ["counter", "act"], counter: true, once: "turn", conds: [],
+    steps: (ab.steps || []).filter(x => x.op !== "modalMarker").concat([{ op: "r42Magni", gate: "ifYouDo" }])
+  })]);
 })(typeof window !== "undefined" ? window : globalThis);
