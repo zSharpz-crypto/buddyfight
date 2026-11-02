@@ -2350,4 +2350,47 @@
       return false;
     };
   })();
+
+  /* ---- [r42] batch 5d: #5374 Kaoru Seta: on your field or in the soul of a «Hello, Happy World!» on your field -> all «Hello, Happy World!» can attack through ---- */
+  (function () {
+    const isHHW = (c) => !!c && (c.attrs || []).some(a => /^hello ?happy ?world!?$/i.test(a));
+    const prevCAT = ABX.canAttackThrough;
+    ABX.canAttackThrough = function (side, unit, which) {
+      if (prevCAT && prevCAT.apply(this, arguments)) return true;
+      try {
+        if (which === "own" || !unit || !isHHW(unit.card)) return false;
+        return core.fieldUnits(F(side), true).some(x => x.unit && x.unit.abxNullified !== B.turnCount &&
+          (x.unit.card.id === 5374 || (isHHW(x.unit.card) && (x.unit.soul || []).includes(5374))));
+      } catch (e) { return false; }
+    };
+  })();
+
+  /* ---- [r42] batch 5e: would-leave replacements: #5395 Marina (Band, from drop to deck bottom + 1 life), #5695 Miko (item, this card field -> drop),
+       #2521 Variable Bit (impact monster with it in soul, soul -> drop) ---- */
+  (function () {
+    const prevWLS = ABX.wouldLeaveSave;
+    ABX.wouldLeaveSave = function (side, pos, unit, byAttack) {
+      if (prevWLS && prevWLS.apply(this, arguments)) return true;
+      try {
+        const f = F(side);
+        if (!f || !unit || !unit.card) return false;
+        const c = unit.card;
+        // #2521: this card is in the soul of an impact monster that would leave the field
+        if (window.IMX && IMX.isImpactMonster(c) && (unit.soul || []).includes(2521)) {
+          unit.soul.splice(unit.soul.indexOf(2521), 1); f.drop.push(2521); return true;
+        }
+        // #5395: your «Band» character would leave the field
+        if (c.type === "Monster" && (c.attrs || []).some(a => /^band$/i.test(a)) && f.life > 1) {
+          const di = (f.drop || []).indexOf(5395);
+          if (di >= 0 && c.id !== 5395) { f.drop.splice(di, 1); f.deck.push(5395); f.life -= 1; return true; }
+        }
+        // #5695: an item would leave your field -> put this card from the field into the drop zone
+        if (c.type === "Item") {
+          const pu = core.fieldUnits(f, false).find(x => x.unit && x.unit.card.id === 5695 && x.unit.abxNullified !== B.turnCount);
+          if (pu) { const pp = (pu.pos || pu.zone); if (pp && f.monsters[pp] === pu.unit) { f.monsters[pp] = null; f.drop.push(5695); (pu.unit.soul || []).forEach(id => f.drop.push(id)); return true; } }
+        }
+      } catch (e) { /* ignore */ }
+      return false;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);

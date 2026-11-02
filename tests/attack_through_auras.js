@@ -18,4 +18,8 @@ run(`fresh(); battle.plr.monsters.left=mk(${other},[2118])`); ck("#2118 in soul:
 run(`battle.plr.monsters.left.soul=[]`); ck("#2118 gone: no", J(`!cat(battle.plr.monsters.left)`));
 run(`fresh(); battle.plr.monsters.left=mk(5649); battle.plr.monsters.right=mk(${other}); battle.plr.monsters.right.card=Object.assign({},CARD_MAP.get(${other}),{name:"That Girl",attrs:["That Girl"]})`);
 ck("#5649: That Girl attacks through", J(`cat(battle.plr.monsters.right)`));
+const hhw = J(`withAttr(/^hello ?happy ?world!?$/i).id`);
+run(`fresh(); battle.plr.monsters.left=mk(${hhw})`); ck("#5374 off: HHW cannot attack through", J(`!cat(battle.plr.monsters.left)`));
+run(`battle.plr.monsters.right=mk(5374)`); ck("#5374 on field: HHW attacks through", J(`cat(battle.plr.monsters.left)`));
+run(`battle.plr.monsters.right=null; battle.plr.monsters.left.soul=[5374]`); ck("#5374 in soul of HHW: attacks through", J(`cat(battle.plr.monsters.left)`));
 console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
