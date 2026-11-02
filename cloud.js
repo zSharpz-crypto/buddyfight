@@ -1,12 +1,12 @@
 /* Supabase login + cloud save for decks and progress.
  * Wraps app.saveState (game.js is not edited). Guests keep using localStorage.
- * Fill in SUPABASE_URL / SUPABASE_KEY below. The anon key is public by design;
+ * SUPABASE_URL / SUPABASE_KEY below are the project URL and publishable key (public by design);
  * data is protected by the Row Level Security policies in supabase_setup.sql. */
 (function () {
   "use strict";
 
-  var SUPABASE_URL = "YOUR_PROJECT_URL";
-  var SUPABASE_KEY = "YOUR_ANON_KEY";
+  var SUPABASE_URL = "https://pdlugnzmzgljrjicbmdp.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_qG83Yd-7UwcEJHj8BZgtnw_9NefD_w5";
   var TABLE = "user_data";
   var LOCAL_KEY = "buddyfight_save_v5";
   var PUSH_DELAY_MS = 1500;
