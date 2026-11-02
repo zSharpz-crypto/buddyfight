@@ -956,6 +956,10 @@ function checkCardLegalityForFlag(card, flagCard, editingLostDeck = false, buddy
   if (activeBuddyId && DEITY_GARGA_BUDDY_IDS.includes(activeBuddyId) && card.type === "Monster" && attrs.includes("dragod")) {
     return { allowed: true, maxCopies: 4, isDragod: true };
   }
+  // #2520 Fake Replica Weapon, Gemclone (in your buddy zone, flag "Hero World"): you can use impact monsters from other worlds
+  if (activeBuddyId === 2520 && (cfg.world === "Hero World" || (flagCard.worlds || []).includes("Hero World")) && window.IMX && IMX.isImpactMonster && IMX.isImpactMonster(card)) {
+    return { allowed: true, maxCopies: 4 };
+  }
 
   return { allowed: false, maxCopies: 0 };
 }

@@ -2737,4 +2737,20 @@
       return out;
     };
   })();
+
+  /* ---- [r42] batch 14: #2079 Tigarion: gains the critical of all cards you are [Ride] on ---- */
+  (function () {
+    const prevSB = ABX.staticBonus;
+    if (prevSB) ABX.staticBonus = function (fighter, unit) {
+      const out = prevSB.apply(this, arguments);
+      try {
+        if (!out || !unit || !unit.card || unit.card.id !== 2079 || unit.abxNullified === B.turnCount || !fighter) return out;
+        const items = typeof getEquippedItems === "function" ? getEquippedItems(fighter).map(x => x.unit) : [fighter.item, fighter.item2].filter(Boolean);
+        items.forEach(it => {
+          if (it && it.card && it !== unit && String(it.itemMode || "").toLowerCase() === "ride") out.crit += getUnitEffectiveCombatStats(fighter, it).crit;
+        });
+      } catch (e) { /* ignore */ }
+      return out;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
