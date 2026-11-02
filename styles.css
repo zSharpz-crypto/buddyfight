@@ -2459,3 +2459,15 @@ body {
   .banner-nav-arrow.left { left: 6px; top: 110px; }
   .banner-nav-arrow.right { right: 6px; top: 110px; }
 }
+
+/* Cloud save / login (cloud.js) */
+.bfc-modal { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.65); }
+.bfc-box { position: relative; width: min(92vw, 360px); padding: 20px; border-radius: 12px; background: #151a2b; color: #fff; border: 1px solid rgba(255,255,255,.18); }
+.bfc-box h3 { margin: 0 0 12px; font-size: 18px; }
+.bfc-box input { display: block; width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: #0d1120; color: #fff; font-size: 14px; }
+.bfc-row { display: flex; gap: 8px; }
+.bfc-row button { flex: 1; padding: 9px; border: 0; border-radius: 8px; background: #3a6df0; color: #fff; font-weight: 600; cursor: pointer; }
+.bfc-row button + button { background: #2b3350; }
+.bfc-close { position: absolute; top: 8px; right: 10px; border: 0; background: none; color: #fff; font-size: 16px; cursor: pointer; }
+.bfc-status { min-height: 18px; margin-top: 10px; font-size: 13px; color: #9fd1ff; }
+.bfc-status.bfc-error { color: #ff8a8a; }
