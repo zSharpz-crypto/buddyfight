@@ -2579,4 +2579,39 @@
       return prevCUA.apply(this, arguments);
     };
   })();
+
+  /* ---- [r42] batch 10: #6433 White Flame Bloodeye: during your opponent's attack phase, nullify the abilities of all monsters and items on their field ---- */
+  (function () {
+    const prevSFN = ABX.syncFrontNullify;
+    ABX.syncFrontNullify = function () {
+      if (prevSFN) prevSFN.apply(this, arguments);
+      try {
+        ["plr", "opp"].forEach(side => {
+          const f = F(side), eSide = otherSide(side), e = F(eSide);
+          const src = core.fieldUnits(f, false).find(x => x.unit.card.id === 6433);
+          const on = !!src && B.activeSide === eSide && B.phase === "attack";
+          core.fieldUnits(e, true).forEach(x => {
+            const u = x.unit;
+            if (on && !u.abxN6433 && u.abxNullified !== B.turnCount) { u.abxN6433 = { prev: u.abxNullified, turn: B.turnCount }; u.abxNullified = B.turnCount; }
+            else if (!on && u.abxN6433) { if (u.abxN6433.turn === B.turnCount) u.abxNullified = u.abxN6433.prev; u.abxN6433 = null; }
+            else if (u.abxN6433 && u.abxN6433.turn !== B.turnCount) u.abxN6433 = null;
+          });
+        });
+      } catch (e) { /* ignore */ }
+    };
+  })();
+
+  /* ---- [r42] batch 10b: #6274 Sonic Stag "Conceal": your «Kuwagata» cannot be destroyed or returned to hand by your opponent's event (spell) effects ---- */
+  (function () {
+    const prevProt = core.isProtected;
+    core.isProtected = function (unit, side, kind, ctx) {
+      if (prevProt.apply(this, arguments)) return true;
+      try {
+        if (unit && unit.card && ctx && ctx.side !== side && ctx.card && ctx.card.type === "Spell" && /destroyed|returned to hand/i.test(String(kind || "")) &&
+          (unit.card.attrs || []).some(a => /^kuwagata$/i.test(a)) &&
+          core.fieldUnits(F(side), true).some(x => x.unit.card.id === 6274 && x.unit.abxNullified !== B.turnCount)) return true;
+      } catch (e) { /* ignore */ }
+      return false;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);

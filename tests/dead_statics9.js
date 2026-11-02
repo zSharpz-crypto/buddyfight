@@ -22,4 +22,15 @@ run(`fresh(); battle.opp.monsters.center=mk(149,[2465]); battle.opp.monsters.cen
 ck("#2465: opp's final phase -> hand card blocked", J(`evaluateCardConditions(CARD_MAP.get(149),battle.plr,battle.opp).met`) === false);
 ck("#2465: [Act] blocked", J(`ABX.canUseAct('plr',CARD_MAP.get(149),{},null).ok`) === false);
 run(`battle.phase='main'`); ck("#2465: other phases -> not blocked by it", J(`evaluateCardConditions(CARD_MAP.get(149),battle.plr,battle.opp).reasons.every(r=>!/Dragoneraser/.test(r))`));
+// #6433: during the opponent's attack phase, nullify all opp monsters and items
+run(`fresh(); battle.plr.monsters.center=mk(6433); battle.opp.monsters.center=mk(149); battle.opp.item=mk(${J(`[...CARD_MAP.values()].find(c=>c.type==="Item").id`)}); battle.activeSide='opp'; battle.phase='attack'; ABX.syncFrontNullify()`);
+ck("#6433: opp attack phase -> opp monster and item nullified", J(`battle.opp.monsters.center.abxNullified===battle.turnCount && battle.opp.item.abxNullified===battle.turnCount && battle.plr.monsters.center.abxNullified!==battle.turnCount`));
+run(`battle.activeSide='plr'; battle.phase='attack'; ABX.syncFrontNullify()`); ck("#6433: own attack phase -> restored", J(`battle.opp.monsters.center.abxNullified!==battle.turnCount && battle.opp.item.abxNullified!==battle.turnCount`));
+// #6274: Kuwagata protected from opponent's spell (event) effects only
+const kw = J(`[...CARD_MAP.values()].find(c=>c.type==="Monster"&&(c.attrs||[]).some(a=>/^kuwagata$/i.test(a))&&c.id!==6274).id`);
+run(`fresh(); battle.plr.monsters.center=mk(6274); battle.plr.monsters.left=mk(${kw})`);
+const spell = J(`[...CARD_MAP.values()].find(c=>c.type==="Spell").id`);
+ck("#6274: protected from opp spell destroy/return", J(`ABX.core.isProtected(battle.plr.monsters.left,'plr','destroyed',{side:'opp',card:CARD_MAP.get(${spell})}) && ABX.core.isProtected(battle.plr.monsters.left,'plr','returned to hand',{side:'opp',card:CARD_MAP.get(${spell})})`));
+ck("#6274: not from opp monster effects", J(`!ABX.core.isProtected(battle.plr.monsters.left,'plr','destroyed',{side:'opp',card:CARD_MAP.get(149)})`));
+run(`battle.plr.monsters.center=null`); ck("#6274: gone -> no protection", J(`!ABX.core.isProtected(battle.plr.monsters.left,'plr','destroyed',{side:'opp',card:CARD_MAP.get(${spell})})`));
 console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
