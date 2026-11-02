@@ -33,4 +33,10 @@ const spell = J(`[...CARD_MAP.values()].find(c=>c.type==="Spell").id`);
 ck("#6274: protected from opp spell destroy/return", J(`ABX.core.isProtected(battle.plr.monsters.left,'plr','destroyed',{side:'opp',card:CARD_MAP.get(${spell})}) && ABX.core.isProtected(battle.plr.monsters.left,'plr','returned to hand',{side:'opp',card:CARD_MAP.get(${spell})})`));
 ck("#6274: not from opp monster effects", J(`!ABX.core.isProtected(battle.plr.monsters.left,'plr','destroyed',{side:'opp',card:CARD_MAP.get(149)})`));
 run(`battle.plr.monsters.center=null`); ck("#6274: gone -> no protection", J(`!ABX.core.isProtected(battle.plr.monsters.left,'plr','destroyed',{side:'opp',card:CARD_MAP.get(${spell})})`));
+// #5877: unreducible when its host [Gridman] / [Powered Zenon] attacks alone
+const grid = J(`[...CARD_MAP.values()].find(c=>c.type==="Monster"&&/gridman/i.test(c.name)&&c.id!==5877).id`);
+run(`fresh(); battle.plr.monsters.left=mk(${grid},[5877]); battle.plr.monsters.right=mk(149)`);
+ck("#5877: Gridman with it in soul attacks alone -> unreducible", J(`ABX.attackUnreducible('plr',[{unit:battle.plr.monsters.left}])`) === true);
+ck("#5877: linked attack -> not unreducible", J(`!ABX.attackUnreducible('plr',[{unit:battle.plr.monsters.left},{unit:battle.plr.monsters.right}])`));
+run(`battle.plr.monsters.left.soul=[]`); ck("#5877: not in soul -> no", J(`!ABX.attackUnreducible('plr',[{unit:battle.plr.monsters.left}])`));
 console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);

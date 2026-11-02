@@ -2614,4 +2614,78 @@
       return false;
     };
   })();
+
+  /* ---- [r42] batch 11: #5877 Buster Borr: while in the soul of a [Gridman] / [Powered Zenon] that attacks alone, its damage cannot be reduced ---- */
+  (function () {
+    const prevAUr = ABX.attackUnreducible;
+    ABX.attackUnreducible = function (attSide, units) {
+      if (prevAUr && prevAUr.apply(this, arguments)) return true;
+      try {
+        const us = (units || []).map(x => (x && x.unit) || x).filter(Boolean);
+        return us.length === 1 && (us[0].soul || []).includes(5877) && us[0].abxNullified !== B.turnCount && /gridman|powered zenon/i.test(us[0].card.name || "");
+      } catch (e) { return false; }
+    };
+  })();
+
+  /* ---- [r42] batch 11b: [D-Share] sharing. Every card with [D-Share] on your field gets the [D] abilities of the other [D-Share] cards on your field
+       (each card's own [D] already runs as its own ability). #5041's own [D] [Counter][Act] (pay 2 gauge: [Stand] this card) was parsed as a static. ---- */
+  OV42.push([5041, /^\[d\]\s*\[counter\]\s*\[act\]/i, () => {
+    const pc = ABX.parseCard({ id: -5041, name: "x", type: "Monster", attrs: [], skill: "[Counter] [Act] You may pay 2 gauge. If you do, [Stand] this card." }).abilities.find(a => a.kind === "act");
+    if (!pc) return null;
+    return { kind: "act", steps: pc.steps, tags: pc.tags || ["counter", "act"], counter: true, conds: pc.conds || [] };
+  }]);
+  (function () {
+    const hasDS = (c) => !!c && /\[d-share\]/i.test(c.skill || "");
+    const prevGet = ABX.get;
+    ABX.get = function (card) {
+      const r = prevGet.apply(this, arguments);
+      try {
+        if (!r || !card || !hasDS(card) || typeof B === "undefined" || !B.plr || !B.opp) return r;
+        const extra = [], seen = new Set([card.id]);
+        ["plr", "opp"].forEach(sd => {
+          const us = core.fieldUnits(F(sd), true).map(x => x.unit);
+          if (!us.some(u => u.card === card && u.abxNullified !== B.turnCount)) return;
+          us.forEach(u => {
+            if (!u.card || u.abxNullified === B.turnCount || !hasDS(u.card) || seen.has(u.card.id)) return;
+            seen.add(u.card.id);
+            ((prevGet.call(ABX, u.card) || {}).abilities || []).forEach(a => {
+              if (/^\s*\[d\]/i.test(String(a.raw || "")) && !(a.unparsed && a.unparsed.length)) extra.push(Object.assign({}, a, { sharedFrom: u.card.id }));
+            });
+          });
+        });
+        return extra.length ? Object.assign({}, r, { abilities: r.abilities.concat(extra) }) : r;
+      } catch (e) { return r; }
+    };
+    if (ABX.resetCaches) ABX.resetCaches();
+  })();
+  // shared [D] stat boosts ("this card gets power+2000 ..."): applied to every [D-Share] card on the same field
+  (function () {
+    const hasDS = (c) => !!c && /\[d-share\]/i.test(c.skill || "");
+    const prevSB = ABX.staticBonus;
+    if (prevSB) ABX.staticBonus = function (fighter, unit) {
+      const out = prevSB.apply(this, arguments);
+      try {
+        if (!out || !unit || !unit.card || !hasDS(unit.card) || unit.abxNullified === B.turnCount || !fighter) return out;
+        const side = B.plr === fighter ? "plr" : B.opp === fighter ? "opp" : null; if (!side) return out;
+        const f = F(side), e = F(otherSide(side));
+        if (!core.fieldUnits(f, true).some(x => x.unit === unit)) return out;
+        const seen = new Set([unit.card.id]);
+        core.fieldUnits(f, true).forEach(x => {
+          const d = x.unit; if (!d.card || d === unit || seen.has(d.card.id) || d.abxNullified === B.turnCount || !hasDS(d.card)) return; seen.add(d.card.id);
+          (ABX.get(d.card).abilities || []).forEach(ab => {
+            if (ab.kind !== "static" || !/^\s*\[d\]/i.test(String(ab.raw || "")) || (ab.unparsed && ab.unparsed.length)) return;
+            const ctx = { side, f, e, card: unit.card, unit, bind: {} };
+            if (!(ab.conds || []).every(c => core.evalCond(c, ctx))) return;
+            (ab.steps || []).forEach(st => {
+              if (st.op !== "boost" || !st.np || !st.np.self || !st.mods) return;
+              if (st.cond && !core.evalCond(st.cond, ctx)) return;
+              out.power += st.mods.power || 0; out.defense += st.mods.defense || 0; out.crit += st.mods.critical || 0;
+              (st.mods.kws || []).forEach(k => { if (k === "penetrate") out.pen = true; if (k === "double attack") out.da = true; if (k === "triple attack") out.ta = true; if (k === "counterattack") out.ca = true; if (k === "move") out.move = true; });
+            });
+          });
+        });
+      } catch (e) { /* ignore */ }
+      return out;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
