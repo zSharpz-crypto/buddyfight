@@ -1,0 +1,21 @@
+// Aura attack-through: #5612 #5649 #6494 #6523 #2118
+const { createEnv } = require("./headless.js");
+const env = createEnv(); const run = env.run; const J = (c) => { const r = run(`JSON.stringify(${c})`); return (r === undefined || r === "undefined") ? undefined : JSON.parse(r); };
+let pass = 0, fail = 0; const ck = (n, ok, x) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : JSON.stringify(x ?? "")); };
+run(`globalThis.mk=(id,soul)=>({card:CARD_MAP.get(id),rested:false,attacksLeft:1,soul:soul||[],tempPower:0,tempDef:0,tempCrit:0});
+ globalThis.fresh=()=>{battle.start('hotseat',generateFlagDeck(447,'T',571,true),generateFlagDeck(447,'O',571,true));battle.renderBattle=function(){};["left","center","right"].forEach(z=>{battle.plr.monsters[z]=null;battle.opp.monsters[z]=null});battle.plr.item=null;battle.turnCount=6;battle.opp.monsters.center=mk(149);};
+ globalThis.cat=(u)=>ABX.canAttackThrough('plr',u,'opp');
+ globalThis.withAttr=(re)=>[...CARD_MAP.values()].find(c=>c.type==="Monster"&&(c.attrs||[]).some(a=>re.test(a))&&c.id!==5612&&c.id!==5649&&c.id!==6494&&c.id!==6523);`);
+const idol = J(`withAttr(/^idol$/i).id`), sw = J(`withAttr(/^skull ?warrior$/i).id`), syoko = J(`[...CARD_MAP.values()].find(c=>c.type==="Monster"&&/syoko hoshi/i.test(c.name)).id`), other = J(`withAttr(/^dragon$/i).id`);
+run(`fresh(); battle.plr.monsters.left=mk(${idol})`); ck("baseline Idol cannot attack through", J(`!cat(battle.plr.monsters.left)`));
+run(`battle.plr.monsters.center=mk(5612)`); ck("#5612 without Syoko: no", J(`!cat(battle.plr.monsters.left)`));
+run(`battle.plr.monsters.right=mk(${syoko})`); ck("#5612 with Syoko: Idol attacks through", J(`cat(battle.plr.monsters.left)`));
+run(`fresh(); battle.plr.monsters.left=mk(${sw}); battle.plr.monsters.right=mk(${other})`); ck("#6494 off: no", J(`!cat(battle.plr.monsters.left)`));
+run(`battle.plr.monsters.center=mk(6494)`); ck("#6494: Skull Warrior yes, others no", J(`cat(battle.plr.monsters.left) && !cat(battle.plr.monsters.right)`));
+run(`battle.plr.monsters.center.abxNullified=battle.turnCount`); ck("#6494 nullified: no", J(`!cat(battle.plr.monsters.left)`));
+run(`fresh(); battle.plr.monsters.left=mk(${other}); battle.plr.monsters.center=mk(6523)`); ck("#6523: all cards on your field", J(`cat(battle.plr.monsters.left)`));
+run(`fresh(); battle.plr.monsters.left=mk(${other},[2118])`); ck("#2118 in soul: host attacks through", J(`cat(battle.plr.monsters.left)`));
+run(`battle.plr.monsters.left.soul=[]`); ck("#2118 gone: no", J(`!cat(battle.plr.monsters.left)`));
+run(`fresh(); battle.plr.monsters.left=mk(5649); battle.plr.monsters.right=mk(${other}); battle.plr.monsters.right.card=Object.assign({},CARD_MAP.get(${other}),{name:"That Girl",attrs:["That Girl"]})`);
+ck("#5649: That Girl attacks through", J(`cat(battle.plr.monsters.right)`));
+console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);

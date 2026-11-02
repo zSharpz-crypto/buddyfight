@@ -2328,4 +2328,26 @@
       } catch (e) { return false; }
     };
   })();
+
+  /* ---- [r42] batch 5c: aura "can attack your opponent even if there are monsters in the center":
+       #5612 Nono (with a Syoko Hoshi: all Idol), #5649 (That Girl), #6494 (Skull Warrior), #6523 (all cards on your field), #2118 (monster with it in soul) ---- */
+  (function () {
+    const hasAttr = (c, re) => !!c && (c.attrs || []).some(a => re.test(a));
+    const live = (f, id) => core.fieldUnits(f, true).some(x => x.unit && x.unit.card && x.unit.card.id === id && x.unit.abxNullified !== B.turnCount);
+    const prevCAT = ABX.canAttackThrough;
+    ABX.canAttackThrough = function (side, unit, which) {
+      if (prevCAT && prevCAT.apply(this, arguments)) return true;
+      try {
+        if (which === "own" || !unit || !unit.card) return false;
+        const f = F(side), c = unit.card;
+        if (hasAttr(c, /^idol$/i) && live(f, 5612) && core.fieldUnits(f, true).some(x => x.unit && /syoko hoshi/i.test(x.unit.card.name || "") && x.unit.abxNullified !== B.turnCount)) return true;
+        if (hasAttr(c, /^that ?girl$/i) && live(f, 5649)) return true;
+        if (hasAttr(c, /^skull ?warrior$/i) && live(f, 6494)) return true;
+        if (live(f, 6523)) return true;
+        // #2118 in the soul of the monster
+        if ((unit.soul || []).includes(2118) && unit.abxNullified !== B.turnCount) return true;
+      } catch (e) { /* ignore */ }
+      return false;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
