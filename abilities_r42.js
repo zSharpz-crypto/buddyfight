@@ -2192,4 +2192,89 @@
     try { (units || []).forEach(x => { const u = x && x.unit; if (u && hasSoulCard(u, 3065)) { const i = u.soul.findIndex(e => Number(soulIdOf(e)) === 3065); if (i >= 0) { u.soul.splice(i, 1); F(attSide).drop.push(3065); } } }); } catch (e) { /* ignore */ }
     return be3065.apply(this, arguments);
   };
+
+  /* ---- dead statics batch 4 (tests/dead_statics4.js): #348 #5249 #6230 #6237 #6287 #1158 #3328 #5483 #5507 #5380 ---- */
+  const eqIds = (fighter) => equippedItems(fighter).filter(u => u.abxNullified !== B.turnCount).map(u => u.card.id);
+  const onFieldId4 = (fighter, id) => core.fieldUnits(fighter, true).some(x => x.unit.card.id === id && x.unit.abxNullified !== B.turnCount);
+  const faceDownBuddy = (fighter) => ((fighter.buddyZone || []).filter(e => e && e.isFaceDown).length) + ((fighter.buddyZoneFaceDown || []).length);
+  // #348 Rune Staff: you do not have to pay the life in the [Cast Cost] of cards with "Great Spell" in the name
+  if (typeof root.parseCardCost === "function") {
+    const pcc348 = root.parseCardCost;
+    root.parseCardCost = function (costStr, skill, fighter, card) {
+      const r = pcc348.apply(this, arguments);
+      try { if (r && r.life > 0 && fighter && card && /great spell/i.test(card.name || "") && eqIds(fighter).includes(348)) r.life = 0; } catch (e) { /* ignore */ }
+      return r;
+    };
+  }
+  const prevSBb4 = ABX.staticBonus;
+  if (prevSBb4) ABX.staticBonus = function (fighter, unit) {
+    const sb = prevSBb4.apply(this, arguments);
+    try {
+      if (!unit || !unit.card || !sb || unit.abxNullified === B.turnCount) return sb;
+      // #5249 Ran Mori: [Shinichi Kudo] and [Conan] on your field have infinite power
+      if (unit.card.type === "Monster" && /shinichi kudo|conan/i.test(unit.card.name || "") && onFieldId4(fighter, 5249)) sb.power += 1e9;
+      // #5507: three or more face-down cards in your buddy zone -> power+5000 defense+5000 critical+1 [Triple Attack]
+      if (unit.card.id === 5507 && faceDownBuddy(fighter) >= 3) { sb.power += 5000; sb.defense += 5000; sb.crit += 1; sb.ta = true; }
+    } catch (e) { /* ignore */ }
+    return sb;
+  };
+  // #3328 Growls Wand: the damage dealt by the [Lifelink] of your «Demon Lord» is reduced by 1
+  ABX.lifelinkReduce = function (side, card) {
+    try { if (card && attrHas(card, /^demonlord$/i) && eqIds(F(side)).includes(3328)) return 1; } catch (e) { /* ignore */ }
+    return 0;
+  };
+  // #5483 Shiki: with a face-down card in your buddy zone, nullify the [Soulguard] of all cards on your opponent's field
+  ABX.sgNullifiedByStatic = function (ownerSide) {
+    try { const att = F(otherSide(ownerSide)); return !!att && onFieldId4(att, 5483) && faceDownBuddy(att) >= 1; } catch (e) { return false; }
+  };
+  // #5380 Maya: your «Pastel*Palettes» cannot have their souls dropped by your opponent's card effects
+  const prevProt5380 = core.isProtected;
+  core.isProtected = function (unit, side, kind, ctx) {
+    if (prevProt5380.apply(this, arguments)) return true;
+    try {
+      if (unit && unit.card && /souls? dropped|drop.*soul/i.test(String(kind || "")) && attrHas(unit.card, /^pastelpalettes$/i) && ctx && ctx.side !== side && onFieldId4(F(side), 5380)) return true;
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  // #6287 / #6237 / #6230 (Medabot "during the battle that this card is attacking ..."): applied when the attack starts, undone when the battle ends
+  let battle4 = [];
+  const abn4 = ABX.applyBattleNullify;
+  ABX.applyBattleNullify = function (attSide, attUnits, defSide, defUnit) {
+    if (abn4) abn4.apply(this, arguments);
+    try {
+      const us = (attUnits || []).filter(u => u && u.card && u.abxNullified !== B.turnCount);
+      if (us.some(u => u.card.id === 6287)) core.fieldUnits(F(defSide), true).forEach(x => { if (x.unit.abxNullified !== B.turnCount && !core.isProtected(x.unit, defSide, "nullified", { side: attSide })) { battle4.push({ unit: x.unit, prev: x.unit.abxNullified }); x.unit.abxNullified = B.turnCount; } });
+      if (us.some(u => u.card.id === 6237)) { F(defSide).abxNoCallBattle = B.turnCount; battle4.push({ side: defSide }); }
+    } catch (e) { /* ignore */ }
+  };
+  const cbn4 = ABX.clearBattleNullify;
+  ABX.clearBattleNullify = function () {
+    battle4.forEach(x => { if (x.unit) x.unit.abxNullified = x.prev; else if (x.side) F(x.side).abxNoCallBattle = 0; });
+    battle4 = [];
+    return cbn4 ? cbn4.apply(this, arguments) : undefined;
+  };
+  const prevAUr4 = ABX.attackUnreducible;
+  ABX.attackUnreducible = function (attSide, units) {
+    if (prevAUr4 && prevAUr4.apply(this, arguments)) return true;
+    try { const us = (units || []).map(x => (x && x.unit) || x).filter(Boolean); if (us.length === 1 && us[0].card && us[0].card.id === 6230 && us[0].abxNullified !== B.turnCount) return true; } catch (e) { /* ignore */ }
+    return false;
+  };
+  // #1158 Fairy King, Oberon: with 7+ «Hero» and «Fairy» cards in your drop zone, nullify all abilities of your opponent's monsters (it cannot be nullified)
+  const sfn1158 = ABX.syncFrontNullify;
+  ABX.syncFrontNullify = function () {
+    if (sfn1158) sfn1158.apply(this, arguments);
+    try {
+      ["plr", "opp"].forEach(side => {
+        const f = F(side), e = F(otherSide(side));
+        const king = core.fieldUnits(f, true).find(x => x.unit.card.id === 1158);
+        const on = !!king && (f.drop || []).filter(id => { const c = core.cardOf(id); return c && attrHas(c, /^(hero|fairy)$/i); }).length >= 7;
+        core.fieldUnits(e, false).forEach(x => {
+          const u = x.unit;
+          if (on && !u.abxN1158 && u.abxNullified !== B.turnCount) { u.abxN1158 = { prev: u.abxNullified, turn: B.turnCount }; u.abxNullified = B.turnCount; }
+          else if (!on && u.abxN1158) { if (u.abxN1158.turn === B.turnCount) u.abxNullified = u.abxN1158.prev; u.abxN1158 = null; }
+          else if (u.abxN1158 && u.abxN1158.turn !== B.turnCount) u.abxN1158 = null;
+        });
+      });
+    } catch (e) { /* ignore */ }
+  };
 })(typeof window !== "undefined" ? window : globalThis);

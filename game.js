@@ -1543,6 +1543,9 @@ function evaluateCardConditions(card, fighter, enemy, isAbilityCall = false) {
 
   if (window.ABX && ABX.core && ABX.core.castBlock) { const cb = ABX.core.castBlock(fighter, card); if (cb) reasons.push(cb); }
   if (card.type === "Monster" && window.ABX && ABX.core && ABX.core.transformCallBlock) { const tb = ABX.core.transformCallBlock(fighter, card); if (tb) reasons.push(tb); }
+  // #6237 Robo-Emperor: during the battle it is attacking, the opponent cannot call monsters
+  if (fighter && fighter.abxNoCallBattle && fighter.abxNoCallBattle === battle.turnCount && card.type === "Monster") reasons.push("You cannot call monsters during this battle (Robo-Emperor).");
+
   // #5969 Lebla Maurice in the buddy zone with the "Magic World" flag: you cannot call monsters other than «Drago Phantom Thief»
   if (fighter && fighter.buddyId === 5969 && card.type === "Monster" && !fighter.flagFaceDown) {
     const lfc = CARD_MAP.get(Number(fighter.flagId));
@@ -9031,7 +9034,7 @@ const battle = {
     if (window.ABX && ABX.core && ABX.core.useSave && ABX.core.useSave(ownerSide, m)) { this.renderBattle(); return false; }
     const abxSG = !!(window.ABX && ABX.staticBonus && ABX.staticBonus(ownerFighter, m).sg);
     // #942 Demonic Demise Sword, Aqulta Gwaneff: nullify the [Soulguard] of monsters this card attacks (no soul is spent, the monster is destroyed)
-    const sgNullified = !!this._destroyByAttack && (this._attackersNow || []).some(u => u && u.card && /nullify the \[soulguard\] of monsters this card attacks/i.test(u.card.skill || ""));
+    const sgNullified = (window.ABX && ABX.sgNullifiedByStatic && ABX.sgNullifiedByStatic(ownerSide)) || !!this._destroyByAttack && (this._attackersNow || []).some(u => u && u.card && /nullify the \[soulguard\] of monsters this card attacks/i.test(u.card.skill || ""));
     if (!sgNullified && (m.card.sg || m.tempSG || abxSG) && !(window.ABX && ABX.kwLost && ABX.kwLost(m, "soulguard")) && m.soul && m.soul.length > 0) {
       const discardedSoul = m.soul.pop();
       const wasFaceDown = isSoulEntryFaceDown(discardedSoul);
@@ -9133,7 +9136,7 @@ const battle = {
             this.checkWinCondition();
           }
         } else if (deadCard.ll > 0 && !(window.ABX && ABX.lifelinkOff && ABX.lifelinkOff(ownerSide, deadCard, m))) {   // "nullify the [Lifelink] of this card"
-          ownerFighter.life -= deadCard.ll;
+          ownerFighter.life -= Math.max(0, deadCard.ll - (window.ABX && ABX.lifelinkReduce ? ABX.lifelinkReduce(ownerSide, deadCard) : 0));
           this.setPrompt(`💔 [Lifelink ${deadCard.ll}] "${deadCard.name}" left the field — ${ownerFighter.name} took ${deadCard.ll} damage!`);
           this.checkWinCondition();
         }
