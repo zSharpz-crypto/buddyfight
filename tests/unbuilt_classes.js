@@ -49,3 +49,31 @@ ok(J(`ABX.canPayExtras('plr',CARD_MAP.get(2466),-1)`) === true, "2466 can pay wi
   } else ok(false, "fixture");
   console.log("pass", pass, "fail", fail);
 })();
+// ---- #1691 / #1676: optional "put this card on top of" ----
+(function () {
+  const { run, } = createEnv(); const J = (js) => JSON.parse(run(`JSON.stringify(${js})`));
+  run(`battle.start('bot', generateFlagDeck(447,'A',1,true), generateFlagDeck(447,'B',2,true));`);
+  ok(J(`!!ABX.onTopOptional(CARD_MAP.get(1691))`) && J(`!ABX.onTopCost(CARD_MAP.get(1691))`), "1691 on-top is optional");
+  const nd = J(`ALL_CARDS.filter(c=>c.type==="Monster"&&(c.attrs||[]).some(a=>/neodragon/i.test(a))).map(c=>[c.id,c.size])`);
+  const big = nd.find(x => x[1] >= 2), small = nd.find(x => x[1] <= 1 && x[0] !== 1691);
+  run(`(function(){const f=battle.plr; f.gauge=[1,1,1,1,1,1]; f.monsters.left=null;f.monsters.right=null; f.monsters.center={card:CARD_MAP.get(${big[0]}),soul:[]}; f.hand=[1691]; battle.activeSide='plr'; battle.phase='main'; battle.completeMonsterCall('plr','center',0,false);})()`);
+  const u = J(`battle.plr.monsters.center && {id:battle.plr.monsters.center.card.id, soul:battle.plr.monsters.center.soul.length, hasHost:battle.plr.monsters.center.soul.some(x=>(x&&x.id!==undefined?x.id:x)===${big[0]})}`);
+  ok(u && u.id === 1691 && u.hasHost, "1691 called on top of Neodragon size>=2 (host goes into soul)");
+  if (small) {
+    run(`(function(){const f=battle.plr; f.monsters.center={card:CARD_MAP.get(${small[0]}),soul:[]}; f.hand=[1691]; f.gauge=[1,1,1,1,1,1]; battle.completeMonsterCall('plr','center',0,false);})()`);
+    const v = J(`battle.plr.monsters.center && {id:battle.plr.monsters.center.card.id, soul:battle.plr.monsters.center.soul.length}`);
+    ok(v && v.id === 1691 && v.soul <= 1, "1691 over a small Neodragon is a plain call (host replaced, only the Soulguard soul)");
+  }
+  console.log("pass", pass, "fail", fail);
+})();
+// ---- #5127 cost reduced per Astrodragon attack ----
+(function () {
+  const { run } = createEnv(); const J = (js) => JSON.parse(run(`JSON.stringify(${js})`));
+  run(`battle.start('bot', generateFlagDeck(447,'A',1,true), generateFlagDeck(447,'B',2,true));`);
+  const ad = J(`ALL_CARDS.find(c=>c.type==="Monster"&&(c.attrs||[]).some(a=>/astrodragon/i.test(a))).id`);
+  const price = () => J(`parseCardCost(CARD_MAP.get(5127).cost,CARD_MAP.get(5127).skill,battle.plr,CARD_MAP.get(5127)).gauge`);
+  ok(price() === 4, "5127 costs 4 with no attacks");
+  run(`ABX.fireAttack('plr',[{unit:{card:CARD_MAP.get(${ad})}}],'opp','center'); ABX.fireAttack('plr',[{unit:{card:CARD_MAP.get(${ad})}}],'opp','center');`);
+  ok(price() === 2, "5127 costs 2 after two Astrodragon attacks");
+  console.log("pass", pass, "fail", fail);
+})();

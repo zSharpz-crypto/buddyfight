@@ -273,4 +273,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - [x] "Pay N gauge & 1 life" costs (#127 #1869 #4711 #4926); conditional "pay another" costs (#211, #454).
 - [x] Soul-from-zone cost variants: "Pay N gauge. Then put up to N / all «X» from drop zone into soul", "You may put ... from hand/drop zone" (#2300 #2690 #4158 #4805 #5846 #2691 #835 #604 #660 #650 #665 #1221 #1492).
 - [x] Round 2: field-to-soul costs (#1121 #3175 #1197), "return N «X» from drop zone to deck" (#2466), "drop all your hand" (#4762), "Pay a total of any 2 gauge" (#4962). #1448, #2675, #3728, #4759 were already built and tested (false positives of the coverage scan).
-- [ ] Still unbuilt: #1691 ("you may put this card on top of a Size 2 or greater «Neodragon»" call cost), #5127 (cost reduced per «Astrodragon» attack this turn), #523 (shout only, nothing to build).
+- [x] Round 3: optional "you may put this card on top of ..." call cost (#1691, #1676): plain call or on top of a matching monster; #5127 cost reduced per «Astrodragon» attack this turn.
+- Nothing left in the unbuilt-class list except #523 (shout only, no effect).

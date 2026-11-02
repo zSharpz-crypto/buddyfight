@@ -1064,6 +1064,13 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
     }
   }
 
+  // "Pay 4 gauge reduced by 1 for each attack of your «Astrodragon» during this turn" (#5127): fireAttack records those attacks on fighter.abxTribeAtk
+  if (fighter && gauge > 0) {
+    const rt = String(skillStr || "").match(/\[(?:Call|Cast|Equip) Cost\][^\n]*?reduced by 1 for each attack of your «([^»]+)» during this turn/i);
+    const rec = rt && fighter.abxTribeAtk;
+    if (rec && rec.turn === (typeof battle !== "undefined" ? battle.turnCount : -1)) gauge = Math.max(0, gauge - (rec.n[rt[1].toLowerCase().replace(/[^a-z0-9]/g, "")] || 0));
+  }
+
   // "[Call Cost] is reduced by N gauge if you used [Overturn] ..." on a normal Monster (#4764); Impact Monsters are handled in impact_monsters.js
   if (fighter && cardObj && cardObj.type !== "Impact" && gauge > 0) {
     const rm = combined.match(/\[Call Cost\] is reduced by (\d+) gauge if you (?:have )?used \[(Overturn|Overkill|Overthrow)\]/i);
@@ -7736,6 +7743,9 @@ const battle = {
         return;
       }
       onTopHost = host;
+    } else if (!isAbilityCall && window.ABX && ABX.onTopOptional && ABX.onTopOptional(c)) {   // "you may put this card on top of ...": only when the chosen zone holds a matching monster
+      const host = f.monsters[zonePos];
+      if (host && ABX.onTopMatches(side, c, host)) onTopHost = host;
     }
 
     if (!isAbilityCall) {

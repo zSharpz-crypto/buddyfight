@@ -1464,11 +1464,17 @@
   // and the monster (with its soul) becomes the new card's soul.
   ABX.onTopCost = function (card) {
     let np = null;
-    abilitiesOf(card, a => a.kind === "cost" && a.costKind === "call").forEach(a => (a.parts || []).forEach(p => { if (p.onTop) np = p.onTop.np; }));
+    abilitiesOf(card, a => a.kind === "cost" && a.costKind === "call").forEach(a => (a.parts || []).forEach(p => { if (p.onTop && !p.onTop.optional) np = p.onTop.np; }));
+    return np;
+  };
+  // "you may put this card on top of a ..." (#1676, #1691): the call may also be a plain call
+  ABX.onTopOptional = function (card) {
+    let np = null;
+    abilitiesOf(card, a => a.kind === "cost" && a.costKind === "call").forEach(a => (a.parts || []).forEach(p => { if (p.onTop && p.onTop.optional) np = p.onTop.np; }));
     return np;
   };
   ABX.onTopHosts = function (side, card) {
-    const np = ABX.onTopCost(card);
+    const np = ABX.onTopCost(card) || ABX.onTopOptional(card);
     if (!np) return [];
     const f = F(side), ctx = { side, f, e: F(otherSide(side)), card, unit: null, bind: {} };
     return refsFor(np, ctx, { owner: "you", area: "field" }).filter(r => r.k === "unit" && r.unit);

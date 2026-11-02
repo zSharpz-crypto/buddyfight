@@ -1419,7 +1419,7 @@
     let m;
     if ((m = t.match(/^pay (\d+|a|one|two|three|four|five|six|seven) gauge$/i))) return { ok: true, text: t, gauge: toNum(m[1]) };
     if ((m = t.match(/^pay (\d+|a|one|two|three|four|five) life$/i))) return { ok: true, text: t, life: toNum(m[1]) };
-    if ((m = t.match(/^(?:put|place) (?:this card|this monster|it) on top of (?:a|an|one|your) (.+?)(?: on your field)?$/i))) { const np = parseNP(m[1] + " on your field"); if (np && !np.junk) return { ok: true, text: t, onTop: { n: 1, np } }; }
+    if ((m = t.match(/^(you may )?(?:put|place) (?:this card|this monster|it) on top of (?:a|an|one|up to one|your) (.+?)(?: on your field)?$/i))) { const np = parseNP(m[2] + " on your field"); if (np && !np.junk) return { ok: true, text: t, onTop: { n: 1, np, optional: !!(m[1] || /^up to one/i.test(t.replace(/^you may /i, "").replace(/^(?:put|place) (?:this card|this monster|it) on top of /i, ""))) } }; }
     if ((m = t.match(/^(?:put|place) the top (?:(\w+) )?cards? of your deck (?:into|in) (?:its|this card's) soul$/i))) return { ok: true, text: t, soulFromDeck: toNum(m[1] || "a") || 1 };
     if ((m = t.match(/^(?:put|place) (?:a|an|one|(\w+)) (.+?) (?:from|in) your (hand|drop zone|field|gauge) (?:into|in|to) (?:its|this card's) soul$/i))) return { ok: true, text: t, soulFrom: { area: lc(m[3]), n: toNum(m[1] || "a") || 1, np: parseNP(m[2]) } };
     if ((m = t.match(/^(?:discard|drop) (?:a|an|one|(\w+)) (.+?)(?: from your hand)?$/i))) return { ok: true, text: t, discard: { n: toNum(m[1] || "a") || 1, np: parseNP(m[2]) } };

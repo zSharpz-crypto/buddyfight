@@ -2789,4 +2789,22 @@
       return r;
     };
   })();
+
+  /* ---- [r42] #5127 Celesphere Decision: remember this turn's attacks per tribe so "[Cast Cost] reduced by 1 for each attack of your «Astrodragon»" can be priced ---- */
+  (function () {
+    const prevFA = ABX.fireAttack;
+    if (typeof prevFA !== "function") return;
+    ABX.fireAttack = function (attSide, units) {
+      try {
+        const f = core.F(attSide), BT = typeof battle !== "undefined" ? battle : root.battle;
+        if (f && BT) {
+          if (!f.abxTribeAtk || f.abxTribeAtk.turn !== BT.turnCount) f.abxTribeAtk = { turn: BT.turnCount, n: {} };
+          const seen = new Set();
+          (units || []).forEach(u => { const c = u && u.unit && u.unit.card; (c && c.attrs || []).forEach(a => seen.add(String(a).toLowerCase().replace(/[^a-z0-9]/g, ""))); });
+          seen.forEach(k => { f.abxTribeAtk.n[k] = (f.abxTribeAtk.n[k] || 0) + 1; });
+        }
+      } catch (e) { /* ignore */ }
+      return prevFA.apply(this, arguments);
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
