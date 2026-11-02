@@ -193,6 +193,8 @@
     [5748, /two or more «?dragod»? with different card names/i, () => null],
     [5759, /two or more different «?dragod»?/i, () => null],
     [5532, /choose and use one of the following two/i, (ab) => ({ kind: "modal", steps: ab.steps, options: clone(ab.options).map(o => { walk(o.steps, x => { if (x.t === "count" && x.np && x.np.filter && x.np.filter.tribes) x.np.filter.distinct = true; }); return o; }) })]
+    [6494, /deals damage to your opponent, you may destroy that card/i, () => ({ kind: "rule", steps: [] })],   // handled by the [r42] "To Darkness" outcome hook
+    [4788, /attacks and deals damage to your opponent, you may destroy that card/i, () => ({ kind: "rule", steps: [] })],
   ];
 
   /* ---- ops ---- */
@@ -2476,6 +2478,51 @@
         if (card && card.id === 5690 && fighter && core.fieldUnits(fighter, false).some(x => x.unit && x.unit !== unit && x.unit.card.size === 3)) d -= 1;
       } catch (e) { /* ignore */ }
       return d;
+    };
+  })();
+
+  /* ---- [r42] batch 8: #6494 "To Darkness" and #4788 Magatsu Flames: when a «Skull Warrior» on your field attacks and deals damage to the opponent,
+       you may destroy it. 6494: +1 gauge from the deck, +1 life, draw. 4788: drop 1 opponent gauge, 1 damage, the opponent drops a hand card of their choice ---- */
+  (function () {
+    const isSW = (c) => !!c && (c.attrs || []).some(a => /^skull ?warrior$/i.test(a));
+    const prevFAO = ABX.fireAttackOutcome;
+    ABX.fireAttackOutcome = function (attSide, units, defSide, outcome) {
+      const r = prevFAO ? prevFAO.apply(this, arguments) : undefined;
+      try {
+        if (!(outcome && outcome.dealtDamage)) return r;
+        const atk = (units || []).map(u => u.unit).filter(u => u && isSW(u.card));
+        if (!atk.length) return r;
+        ABX.queue(async () => {
+          const f = F(attSide), e = F(otherSide(attSide));
+          for (const srcId of [6494, 4788]) {
+            for (const su of core.fieldUnits(f, true).filter(x => x.unit.card.id === srcId && x.unit.abxNullified !== B.turnCount).map(x => x.unit)) {
+              for (const u of atk) {
+                const pos = ["left", "center", "center2", "right"].find(p => f.monsters[p] === u);
+                if (!pos) continue;
+                let yes = true;
+                if (!(f.isBot || ABX.autoPlay) && ABX.ui && ABX.ui.pickOption) {
+                  const i = await ABX.ui.pickOption({ title: `${su.card.name} — ${srcId === 6494 ? "To Darkness" : "Magatsu Flames"}`, subtitle: `Destroy "${u.card.name}"?`, options: ["Destroy it", "No"] });
+                  yes = i === 0;
+                }
+                if (!yes) continue;
+                B.destroyMonster(attSide, pos);
+                if (Object.values(f.monsters).includes(u)) continue;   // saved: no effect
+                if (srcId === 6494) {
+                  if (f.deck.length) f.gauge.push(f.deck.shift());
+                  f.life += 1;
+                  if (f.deck.length) f.hand.push(f.deck.shift());
+                } else {
+                  if (e.gauge.length) e.drop.push(e.gauge.pop());
+                  core.applyDamage(otherSide(attSide), 1, { kind: "effect" });
+                  if (OPS.oppDiscard && OPS.oppDiscard.run) await OPS.oppDiscard.run({ n: 1 }, { side: attSide, f, e, card: su.card, unit: su, bind: {}, auto: true });
+                }
+                fresh();
+              }
+            }
+          }
+        });
+      } catch (e) { /* ignore */ }
+      return r;
     };
   })();
 })(typeof window !== "undefined" ? window : globalThis);
