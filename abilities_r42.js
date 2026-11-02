@@ -2406,4 +2406,35 @@
       } catch (e) { return false; }
     };
   })();
+
+  /* ---- [r42] batch 6: #6014 Godagito [Spiral DG-Share]: on your center -> gets the [D-Share] keywords of cards in its soul,
+       and the size of monsters on your left and right is reduced by 1 ---- */
+  (function () {
+    const prevSB = ABX.staticBonus;
+    if (prevSB) ABX.staticBonus = function (fighter, unit) {
+      const out = prevSB.apply(this, arguments);
+      try {
+        if (!out || !unit || !unit.card || unit.card.id !== 6014 || unit.abxNullified === B.turnCount || !fighter || fighter.monsters.center !== unit) return out;
+        (unit.soul || []).forEach(id => {
+          const sc = core.cardOf(id);
+          if (!sc || !/\[d-share\]/i.test(sc.skill || "")) return;
+          if (/\[penetrate\]/i.test(sc.skill)) out.pen = true;
+          if (/\[double attack\]/i.test(sc.skill)) out.da = true;
+          if (/\[triple attack\]/i.test(sc.skill)) out.ta = true;
+          if (/\[counterattack\]/i.test(sc.skill)) out.ca = true;
+          if (/\[move\]/i.test(sc.skill)) out.move = true;
+        });
+      } catch (e) { /* ignore */ }
+      return out;
+    };
+    const prevSD = ABX.sizeDelta;
+    ABX.sizeDelta = function (fighter, card, unit) {
+      let d = prevSD ? prevSD.apply(this, arguments) : 0;
+      try {
+        const c = fighter && fighter.monsters && fighter.monsters.center;
+        if (unit && c && c.card.id === 6014 && c.abxNullified !== B.turnCount && (fighter.monsters.left === unit || fighter.monsters.right === unit)) d -= 1;
+      } catch (e) { /* ignore */ }
+      return d;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
