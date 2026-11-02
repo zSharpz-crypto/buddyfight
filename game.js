@@ -1021,7 +1021,7 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
     // the card's `cost` field is sometimes cut at the first "[" ("[Call Cost] [Put one [Nanashi]"): read the soul wording from the full skill-text line
     const sm = (skillStr || "").match(/\[(Call Cost|Cast Cost|Equip Cost)\]\s*([^\n]+)/i);
     const soulLine = sm && sm[2].length > line.length && sm[2].startsWith(line) ? sm[2] : line;
-    const gMatch = soulLine.match(/Pay\s+(\d+)\s+gauge/i);
+    const gMatch = soulLine.match(/Pay\s+(?:a total of (?:any )?)?(\d+)\s+gauge/i);   // "Pay a total of any 2 gauge" (#4962)
     if (gMatch) gauge = parseInt(gMatch[1], 10);
     // "If you are not [Transform] into a card, pay another N gauge" (#1386): only a fighter with a [Transform] item on the field pays the base cost
     const ntMatch = String(skillStr || line).match(/\[(?:Call|Cast|Equip) Cost\][^\n]*?If you are not \[Transform\][^,]*,\s*pay another (\d+) gauge/i);

@@ -1388,7 +1388,7 @@
         return;
       }
       // [r42] soul-cost variants: "Pay 2 gauge. Then, put up to one card / two cards / all «Deep» / up to four «A» or «B» from your drop zone into this card's soul", "You may put a card with "X" in its card name from your hand into this card's soul"
-      const mZ2 = !p.soulFrom && txt.match(/^(?:pay \d+ gauge[.,]?\s*)?(?:then,?\s*)?(you may )?put (up to )?(a|an|one|two|three|four|five|\d+|all|as many)\s+(.+?)(?: as you like)? from your (drop zone|hand)(?: with "([^"]+)" in its card name)? into (?:this (?:monster|card)'s|this card|its) soul\.?\]?$/i);
+      const mZ2 = !p.soulFrom && txt.match(/^(?:pay \d+ gauge[.,]?\s*)?(?:then,?\s*)?(you may )?put (up to )?(a|an|one|two|three|four|five|\d+|all|as many)\s+(.+?)(?: as you like)? from your (drop zone|hand|field)(?: with "([^"]+)" in its card name)? into (?:this (?:monster|card)'s|this card|its) soul\.?\]?$/i);
       if (mZ2) {
         const NW = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
         const q = mZ2[3].toLowerCase(), many = q === "all" || q === "as many";
@@ -1401,9 +1401,20 @@
           flt.tribes = ts;
         }
         const n = many ? 99 : (NW[q] || parseInt(q, 10) || 1);
-        out.push({ soulFrom: { area: mZ2[5].toLowerCase() === "hand" ? "hand" : "drop zone", n, upTo: !!(mZ2[1] || mZ2[2] || many), np: { raw: what, qty: { n }, filter: flt } }, text: txt });
+        out.push({ soulFrom: { area: mZ2[5].toLowerCase() === "drop zone" ? "drop zone" : mZ2[5].toLowerCase(), n, all: q === "all", upTo: !!(mZ2[1] || mZ2[2] || q === "as many"), np: { raw: what, qty: { n }, filter: flt } }, text: txt });
         return;
       }
+      // [r42] #3175 "If there is one or more «Prism Dragon» on your field, put all of them into this card's soul"
+      const mAll = !p.soulFrom && txt.match(/^if there (?:is|are) one or more [«"]?([^»"]+?)[»"]? on your field,\s*put all of them into this card's soul\.?$/i);
+      if (mAll) { out.push({ soulFrom: { area: "field", n: 99, all: true, np: { raw: mAll[1], qty: { n: 99 }, filter: { tribes: [mAll[1].trim()] } } }, text: txt }); return; }
+      // [r42] #1197 two named cards from the field into the soul
+      const mTwo = !p.soulFrom && txt.match(/^put a card with "([^"]+)" in its card name and a card with "([^"]+)" in its card name on your field into this card's soul\.?\]?$/i);
+      if (mTwo) { [mTwo[1], mTwo[2]].forEach(nm => out.push({ soulFrom: { area: "field", n: 1, np: { raw: "a card", qty: { n: 1 }, filter: { names: [lc(nm)] } } }, text: txt })); return; }
+      // [r42] #2466 "Return three «Dragonarms» from your drop zone to your deck, and shuffle it"
+      const mRet = !p.returnDrop && txt.match(/^return (a|one|two|three|four|\d+) [«"]?([^»"]+?)[»"]? from your drop zone to your deck,?\s*and shuffle it\.?\]?$/i);
+      if (mRet) { out.push({ returnDrop: { n: { a: 1, one: 1, two: 2, three: 3, four: 4 }[mRet[1].toLowerCase()] || parseInt(mRet[1], 10) || 1, tribe: mRet[2].trim() }, text: txt }); return; }
+      // [r42] #4762 "If you have one or more hand cards, drop all your hand cards"
+      if (/^if you have one or more hand cards,\s*drop all your hand cards\.?$/i.test(txt)) { out.push({ dropAllHand: true, text: txt }); return; }
       // [Cast Cost] [Put a hand card on the bottom of your deck] (#6190 -Damuna-): needs that many OTHER hand cards, goes to the bottom of the deck
       const mBottom = txt.match(/^put (a|an|one|two|three|\d+) hand cards? on the bottom of your deck\.?$/i);
       if (mBottom) {
@@ -1466,7 +1477,9 @@
   ABX.canPayExtras = function (side, card, exclHandIdx) {
     if (ABX.onTopCost(card) && !ABX.onTopHosts(side, card).length) return false;
     return extraParts(card).every(p => {
-      if (p.allHandToSoul) return true;   // "if you have one or more hand cards": nothing to pay with an empty hand
+      if (p.allHandToSoul || p.dropAllHand) return true;   // "if you have one or more hand cards": nothing to pay with an empty hand
+      if (p.returnDrop) return (F(side).drop || []).filter(id => { const c = cardOf(id); return c && tribeEq(c, p.returnDrop.tribe); }).length >= p.returnDrop.n;
+      if (p.soulFrom && p.soulFrom.all) return true;   // "put all of them": nothing to pay when there are none
       if (p.chooseSoulFromAny) return partCands(p, side, card, exclHandIdx).length >= 1;
       if (p.soulFrom && p.soulFrom.upTo) return true;   // "up to N": zero is fine
       return partCands(p, side, card, exclHandIdx).length >= ((p.soulFrom || p.discard || p.destroy).n || 1);
@@ -1479,6 +1492,12 @@
   ABX.payExtras = async function (side, card, unit) {
     const f = F(side);
     for (const part of extraParts(card)) {
+      if (part.dropAllHand) { f.drop.push(...f.hand.splice(0)); continue; }
+      if (part.returnDrop) {
+        for (let k = 0; k < part.returnDrop.n; k++) { const i = f.drop.findIndex(id => { const c = cardOf(id); return c && tribeEq(c, part.returnDrop.tribe); }); if (i >= 0) f.deck.push(f.drop.splice(i, 1)[0]); }
+        if (B.shuffleFighterDeck) B.shuffleFighterDeck(side);
+        continue;
+      }
       if (part.allHandToSoul) {   // every remaining hand card goes face down into the new card's soul
         const ids = f.hand.splice(0);
         ids.forEach(id => { const entry = typeof root.createSoulEntry === "function" ? root.createSoulEntry(id, true) : { id, isFaceDown: true }; if (unit && Array.isArray(unit.soul)) unit.soul.push(entry); else f.drop.push(id); });
