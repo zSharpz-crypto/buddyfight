@@ -2220,7 +2220,11 @@
   };
   // #3328 Growls Wand: the damage dealt by the [Lifelink] of your «Demon Lord» is reduced by 1
   ABX.lifelinkReduce = function (side, card) {
-    try { if (card && attrHas(card, /^demonlord$/i) && eqIds(F(side)).includes(3328)) return 1; } catch (e) { /* ignore */ }
+    try {
+      if (card && attrHas(card, /^demonlord$/i) && eqIds(F(side)).includes(3328)) return 1;
+      // #4192 Ricky: nullify the [Lifelink] of your size 3 «Raging Spirits»
+      if (card && card.size === 3 && attrHas(card, /^raging ?spirits$/i) && onFieldId4(F(side), 4192)) return 99;
+    } catch (e) { /* ignore */ }
     return 0;
   };
   // #5483 Shiki: with a face-down card in your buddy zone, nullify the [Soulguard] of all cards on your opponent's field
@@ -2433,6 +2437,43 @@
       try {
         const c = fighter && fighter.monsters && fighter.monsters.center;
         if (unit && c && c.card.id === 6014 && c.abxNullified !== B.turnCount && (fighter.monsters.left === unit || fighter.monsters.right === unit)) d -= 1;
+      } catch (e) { /* ignore */ }
+      return d;
+    };
+  })();
+
+  /* ---- [r42] batch 7: #2693 (soul undroppable), #3638 (nullify the monster in front), #5690 (size -1 with an originally size 3 monster) ---- */
+  (function () {
+    const prevProt = core.isProtected;
+    core.isProtected = function (unit, side, kind, ctx) {
+      if (prevProt.apply(this, arguments)) return true;
+      try {
+        if (unit && unit.card && unit.card.id === 2693 && unit.abxNullified !== B.turnCount && /souls? dropped|drop.*soul/i.test(String(kind || "")) && ctx && ctx.side !== side) return true;
+      } catch (e) { /* ignore */ }
+      return false;
+    };
+    const prevSFN = ABX.syncFrontNullify;
+    ABX.syncFrontNullify = function () {
+      if (prevSFN) prevSFN.apply(this, arguments);
+      try {
+        ["plr", "opp"].forEach(side => {
+          const f = F(side), e = F(otherSide(side));
+          ["left", "center", "right"].forEach(pos => {
+            const u = e.monsters[pos]; if (!u) return;
+            const src = f.monsters[pos];
+            const on = !!src && src.card.id === 3638 && src.abxNullified !== B.turnCount;
+            if (on && !u.abxN3638 && u.abxNullified !== B.turnCount) { u.abxN3638 = { prev: u.abxNullified, turn: B.turnCount }; u.abxNullified = B.turnCount; }
+            else if (!on && u.abxN3638) { if (u.abxN3638.turn === B.turnCount) u.abxNullified = u.abxN3638.prev; u.abxN3638 = null; }
+            else if (u.abxN3638 && u.abxN3638.turn !== B.turnCount) u.abxN3638 = null;
+          });
+        });
+      } catch (e) { /* ignore */ }
+    };
+    const prevSD = ABX.sizeDelta;
+    ABX.sizeDelta = function (fighter, card, unit) {
+      let d = prevSD ? prevSD.apply(this, arguments) : 0;
+      try {
+        if (card && card.id === 5690 && fighter && core.fieldUnits(fighter, false).some(x => x.unit && x.unit !== unit && x.unit.card.size === 3)) d -= 1;
       } catch (e) { /* ignore */ }
       return d;
     };
