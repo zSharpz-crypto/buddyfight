@@ -2708,4 +2708,33 @@
     kind: "act", tags: ["counter", "act"], counter: true, once: "turn", conds: [],
     steps: (ab.steps || []).filter(x => x.op !== "modalMarker").concat([{ op: "r42Magni", gate: "ifYouDo" }])
   })]);
+
+  /* ---- [r42] batch 13: #5474 Idol With Glasses, Haruna Kamijo: all characters on the field get «Glasses» (count = characters on the field);
+       this card gets critical+1 for each «Glasses» on the field; at the start of your attack phase with 3+ different «Idol»: gain 1 life for each ---- */
+  const glassesCount = () => {
+    let n = 0;
+    [B.plr, B.opp].forEach(fx => { if (fx) core.fieldUnits(fx, false).forEach(x => { n++; }); });
+    return n;
+  };
+  const has5474 = () => [B.plr, B.opp].some(fx => fx && core.fieldUnits(fx, false).some(x => x.unit.card.id === 5474 && x.unit.abxNullified !== B.turnCount));
+  OV42.push([5474, /gets critical\+1 for each .?glasses/i, () => ({ kind: "rule", steps: [] })]);
+  OV42.push([5474, /you gain 1 life for each .?glasses/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42GlassesLife" }] })]);
+  OPS.r42GlassesLife = {
+    run(s, ctx) {
+      const f = ctx.f;
+      const idols = new Set(core.fieldUnits(f, false).filter(x => (x.unit.card.attrs || []).some(a => /^idol$/i.test(a))).map(x => x.unit.card.name));
+      if (idols.size < 3) return false;
+      const n = has5474() ? glassesCount() : 0;
+      if (n > 0) { f.life += n; fresh(); }
+      return n > 0;
+    }, check: () => true
+  };
+  (function () {
+    const prevSB = ABX.staticBonus;
+    if (prevSB) ABX.staticBonus = function (fighter, unit) {
+      const out = prevSB.apply(this, arguments);
+      try { if (out && unit && unit.card && unit.card.id === 5474 && unit.abxNullified !== B.turnCount && fighter && core.fieldUnits(fighter, false).some(x => x.unit === unit)) out.crit += glassesCount(); } catch (e) { /* ignore */ }
+      return out;
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
