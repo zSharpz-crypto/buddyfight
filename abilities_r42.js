@@ -2393,4 +2393,17 @@
       return false;
     };
   })();
+
+  /* ---- [r42] batch 5f: #6494 Yamigitsune "Re:B": a «Skull Warrior» attacking alone -> its damage to the opponent cannot be reduced ---- */
+  (function () {
+    const prevAUr = ABX.attackUnreducible;
+    ABX.attackUnreducible = function (attSide, units) {
+      if (prevAUr && prevAUr.apply(this, arguments)) return true;
+      try {
+        const us = (units || []).map(x => (x && x.unit) || x).filter(Boolean);
+        if (us.length !== 1 || !(us[0].card.attrs || []).some(a => /^skull ?warrior$/i.test(a))) return false;
+        return core.fieldUnits(F(attSide), true).some(x => x.unit && x.unit.card.id === 6494 && x.unit.abxNullified !== B.turnCount);
+      } catch (e) { return false; }
+    };
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
