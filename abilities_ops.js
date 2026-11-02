@@ -407,6 +407,32 @@
   };
 
   /* ---------- call ---------- */
+  // A human player who is called-to by an effect chooses (1) which of their monsters go to the drop zone when the call
+  // goes over the size limit and (2) which zone it is called to (it used to drop the leftmost ones and fill the first open zone).
+  // Bots / auto play keep the automatic behaviour. `fixedPos`: the effect names the zone itself ("call it to the center").
+  async function chooseCallPlacement(ctx, card, fixedPos) {
+    const f = ctx.f, side = ctx.side;
+    if (f.isBot || ABX.autoPlay || ctx.auto || !ABX.ui || !ABX.ui.pickOption || !ABX.ui.pickCards) return null;
+    const max = f.maxSize || 3, sz = typeof getEffectiveCardSize === "function" ? getEffectiveCardSize(f, card) : (card.size || 0);
+    const label = { left: "Left", center: "Center", right: "Right", center2: "Center (2nd)" };
+    const replaced = () => (fixedPos && f.monsters[fixedPos]) ? (typeof getEffectiveCardSize === "function" ? getEffectiveCardSize(f, f.monsters[fixedPos].card) : (f.monsters[fixedPos].card.size || 0)) : 0;
+    for (let guard = 0; guard < 6 && B.getCurrentSizeUsed(f) - replaced() + sz > max; guard++) {
+      const occ = MONSTER_POSITIONS.filter(p => f.monsters[p] && p !== fixedPos);
+      if (!occ.length) break;
+      const idxs = await ABX.ui.pickCards({ title: `${card.name} — over your size limit: choose a monster to put into your drop zone`, subtitle: `Calling it needs ${B.getCurrentSizeUsed(f) - replaced() + sz - max} more Size free.`, cards: occ.map(p => ({ card: f.monsters[p].card, badge: label[p] })), min: 1, max: 1 });
+      const p = occ[(idxs && idxs[0] != null && occ[idxs[0]]) ? idxs[0] : 0];
+      const u = f.monsters[p], retO = u.oppressedBy || side;
+      B.sendMonsterToDropWithAnimation(side, p, true);
+      if (ABX.fireLeave) ABX.fireLeave(retO, u.card, false, true);
+    }
+    if (fixedPos) return fixedPos;
+    let opts = ["left", "center", "right"].filter(p => !f.monsters[p]);
+    if (!opts.length && typeof canPlaceSecondCenter === "function" && canPlaceSecondCenter(f, card)) opts = ["center2"];
+    if (!opts.length) opts = ["left", "center", "right"];   // no open zone: it replaces that monster
+    if (opts.length === 1) return opts[0];
+    const i = await ABX.ui.pickOption({ title: `${card.name} — choose the zone to call it to`, options: opts.map(p => ({ label: label[p], sub: f.monsters[p] ? `replaces "${f.monsters[p].card.name}"` : "" })) });
+    return opts[i >= 0 && opts[i] ? i : 0];
+  }
   OPS.call = {
     async run(s, ctx) {
       const f = ctx.f;
@@ -454,6 +480,7 @@
           if (!hc[0]) continue;
           under = hc[0].unit; pos = core.posOfUnit(f, under);
         }
+        if (!under) { const cp = await chooseCallPlacement(ctx, r.card, (s.pos && s.pos !== "open area") ? pos : null); if (cp) pos = cp; }
         const cost = s.pay ? parseCardCost(r.card.cost, r.card.skill, f, r.card) : { gauge: 0, life: 0 };
         if (s.pay && (f.gauge.length < cost.gauge || f.life <= cost.life)) continue;
         if (r.k === "soul") { const id = detach(r); if (id == null) continue; f.hand.push(id); }   // from a soul

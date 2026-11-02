@@ -257,3 +257,6 @@ Attack-through #5612 #6494 #6523 #2118 #5374; nullify [Penetrate] #2972 (via ABX
 ## Wrong-trigger wave D (r42, tests/wrong_trigger_d.js)
 Fixed: #3491 (enter from drop), #5194 #5840 (enter by your effect, gauge + draw), #6354 (enters opp field by your effect), #5657 (draw by your effect), #5656 (opp draws by effect, 3 different Idol), #5771 (opp hand increases), #6499 (opp gauge up -> drop to 2).
 New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` exported. Still open: #1381 (leave during attack phase), plus the one-offs listed above.
+
+## Ability calls: choose zone + what leaves for the size limit (2026-11-02, tests/call_choice.js)
+- [x] Monsters called by an effect (e.g. #867 Azi Dahaka via Abygale-type calls) always went to the first open zone (left) and, when over the size limit, the leftmost monsters were dropped automatically. Now a human player picks which monsters go to the drop zone and which zone (left/center/right) it is called to (`chooseCallPlacement` in abilities_ops.js). Bots/auto play and effects that name the zone ("call it to the center") are unchanged.
