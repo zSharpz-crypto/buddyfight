@@ -3504,4 +3504,71 @@
     // #209: cast timing line is covered by the free-counter window
     OV42.push([209, /you may cast this during an attack/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
   }
+
+  /* batch 2: #857 #6560 #1504 #91 #1959 #5987 #5536 */
+  {
+    const stOf = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    const MARK = () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] });
+    // #857 Remote Punishment: damage = number of monsters destroyed by this attack
+    OPS.r42RemotePunish = { run(s, ctx) { const n = (ctx.event && ctx.event.destroyedCount) || 1; core.applyDamage(otherSide(ctx.side), n, { kind: "effect", sourceCard: ctx.card }); fresh(); return true; } };
+    OV42.push([857, /remote punishment/i, () => ({ kind: "triggered", trigger: { event: "attackDestroys", self: true }, conds: [], steps: [{ op: "r42RemotePunish" }] })]);
+    // #6560: attack with 20+ cards in both drop zones
+    OPS.r42DaredevilBoom = {
+      async run(s, ctx) {
+        if (F("plr").drop.length + F("opp").drop.length < 20) return false;
+        for (const x of stOf("Destroy all cards on your opponent's field, and for this turn, this card gets critical+3.")) await OPS[x.op].run(x, ctx);
+        return true;
+      }
+    };
+    OV42.push([6560, /twenty or more cards/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42DaredevilBoom" }] })]);
+    // #1504 It Takes Two to Clap (once per turn)
+    OPS.r42TakesTwo = {
+      async run(s, ctx) {
+        const did = {};
+        for (const sd of [ctx.side, otherSide(ctx.side)]) {
+          const f = F(sd); if (!f.hand.length) continue;
+          const cands = f.hand.map((id, idx) => ({ k: "zone", side: sd, area: "hand", idx, id, card: core.cardOf(id) }));
+          const ch = await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { chooserSide: sd, intent: "cost", title: ctx.card.name + " \u2014 you may discard a card" });
+          const r = ch && ch[0]; if (!r) continue;
+          const i = f.hand.indexOf(r.id); if (i < 0) continue;
+          f.drop.push(f.hand.splice(i, 1)[0]); did[sd] = true; if (ABX.fireDiscarded) ABX.fireDiscarded(sd, core.cardOf(r.id));
+        }
+        const sds = [ctx.side, otherSide(ctx.side)];
+        if (did[sds[0]] !== did[sds[1]] || (!did[sds[0]] && !did[sds[1]])) sds.forEach(sd => { if (!did[sd]) core.applyDamage(sd, 2, { kind: "effect", sourceCard: ctx.card }); });
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([1504, /you and your opponent may discard a card/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], once: "turn", steps: [{ op: "r42TakesTwo" }] })]);
+    // #91 Cabal Preparations
+    OPS.r42CabalPrep = {
+      async run(s, ctx) {
+        const f = ctx.f;
+        const cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(x => x.card && x.card.type === "Spell" && x.card.set && ((x.card.worlds || []).includes("Magic World") || x.card.world === "Magic World"));
+        if (!cands.length) return false;
+        const ch = await core.pick(cands, { qty: { n: 1, upTo: true }, raw: "a Magic World spell with Set" }, ctx, { intent: "help", title: ctx.card.name + " \u2014 you may cast a spell" });
+        if (!ch || !ch.length) return false;
+        ctx.bind = ctx.bind || {}; ctx.bind.chosen = [Object.assign({}, ch[0], { area: "hand" })];
+        return OPS.castFrom.run({ op: "castFrom", ref: "chosen", pay: false }, ctx);
+      }
+    };
+    OV42.push([91, /cabal preparations/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42CabalPrep" }] })]);
+    // #1959 BAR King Solomon
+    TG(1959, "when the number of cards in your opponent's hand increases", { event: "handUp", owner: "opp" }, "your opponent chooses and drops a hand card", { once: "turn" });
+    // #5987 Time Scout, Khan
+    OPS.r42KhanPunish = {
+      async run(s, ctx) {
+        const f = ctx.f, e = ctx.e;
+        if (!(((f.godclock && f.godclock.reversalCount) || 0) > 0) || !e.hand.length) return false;
+        const cands = e.hand.map((id, idx) => ({ k: "zone", side: otherSide(ctx.side), area: "hand", idx, id, card: core.cardOf(id) }));
+        const ch = await core.pick(cands, { qty: { n: 1 } }, ctx, { chooserSide: otherSide(ctx.side), intent: "cost", title: "Choose a hand card to put on the bottom of your deck" });
+        const r = ch && ch[0]; if (!r) return false;
+        const i = e.hand.indexOf(r.id); if (i < 0) return false;
+        e.deck.push(e.hand.splice(i, 1)[0]); fresh(); return true;
+      }
+    };
+    OV42.push([5987, /returned to hand or deck by your card effects/i, () => ({ kind: "triggered", trigger: { event: "fieldToHand", owner: "opp" }, conds: [], once: "turn", steps: [{ op: "r42KhanPunish" }] })]);
+    // #5536 Liim: returned at the final phase by ABX.fireTurnEvent (engine special case)
+    OV42.push([5536, /at the start of the final phase of a turn that this card is dropped from your hand/i, MARK]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);

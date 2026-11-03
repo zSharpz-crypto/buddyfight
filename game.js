@@ -8989,7 +8989,7 @@ const battle = {
         let anyDestroyed = false;
         ["left", "center", "right"].forEach(p => {
           if (this.matchOver || !defFighter.monsters[p]) return;
-          if (this.resolveMonsterVsMonster(attSide, units, defSide, p, combinedPower, combinedCrit, anyPenetrate)) anyDestroyed = true;
+          if (this.resolveMonsterVsMonster(attSide, units, defSide, p, combinedPower, combinedCrit, anyPenetrate)) { anyDestroyed = true; outcome.destroyedCount = (outcome.destroyedCount || 0) + 1; }
         });
         outcome.destroyedMonster = anyDestroyed;
         if (sweeper.abxAttackAllFighter !== false && !this.matchOver) outcome.dealtDamage = dealDirect() > 0;
@@ -9006,7 +9006,7 @@ const battle = {
           });
         }
       } else if (targetMonster) {
-        outcome.destroyedMonster = !!this.resolveMonsterVsMonster(attSide, units, defSide, targetPos, combinedPower, combinedCrit, anyPenetrate);
+        outcome.destroyedMonster = !!this.resolveMonsterVsMonster(attSide, units, defSide, targetPos, combinedPower, combinedCrit, anyPenetrate); if (outcome.destroyedMonster) outcome.destroyedCount = 1;
         outcome.dealtDamage = outcome.destroyedMonster && (targetPos === "center" || targetPos === "center2") && anyPenetrate;
       } else {
         outcome.dealtDamage = dealDirect() > 0;

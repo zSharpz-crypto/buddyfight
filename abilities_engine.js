@@ -1077,7 +1077,7 @@
         await fireTriggers((t, src, side) => t.event === "attackOutcome" && t.self && side === attSide && us.has(src.unit), { name: "attackOutcome" });
       }
       if (outcome && outcome.destroyedMonster) {
-        await fireTriggers((t, src, side) => t.event === "attackDestroys" && t.self && side === attSide && us.has(src.unit), { name: "attackDestroys" });
+        await fireTriggers((t, src, side) => t.event === "attackDestroys" && t.self && side === attSide && us.has(src.unit), { name: "attackDestroys", destroyedCount: (outcome && outcome.destroyedCount) || 1 });
       }
     });
   };
