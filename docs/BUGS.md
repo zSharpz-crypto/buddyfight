@@ -317,3 +317,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch B (dead families): #4154 #3639 #5914 call-cost reductions (parseCardCost; #3639/#5914 apply to any call, not only from hand), #2342 #2451 #3525 shield counters (lifeFloor now takes a target), #3644 #3648 #3662 #5433. Tests: tests/dead_batch_b.js. Not built: #1687 soul-based cost cut, #2368 #3289 #356 #2029 #5701 #1151.
 - Batch B2: #2368 (pay up to 5 life -> crit; human prompt, bots/auto pay 0) #3289 (attack-phase drop -> soul/gauge; auto = soul). Test: dead_batch_b.
 - Batch B3: #80 (reveal top, free-cast spell; human prompt) #5533 #1974 (oppCast 1 dmg once/turn). #765 already parsed (audit overcount). Test: dead_batch_b.
+- Batch B4: #3904 (equip up to two Hero items free; cast restriction 'no monsters' not enforced) #356 #5701 (Set-spell soul from deck, payoff). #3676/#5346 already handled by multi-item lists (audit overcount). Test: dead_batch_b.

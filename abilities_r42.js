@@ -4004,6 +4004,37 @@
     TG(5533, "when this card enters the field on the center", { event: "enter", self: true }, "put up to one \u00abLegend Dragon\u00bb item from your deck into your hand, and shuffle your deck", { conds: [{ t: "selfPos", pos: "center" }] });
     // #1974 Perger: when your opponent uses a spell, 1 damage to them (once per turn)
     TG(1974, "when your opponent uses a spell", { event: "oppCast" }, "deal 1 damage to your opponent", { once: "turn" });
+    // #3904 For The Chosen Ones: equip up to two Hero items from hand free
+    OPS.r42EquipHeroes = { async run(s, ctx) {
+      const f = ctx.f; let n = 0;
+      for (let k = 0; k < 2; k++) {
+        const cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(x => x.card && x.card.type === "Item" && (x.card.attrs || []).some(a => /^hero$/i.test(a)));
+        if (!cands.length) break;
+        const ch = (await core.pick(cands, { qty: { n: 1, upTo: true }, raw: "up to one Hero item from your hand" }, ctx, { intent: "help", title: ctx.card.name + " \u2014 equip a Hero item" })) || [];
+        if (!ch.length) break;
+        const i = f.hand.indexOf(ch[0].id); if (i < 0) break; f.hand.splice(i, 1);
+        const it = { card: ch[0].card, rested: false, attacksLeft: ch[0].card.atk_max || 1, soul: [] };
+        if (!f.item || f.item.isEndrulerFlag) f.item = it; else if (!f.item2) f.item2 = it; else { f.drop.push(f.item.card.id, ...(f.item.soul || [])); f.item = it; }
+        if (ABX.fireEquipped) await ABX.fireEquipped(ctx.side, ch[0].card, it);
+        n++;
+      }
+      fresh(); return n > 0; }, check: () => true };
+    OV42.push([3904, /equip up to two/i, () => ({ kind: "spell", steps: [{ op: "r42EquipHeroes" }] })]);
+    // #356 Fimbulwinter / #5701 Quest Start: Set-spell soul helpers
+    const hostOf = (ctx) => ctx.soulHost || ctx.card;
+    OPS.r42SetSoulFromDeck = { run(s, ctx) { const h = hostOf(ctx), f = ctx.f; h.soul = h.soul || []; let n = 0; for (let i = 0; i < s.n && f.deck.length; i++) { h.soul.push(f.deck.shift()); n++; } fresh(); return n > 0; }, check: () => true };
+    OV42.push([356, /put two cards from the top of your deck into this card.s soul/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42SetSoulFromDeck", n: 2 }] })]);
+    OV42.push([5701, /put up to one card from the top of your deck into this card.s soul face down/i, () => ({ kind: "triggered", trigger: { event: "damaged", who: "opp" }, conds: [], steps: [{ op: "r42SetSoulFromDeck", n: 1 }] })]);
+    OPS.r42QuestPayoff = { async run(s, ctx) {
+      const h = hostOf(ctx), f = ctx.f;
+      if (!h.soul || h.soul.length < 3) return false;
+      const i = (f.setSpells || []).indexOf(h); if (i < 0) return false;
+      f.setSpells.splice(i, 1); f.drop.push(h.id, ...h.soul); h.soul = [];
+      f.life += 3;
+      await OPS.draw.run({ op: "draw", n: 3 }, ctx);
+      core.applyDamage(ctx.side === "plr" ? "opp" : "plr", 3, { kind: "effect" });
+      fresh(); return true; }, check: () => true };
+    OV42.push([5701, /at the end of your turn, if this card has three or more/i, () => ({ kind: "triggered", trigger: { event: "turnEnd", who: "you" }, conds: [], steps: [{ op: "r42QuestPayoff" }] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

@@ -55,5 +55,13 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("5533: Legend Dragon item to hand", val(`return battle.plr.hand.includes(ld.id)`), val(`return [ld&&ld.id,battle.plr.hand]`));
   run(`fresh(); globalThis.k2=mk(1974); battle.plr.monsters.left=k2; go(1974,'triggered','oppCast',k2)`); await settle();
   ck("1974: 1 damage to opponent", val(`return battle.opp.life===9`));
+  run(`fresh(); globalThis.hr=window.BUDDYFIGHT_CARDS.filter(c=>c.type==='Item'&&(c.attrs||[]).includes('Hero')).slice(0,2); battle.plr.hand=hr.map(c=>c.id); battle.plr.item=null; go(3904,'spell')`); await settle();
+  ck("3904: two Hero items equipped from hand", val(`return !!battle.plr.item&&!!battle.plr.item2&&battle.plr.hand.length===0`), val(`return [!!battle.plr.item,!!battle.plr.item2,battle.plr.hand.length]`));
+  run(`fresh(); globalThis.h=Object.assign({},card(356),{soul:[]}); battle.plr.setSpells=[h]; battle.plr.deck=[21,22,23]; ABX.core.runAbility('plr',h,ab(356,'triggered','enter'),null,{event:{name:'enter'}})`); await settle();
+  ck("356: two deck cards into the Set spell's soul", val(`return h.soul.length===2&&battle.plr.deck.length===1`), val(`return [h.soul,battle.plr.deck]`));
+  run(`fresh(); globalThis.q=Object.assign({},card(5701),{soul:[21,22,23]}); battle.plr.setSpells=[q]; battle.plr.life=4; battle.plr.deck=[31,32,33,34,35]; battle.plr.hand=[]; ABX.core.runAbility('plr',q,ab(5701,'triggered','turnEnd'),null,{event:{name:'turnEnd'}})`); await settle();
+  ck("5701: 3 souls -> drop self, +3 life, draw 3, 3 damage", val(`return battle.plr.setSpells.length===0&&battle.plr.life===7&&battle.plr.hand.length===3&&battle.opp.life===7`), val(`return [battle.plr.setSpells.length,battle.plr.life,battle.plr.hand.length,battle.opp.life]`));
+  run(`fresh(); globalThis.q2=Object.assign({},card(5701),{soul:[21]}); battle.plr.setSpells=[q2]; battle.plr.life=4; ABX.core.runAbility('plr',q2,ab(5701,'triggered','turnEnd'),null,{event:{name:'turnEnd'}})`); await settle();
+  ck("5701: <3 souls -> nothing", val(`return battle.plr.setSpells.length===1&&battle.plr.life===4`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
