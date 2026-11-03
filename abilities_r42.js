@@ -4035,6 +4035,38 @@
       core.applyDamage(ctx.side === "plr" ? "opp" : "plr", 3, { kind: "effect" });
       fresh(); return true; }, check: () => true };
     OV42.push([5701, /at the end of your turn, if this card has three or more/i, () => ({ kind: "triggered", trigger: { event: "turnEnd", who: "you" }, conds: [], steps: [{ op: "r42QuestPayoff" }] })]);
+    // cast restrictions: #765 not in a final phase; #3904 only with no monsters; #1141 only with 2+ Black Dragon on the field
+    {
+      const prevCBb = core.castBlock;
+      core.castBlock = function (fighter, card) {
+        const r = prevCBb ? prevCBb.apply(this, arguments) : null;
+        if (r) return r;
+        try {
+          if (card && card.id === 765 && B.phase === "final") return `"${card.name}" cannot be cast during a final phase`;
+          if (card && card.id === 3904 && Object.values(fighter.monsters || {}).some(Boolean)) return `"${card.name}" can only be cast with no monsters on your field`;
+          if (card && card.id === 1141 && core.fieldUnits(fighter, false).filter(x => x.unit && x.unit.card && x.unit.card.type === "Monster" && (x.unit.card.attrs || []).some(a => /^blackdragon$/i.test(a))).length < 2) return `"${card.name}" needs two or more Black Dragon on your field`;
+        } catch (e) { /* ignore */ }
+        return null;
+      };
+      // #1141 Violence Familiar: damage from "Spectral Strike" is +1 this turn
+      const prevADv = core.applyDamage;
+      core.applyDamage = function (side, n, src) {
+        try {
+          const topAb = (ABX.abStack || [])[(ABX.abStack || []).length - 1];
+          if (n > 0 && topAb && /^spectral strike$/i.test(String(topAb.name || "")) && F(otherSide(side)).r42SSPlus === B.turnCount) arguments[1] = n + 1;
+        } catch (e) { /* ignore */ }
+        return prevADv.apply(this, arguments);
+      };
+    }
+    OV42.push([1141, /damage dealt to your opponent from .spectral strike. is increased by 1/i, () => ({ kind: "spell", steps: [{ op: "r42SSPlus" }] })]);
+    OPS.r42SSPlus = { run(s, ctx) { ctx.f.r42SSPlus = B.turnCount; return true; }, check: () => true };
+    // #2259 Patrol Ninja: enter -> size 2 or less Ninja from drop to hand
+    TG(2259, "when this card enters the field", { event: "enter", self: true }, "put up to one size 2 or less Ninja from your drop zone into your hand");
+    // #6556 Galiazond: start of each player's turn -> up to two size 2 or less "Dragon Emperor" from drop to hand
+    TG(6556, "at the start of each player", { event: "turnStart", who: "any" }, "put up to two size 2 or less monsters with \"Dragon Emperor\" in their card names from your drop zone into your hand");
+    // #2790 Gaen: entering by Transform -> opponent cannot draw during their next turn
+    OPS.r42NoDrawNext = { run(s, ctx) { F(otherSide(ctx.side)).r42NoDraw = B.turnCount + 1; return true; }, check: () => true };
+    OV42.push([2790, /your opponent cannot draw cards during their next turn/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42NoDrawNext" }] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

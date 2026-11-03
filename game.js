@@ -4688,6 +4688,7 @@ const battle = {
 
   drawCardsWithAnimation(side, count = 1, onComplete = null) {
     const f = this.getFighter(side);
+    if (f.r42NoDraw === this.turnCount) count = 0;   // #2790 Gaen: cannot draw cards during that turn
     if (count <= 0 || f.deck.length === 0) {
       this.renderBattle();
       if (onComplete) onComplete();
