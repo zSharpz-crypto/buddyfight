@@ -3451,4 +3451,57 @@
     };
     OV42.push([3609, /choose one of the attacking cards/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], optional: true, steps: [{ op: "r42IzmainTrade" }] })]);
   }
+
+  /* remaining link/attack + draw/hand families, batch 1: #3656 #1595 #5285 #5998 #3899 #209 */
+  {
+    const stOf = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    const trig2 = (ab, extra) => Object.assign({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [] }, extra);
+    // #3656 BFF Sensor
+    OV42.push([3656, /bff sensor|your other monster enters/i, () => { const st = stOf("Look at the top three cards of your deck, put up to one Thunder Empire from among them into your hand, and put the rest on the bottom of your deck."); return st && { kind: "triggered", trigger: { event: "otherEnter", np: ABX.parseNP("other monster") }, conds: [], once: "turn", steps: st }; }]);
+    // #1595 [Act] discard this card from hand + 1 gauge: search a "Duel Sieger" card
+    OPS.r42DiscardSelfSearch = {
+      async run(s, ctx) {
+        const f = ctx.f, i = f.hand.indexOf(ctx.card.id);
+        if (i < 0 || f.gauge.length < 1) return false;
+        f.drop.push(f.gauge.pop());
+        f.drop.push(f.hand.splice(i, 1)[0]);
+        if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, ctx.card);
+        const st = stOf("Search your deck for one card with Duel Sieger in its card name, put it into your hand, and shuffle your deck.");
+        for (const x of st) await OPS[x.op].run(x, ctx);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([1595, /you may discard this card from your hand and pay 1 gauge/i, () => ({ kind: "act", tags: ["act"], conds: [], from: "hand", steps: [{ op: "r42DiscardSelfSearch" }] })]);
+    // #5285 Ai Haibara's Day: drop a hand card as cost, draw two, once per turn
+    OPS.r42DropHandCost = { async run(s, ctx) { const f = ctx.f; if (!f.hand.length) return false; const np = ABX.parseSentenceSteps("Put a card in your hand into your drop zone.", {}).steps[0].np; const refs = await core.pick(core.refsFor(np, ctx), np, ctx, { intent: "help", title: ctx.card.name + " \u2014 drop a hand card (cost)" }); const r = refs && refs[0]; if (!r) return false; const i = f.hand.indexOf(r.id); if (i < 0) return false; f.drop.push(f.hand.splice(i, 1)[0]); if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, core.cardOf(r.id)); return true; } };
+    OV42.push([5285, /draw two cards/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [{ op: "r42DropHandCost" }].concat(stOf("Draw two cards.")) })]);
+    // #5998 crit reduced per Reversal
+    OV42.push([5998, /critical of a card on your opponent's field is reduced/i, (ab) => { const st = stOf("For this turn, a card on your opponent's field gets critical-1."); if (!st) return null; st[0].each = { perReversal: true }; return trig2(ab, { steps: st }); }]);
+    // #3899 Asmodai: when a 72 Pillars / Thunder Empire monster enters your field, choose an opp card, may discard a hand card; if you do destroy it
+    OPS.r42AsmodaiKill = {
+      async run(s, ctx) {
+        const f = ctx.f;
+        const cnp = ABX.parseSentenceSteps("Destroy a card on your opponent's field.", {}).steps[0].np;
+        const cands = core.refsFor(cnp, ctx);
+        if (!cands.length || !f.hand.length) return false;
+        const ch = await core.pick(cands, cnp, ctx, { intent: "harm", title: ctx.card.name + " \u2014 choose a card" });
+        if (!ch || !ch.length) return false;
+        const hnp = ABX.parseSentenceSteps("Put up to one card in your hand into your drop zone.", {}).steps[0].np;
+        const hr = await core.pick(core.refsFor(hnp, ctx), hnp, ctx, { intent: "help", title: ctx.card.name + " \u2014 you may discard a card" });
+        const r = hr && hr[0]; if (!r) return false;
+        const i = f.hand.indexOf(r.id); if (i < 0) return false;
+        f.drop.push(f.hand.splice(i, 1)[0]); if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, core.cardOf(r.id));
+        ctx.bind = ctx.bind || {}; ctx.bind.chosen = ch;
+        await OPS.destroy.run({ op: "destroy", np: { qty: { n: 1 }, ref: "chosen", self: false, filter: {}, zone: null } }, ctx);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([3899, /when .{0,3}72 pillars.{0,3} or .{0,3}thunder empire/i, () => ({ kind: "triggered", trigger: { event: "otherEnter", np: ABX.parseNP("«Pillars» or «Thunder Empire» monster") }, conds: [], steps: [{ op: "r42AsmodaiKill" }] })]);
+    OV42.push([1595, /also regarded as/i, () => ({ kind: "rule", steps: [] })]);
+    OV42.push([5285, /\[cast cost\]/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+    // #209: cast timing line is covered by the free-counter window
+    OV42.push([209, /you may cast this during an attack/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);
