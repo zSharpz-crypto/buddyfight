@@ -3055,4 +3055,42 @@
   OV42.push([6215, /if it entered the field or was \[ride\] by another/i, () => ({ kind: "triggered", trigger: ENTER, also: [{ event: "equipped", self: true }], conds: [], steps: [...parseS("you gain 3 life"),
     ...withCond(parseS("put up to one «Battle Building» or «Super Robot» monster from your deck into your drop zone"), { t: "xEnteredByTribe", tribes: ["Battle Building", "Super Robot"] }),
     Object.assign(parseS("draw a card")[0], { gate: "ifYouDo" }), { op: "shuffle", who: "you", cond: { t: "xEnteredByTribe", tribes: ["Battle Building", "Super Robot"] } }] })]);
+
+  /* ---- [r42] Hero World batch 3: element conditions + a few trigger-event mix-ups ---- */
+  const DROP_HAS = (tribe) => has({ tribes: [tribe] }, "drop zone");
+  // #3219 Mud-Wind Demon Geanemos: only "if you have «Earth» and «Wind» in your drop zone" - the condition was lost, so it returned a card every time
+  OV42.push([3219, /if you have .earth. and .wind. in your drop zone/i, () => ({ kind: "triggered", trigger: ENTER, conds: [{ t: "and", list: [DROP_HAS("Earth"), DROP_HAS("Wind")] }], steps: parseS("return a card from your opponent's field to their hand, and you gain 1 life") })]);
+  // #3280 Water-Flame Demon Hydropyro: same ("«Fire» and «Water» in your drop zone")
+  // #3280: choose an opposing monster, drop one of its souls, then destroy that same monster (dropSoul leaves no "that card" for the destroy step)
+  OPS.r42DropSoulDestroy = {
+    async run(s, ctx) {
+      const e = ctx.e, cands = ["left", "center", "right"].filter(p => e.monsters[p]).map(p => ({ pos: p, unit: e.monsters[p], side: ctx.side === "plr" ? "opp" : "plr" }));
+      if (!cands.length) return false;
+      const ch = await core.pick(cands.map(c => Object.assign(c, { id: c.unit.card ? c.unit.card.id : c.unit.id, area: "field" })), { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", title: `${ctx.card.name} - choose an opponent's monster` });
+      const t = ch && ch[0]; if (!t) return false;
+      if ((t.unit.soul || []).length) e.drop.push(t.unit.soul.pop());
+      battle.destroyMonster(t.side, t.pos); fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([3280, /if you have .fire. and .water. in your drop zone/i, (ab) => ({ kind: "triggered", trigger: ENTER, conds: [{ t: "and", list: [DROP_HAS("Fire"), DROP_HAS("Water")] }], steps: [{ op: "r42DropSoulDestroy" }] })]);
+  // #3278 Armor Talisman: ELEMENT CONTROL - four independent "if you have «X» in your drop zone" effects
+  OV42.push([3278, /if you have .fire. in your drop zone, deal 1 damage/i, () => ({ kind: "spell", tags: ["counter"], once: "turn", conds: [], steps: [
+    ...withCond(parseS("deal 1 damage to your opponent"), DROP_HAS("Fire")), ...withCond(parseS("put the top card of your deck into your gauge"), DROP_HAS("Water")),
+    ...withCond(parseS("draw a card"), DROP_HAS("Wind")), ...withCond(parseS("you gain 1 life"), DROP_HAS("Earth"))] })]);
+  // #1987 Noble of Darkness Killnight: "When this card is put into your drop zone from hand, either put the top card of your deck into your gauge, or put a card from your opponent's gauge into their drop zone"
+  OPS.r42Killnight = {
+    async run(s, ctx) {
+      const f = ctx.f, e = ctx.e;
+      let pick = 0;
+      if (!(ctx.auto || ABX.autoPlay || f.isBot) && ABX.ui && ABX.ui.pickOption) pick = await ABX.ui.pickOption({ title: `${ctx.card.name} - choose one`, options: [{ label: "Put the top card of your deck into your gauge" }, { label: "Put a card from your opponent's gauge into their drop zone" }] });
+      if (pick === 1) { if (!e.gauge.length) return false; e.drop.push(e.gauge.pop()); }
+      else { if (!f.deck.length) return false; f.gauge.push(f.deck.shift()); }
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([1987, /when this card is put into your drop zone from hand/i, () => ({ kind: "triggered", trigger: { event: "discardedFromHand", self: true }, conds: [], steps: [{ op: "r42Killnight" }] })]);
+  // #2566 Gigadroid Biggest: "When you are [Ride] on this card" (not on every call)
+  OV42.push([2566, /when you are \[ride\] on this card/i, () => ({ kind: "triggered", trigger: { event: "equipped", self: true }, conds: [], steps: parseS("put a card from your opponent's gauge into their drop zone") })]);
+  // #3282 Megadroid, Larger: put up to two "Droid" monsters from your drop zone on top of your deck
+  OV42.push([3282, /put up to two monsters with .droid. in their card names/i, () => ({ kind: "triggered", trigger: ENTER, conds: [], steps: parseS("put up to two monsters with \"Droid\" in their card names from your drop zone on the top of your deck") })]);
 })(typeof window !== "undefined" ? window : globalThis);
