@@ -30,5 +30,8 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("6216 ride with Card Burn on field: ridden, Burn dropped, 4 gauge paid", val(`return battle.plr.item&&battle.plr.item.card.id===6216 && !battle.plr.monsters.left && battle.plr.drop.includes(943) && battle.plr.gauge.length===__g-4`), val(`return [battle.plr.item&&battle.plr.item.card.id, battle.plr.monsters.left&&battle.plr.monsters.left.card.id, battle.plr.drop, battle.plr.gauge.length, __g]`));
   run(`{ const me=setup(); me.hand=[6216]; battle.equipCardFromHand('plr',0,'Ride'); }`); await settle();
   ck("6216 ride without Card Burn: refused", val(`return !battle.plr.item && battle.plr.hand.includes(6216)`), val(`return [battle.plr.item, battle.plr.hand]`));
+  // #6217 Kaizerion: ride -> up to four Brave Machine "Deity" cards from deck into its soul, deck shuffled
+  run(`{ const me=setup(); me.deck=[1332,1378,1379,1380,1054,1054]; me.hand=[6217]; me.monsters.center=null; me.item={card:CARD_MAP.get(950),rested:false,attacksLeft:1,soul:[]}; battle.equipCardFromHand('plr',0,'Ride'); }`); await settle();
+  ck("6217 ride: Deity Brave Machines go into its soul", val(`const it=battle.plr.item; return it&&it.card.id===6217 && [1332,1378,1379,1380].filter(i=>it.soul.some(x=>(x.id||x)===i)).length>=3 && !it.soul.some(x=>(x.id||x)===1054)`), val(`const it=battle.plr.item; return [it&&it.card.id, it&&it.soul]`));
   console.log("pass", pass, "fail", fail);
 })();

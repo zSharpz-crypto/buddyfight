@@ -3120,4 +3120,21 @@
   };
   OV42.push([943, /put a "card serpent"/i, () => ({ kind: "act", steps: [{ op: "r42RideChain", gauge: 4, need: ["Card Serpent", "Card Rhino", "@self"], rideId: 950 }] })]);
   OV42.push([2152, /ultimate card burn.*d-wing/i, () => ({ kind: "act", tags: ["counter"], steps: [{ op: "r42RideChain", gauge: 2, need: ["Ultimate Card Burn", "@self"], rideId: 2107 }] })]);
+
+  // #6217 Kaizerion: "When you [Ride] on this card, put up to four «Brave Machine» with "Deity" in their card names into this card's soul from your deck, and shuffle your deck"
+  OPS.r42DeckToSoul = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side, unit = ctx.unit || (f.item && f.item.card.id === ctx.card.id ? f.item : null);
+      if (!unit) return false;
+      const cands = f.deck.map((id, idx) => ({ k: "zone", side, area: "deck", idx, id, card: core.cardOf(id) })).filter(c => c.card && core.matchFilter(c.card, s.filter, null, ctx));
+      let n = 0;
+      if (cands.length) {
+        const ch = await core.pick(cands, { qty: { n: s.n, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - put into its soul` });
+        (ch || []).forEach(r => { const i = f.deck.indexOf(r.id); if (i >= 0) { f.deck.splice(i, 1); unit.soul = unit.soul || []; unit.soul.push(r.id); n++; } });
+      }
+      if (s.shuffle && battle.shuffleFighterDeck) battle.shuffleFighterDeck(side);
+      fresh(); return n > 0;
+    }, check: () => true
+  };
+  OV42.push([6217, /when you \[ride\] on this card, put up to four/i, () => ({ kind: "triggered", trigger: { event: "equipped", self: true }, conds: [], steps: [{ op: "r42DeckToSoul", n: 4, shuffle: true, filter: { names: ["deity"], tribes: ["Brave Machine"], types: [] } }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
