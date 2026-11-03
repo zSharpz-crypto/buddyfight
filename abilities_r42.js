@@ -3137,4 +3137,23 @@
     }, check: () => true
   };
   OV42.push([6217, /when you \[ride\] on this card, put up to four/i, () => ({ kind: "triggered", trigger: { event: "equipped", self: true }, conds: [], steps: [{ op: "r42DeckToSoul", n: 4, shuffle: true, filter: { names: ["deity"], tribes: ["Brave Machine"], types: [] } }] })]);
+
+  // #1985 Blue Valor Lord Lancer: "[Counter][Act] If you are not [Transform] into this card, you may pay the [Transform] cost, if you do you may [Transform] into this card from the field"
+  OPS.r42TransformFromField = {
+    run(s, ctx) {
+      const f = ctx.f, side = ctx.side, card = ctx.card;
+      if (f.item && f.item.card.id === card.id) return false;                       // already transformed into this card
+      const pos = ["left", "center", "right"].find(p => f.monsters[p] && (f.monsters[p] === ctx.unit || f.monsters[p].card.id === card.id));
+      if (!pos || !ABX.canModeEquip(side, card, true).ok) return false;
+      const u = f.monsters[pos];
+      f.monsters[pos] = null; f.hand.push(card.id);
+      ABX._modeByEffect = true; ABX._modeFree = false;
+      let ok = false; try { ok = battle.equipCardFromHand(side, f.hand.lastIndexOf(card.id), "Transform") !== false; } finally { ABX._modeByEffect = false; }
+      const stillHand = f.hand.lastIndexOf(card.id);
+      if (!(f.item && f.item.card.id === card.id)) { if (stillHand >= 0) f.hand.splice(stillHand, 1); f.monsters[pos] = u; ok = false; }
+      else (u.soul || []).forEach(sid => f.drop.push(sid && sid.id ? sid.id : sid));
+      fresh(); return ok;
+    }, check: () => true
+  };
+  OV42.push([1985, /if you are not \[transform\] into this card/i, () => ({ kind: "act", tags: ["counter"], steps: [{ op: "r42TransformFromField" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);

@@ -33,5 +33,10 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #6217 Kaizerion: ride -> up to four Brave Machine "Deity" cards from deck into its soul, deck shuffled
   run(`{ const me=setup(); me.deck=[1332,1378,1379,1380,1054,1054]; me.hand=[6217]; me.monsters.center=null; me.item={card:CARD_MAP.get(950),rested:false,attacksLeft:1,soul:[]}; battle.equipCardFromHand('plr',0,'Ride'); }`); await settle();
   ck("6217 ride: Deity Brave Machines go into its soul", val(`const it=battle.plr.item; return it&&it.card.id===6217 && [1332,1378,1379,1380].filter(i=>it.soul.some(x=>(x.id||x)===i)).length>=3 && !it.soul.some(x=>(x.id||x)===1054)`), val(`const it=battle.plr.item; return [it&&it.card.id, it&&it.soul]`));
+  // #1985 Blue Valor: [Counter][Act] pay the [Transform] cost and [Transform] into this card from the field
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(1985)); globalThis.__g=me.gauge.length; ABX.useAct('plr',CARD_MAP.get(1985),me.monsters.center); }`); await settle();
+  ck("1985 act: transforms into itself, 1 gauge paid, leaves the monster zone", val(`return battle.plr.item&&battle.plr.item.card.id===1985 && !battle.plr.monsters.center && battle.plr.gauge.length===__g-1`), val(`return [battle.plr.item&&battle.plr.item.card.id, battle.plr.monsters.center&&battle.plr.monsters.center.card.id, battle.plr.gauge.length, __g, battle.plr.hand]`));
+  run(`{ const me=setup(); me.item={card:CARD_MAP.get(1985),rested:false,attacksLeft:1,soul:[]}; me.monsters.center=mk(CARD_MAP.get(1985)); globalThis.__g=me.gauge.length; ABX.useAct('plr',CARD_MAP.get(1985),me.monsters.center); }`); await settle();
+  ck("1985 act while already transformed into it: nothing paid", val(`return battle.plr.gauge.length===__g`), val(`return [battle.plr.gauge.length,__g]`));
   console.log("pass", pass, "fail", fail);
 })();
