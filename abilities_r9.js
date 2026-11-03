@@ -736,7 +736,7 @@
     const f = F(side), lifeBefore = f.life;
     const dealt = applyNow.call(this, side, n, src);
     const S = core.st(f);
-    if (f.life <= 0 && lifeBefore > 0 && S.lifeFloor === B.turnCount) { f.life = 1; S.lifeFloor = null; say(`💫 ${f.name || "You"} stayed at 1 life!`); }
+    if (f.life <= 0 && lifeBefore > 0 && S.lifeFloor === B.turnCount) { f.life = S.lifeFloorTo || 1; S.lifeFloor = null; say(`💫 ${f.name || "You"} stayed at 1 life!`); }
     return dealt;
   };
   // "you cannot lose the game" until the opponent's next turn starts
@@ -1245,7 +1245,7 @@
   A5.push([/^(?:for this turn,? )?if your life would become 0(?: with that impact| by (?:an|that) (?:attack|impact))?,? (?:it|your life) becomes 1(?: instead)?$/i, () => ({ op: "lifeFloor", persist: true }), true]);
   A5.push([/^if your life would become 0(?: with that impact)?,? (?:it|your life) becomes 1(?: instead)?$/i, () => ({ op: "lifeFloor", persist: true }), false]);
   ABX.ACTION_RULES.unshift(...A5);
-  OPS.lifeFloor.run = function (s, ctx) { const S = core.st(ctx.f); S.lifeFloor = B.turnCount; S.lifeFloorPersist = !!s.persist; return true; };
+  OPS.lifeFloor.run = function (s, ctx) { const S = core.st(ctx.f); S.lifeFloor = B.turnCount; S.lifeFloorPersist = !!s.persist; S.lifeFloorTo = s.to || 1; return true; };
   // keep a turn-long floor ("for this turn, if your life would become 0, it becomes 1 instead")
   const apFloor = core.applyDamage;
   core.applyDamage = function (side, n, src) {

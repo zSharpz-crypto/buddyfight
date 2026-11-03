@@ -3936,6 +3936,31 @@
     }
     // #2473 Jackknife Linker: your life cannot drop below 1 during that attack phase
     OV42.push([2473, /if your life would become 0, it becomes 1/i, () => spell([{ op: "lifeFloor" }])]);
+    // Batch B: shield-type counter spells
+    OV42.push([2342, /next time you would take damage, it is reduced by 3/i, () => ({ kind: "spell", steps: [{ op: "shield", mode: "next", reduceBy: 3 }] })]);
+    OV42.push([2451, /top card of your deck into your gauge/i, () => ({ kind: "spell", steps: [{ op: "gaugeUpTop" }, { op: "shield", mode: "next", toZero: true }] })]);
+    OV42.push([3525, /life would become 0, it becomes 2/i, () => ({ kind: "spell", steps: [{ op: "lifeFloor", persist: true, to: 2 }] })]);
+    OPS.gaugeUpTop = { run(s, ctx) { const f = ctx.f; if (f.deck.length) f.gauge.push(f.deck.shift()); return true; }, check: () => true };
+    // #3644 Earlbow "SD": end of opp's turn, with a Black Dragon Set on your field -> 2 cards to gauge + 2 life
+    OPS.r42EarlbowEOT = { run(s, ctx) {
+      const f = ctx.f;
+      if (!(f.setSpells || []).some(c => c && (c.attrs || []).some(a => /^blackdragon$/i.test(a)))) return false;
+      for (let i = 0; i < 2; i++) OPS.gaugeUpTop.run({}, ctx);
+      f.life += 2; return true; }, check: () => true };
+    OV42.push([3644, /at the end of your opponent's turn/i, () => ({ kind: "triggered", trigger: { event: "turnEnd", who: "opp" }, conds: [], steps: [{ op: "r42EarlbowEOT" }] })]);
+    // #3648 Thunderstar: attack -> top cards to gauge = number of different worlds on your field
+    OPS.r42WorldGauge = { run(s, ctx) {
+      const w = new Set(); core.fieldUnits(ctx.f, true).forEach(x => { if (x.unit && x.unit.card) (x.unit.card.worlds || [x.unit.card.world]).filter(Boolean).forEach(n => w.add(n)); });
+      for (let i = 0; i < w.size; i++) OPS.gaugeUpTop.run({}, ctx);
+      return w.size > 0; }, check: () => true };
+    OV42.push([3648, /number of different world names/i, () => ({ kind: "triggered", trigger: { event: "attack", self: true }, conds: [], steps: [{ op: "r42WorldGauge" }] })]);
+    // #3662 Tyrant Demon: gain life equal to this card's critical when it destroys a monster or deals damage to the opponent
+    OPS.r42LifeCrit = { run(s, ctx) {
+      const u = ctx.unit; if (!u) return false;
+      const st = root.getUnitEffectiveCombatStats ? root.getUnitEffectiveCombatStats(ctx.f, u) : null; ctx.f.life += (st && st.crit) || u.card.crit || 1; return true; }, check: () => true };
+    OV42.push([3662, /you gain life equal to this card.s critical/i, () => ({ kind: "triggered", trigger: { event: "attackDestroys", self: true }, conds: [], also: [{ event: "dealsDamage", self: true }], steps: [{ op: "r42LifeCrit" }] })]);
+    // #5433: at the end of a battle in which a Hello, Happy World character with this card in its soul attacked -> +2 life
+    TG(5433, "at the end of the battle", { event: "battleEnd", attFilter: { tribes: ["HelloHappyWorld"], soul: true } }, "you gain 2 life");
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

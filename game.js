@@ -1109,6 +1109,16 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
     if (rm && (fighter.overUsed ? fighter.overUsed[rm[2].toLowerCase()] : fighter.overturnUsed)) gauge = Math.max(0, gauge - parseInt(rm[1], 10));
   }
 
+  // #4154 Jackknife: -3 gauge if [Overturn] was used this game; #3639 a Black Dragon called while Vidanouve is on your field costs 1 less gauge; #5914 Making Kaiju (Set) reduces a «Kaiju» call by 1
+  if (fighter && cardObj && gauge > 0 && cardObj.type !== "Spell") {
+    const at = (cardObj.attrs || []).map(x => String(x).toLowerCase());
+    let red = 0;
+    if (cardObj.id === 4154 && fighter.overturnUsed) red += 3;
+    if (at.includes("blackdragon") && getAllFieldUnits(fighter).some(u => u && u.card && u.card.id === 3639)) red += 1;
+    if (at.includes("kaiju") && (fighter.setSpells || []).some(c => c && c.id === 5914)) red += 1;
+    if (red) gauge = Math.max(0, gauge - red);
+  }
+
   // #1961 Great Spell, Demons Concert: the gauge is reduced by the number of 72 Pillars on your field; #3920 Narcolepsy: -3 gauge if an item on your field has 6+ «Plague» spells in its soul
   if (fighter && cardObj && cardObj.type === "Spell" && gauge > 0 && (cardObj.id === 1961 || cardObj.id === 3920)) {
     if (cardObj.id === 1961) {
