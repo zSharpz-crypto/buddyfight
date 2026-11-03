@@ -1,87 +1,10 @@
-# Dead ability families (audit 2026-11-03)
+# Dead ability families (audit 2026-11-03, after the session fixes)
 
-Source: dead_audit.js (223 fully-dead abilities). Build one family per session, test first.
+Source: dead_audit.js. 188 abilities still dead (223 at the start of the session). Build one family per session, test first.
 
-## Link / attack condition (42)
-- #209 [Dungeon World/spell] You may cast this during an attack on your opponent's turn.
-- #291 [Katana World/triggered] When you are being attacked by a monster with power 5000 or more on your opponent's field, if this card is in the soul of a card with "Secre
-- #292 [Katana World/triggered] When you are being link attacked, if this card is in the soul of a card with "Secret Sword" in its card name, you may cast it. (You may not 
-- #296 [Katana World/triggered] When you are being attacked by an opponent's Weapon, if this card is in the soul of "Secret Sword, Lethal Formation", you may cast it. (You 
-- #857 [Katana World/static] Remote Punishment If this card attacks and destroys your opponent's monster, this card deals damage equal to the number of monsters destroye
-- #870 [Danger World/triggered] When this card attacks, for this battle, increase the critical of this card by the sum of the critical of your item on your field and the it
-- #1154 [Dungeon World/triggered] When this card is attacked, for this turn, nullify the [Penetrate] of all cards on your opponent's field.
-- #1351 [Hero World/spell] For this turn, a card you are [Ride] on can attack your opponent even if there is a monster in his or her center.
-- #1504 [Magic World/triggered] "It Takes Two to Clap" When this card enters the field, you and your opponent may discard a card from hand. Deal 2 damage to the fighter who
-- #1546 [Dungeon World/triggered] When an item on your field attacks, put the top card of your deck into this card's soul face down.
-- #2014 [Danger World/triggered] At the end of the attack of this card, you may stand your Weapon, if you do, put this card and a card from your drop zone into the soul of t
-- #2302 [Legend World / Star Dragon World/triggered] At the end of the battle that a monster with "Zodiac" in its card name and this card in its soul attacked, for this turn, that card gets [Do
-- #2553 [Dungeon World/triggered] When this card link attacks with another «Knight» and if you have "Thunder Beast Spear, Bestia" equipped, deal 1 damage to your opponent!
-- #2554 [Dungeon World/triggered] When this card link attacks with another «Knight» and if you have "Wind Scaled Spear, Eskamal" equipped, destroy a monster or item on your o
-- #2637 [Darkness Dragon World/triggered] When this card's attack destroys an opponent's monster, put the top two cards of your opponent's deck into his or her drop zone.
-- #2683 [Hero World/triggered] "Demonic Child's Ploy" When this card attacks, you may discard up to two cards from your hand. If you do, draw the number of cards equal to 
-- #2783 [Dungeon World / Darkness Dragon World/triggered] "Spectral Strike" When this card's attack destroys a monster on your opponent's field, all fighters put the top card of your deck into your 
-- #3104 [Star Dragon World/triggered] When this card is attacked, you may return this card from your field, and one of the attacking monsters to their owners' hand.
-- #3159 [Star Dragon World/spell] For this turn, a «Prism Dragon» monster on your field can attack your opponent even if there is a monster on his or her center.
-- #3242 [Dungeon World / Katana World/triggered] At the end of the battle where your Adventurer or Skull Warrior attacked, you may choose a monster on your opponent's field and destroy a mo
-- #3256 [Hero World/triggered] At the end of the battle that a «Superheroine» on your field attacked, you may return that card from the field to hand.
-- #3609 [Darkness Dragon World/triggered] When you are being attacked, choose one of the attacking cards, and you may put this card from the field into your drop zone. If you do, put
-- #3664 [Danger World/triggered] When your opponent`s card attacks, charge the target of the attack to this card.
-- #3841 [Star Dragon World/triggered] When your opponent's cards attack, change the target of the attacks to a «Prism Dragon» on your center.
-- #4543 [Katana World/triggered] At the end of the battle of that this card attacked, if an «Electrodeity» on your field has souls, for this turn, this card gets [Double Att
-- #5023 [Katana World/triggered] At the end of the battle that this card attacked, put up to one card from the top of your deck face down on the field as a "«Dragod»/size 0/
-- #5368 [Star Dragon World/triggered] At the start of each player's attack phase, put all «Astrodragon» monsters from your field to separate areas on your field.
-- #5380 [BanG Dream! Girls Band Party! PICO/triggered] When your opponent's cards attack, change the target of the attack to the «Pastel*Palettes» on your center.
-- #5434 [BanG Dream! Girls Band Party! PICO/triggered] At the end of the battle that a Pastel Palettes character with this card in its soul attacked, deal 1 damage to your opponent!
-- #5436 [BanG Dream! Girls Band Party! PICO/triggered] At the end of the battle that an Afterglow character with this card in its soul attacked, destroy or return to hand a character on your oppo
-- #5556 [Dungeon World/triggered] At the end of the battle that the «Adventurer» or «Dungeon Enemy» with this card in its soul attacked, destroy up to one card on your oppone
-- #5649 [THE IDOLM@STER Cinderella Girls Theater/static] «That Girl» on your field can attack your opponent even if they have characters on the center.
-- #5702 [Dungeon World/triggered] During your final phase, when you [Set] an impact, you get another attack phase. This ability only activates once per turn.
-- #5928 [SSSS.GRIDMAN/triggered] When this card in the soul of a [Gridman] or [Powered Zenon] is attacking a character alone, it attacks all of your opponent's characters in
-- #5987 [Magic World/triggered] When a card on your opponent's field is returned to hand or deck by your card effects, if your flag [Reversal] during this fight, your oppon
-- #5998 [Katana World/triggered] When this card enters the field, for this turn, the critical of a card on your opponent's field is reduced by 1 for each time your flags [Re
-- #6088 [Sword Art Online/spell] Your «Moonlit Black Cats» items can attack even if you have characters in the center.
-- #6282 [Medabots/triggered] "Gatling" When this card attacks a character alone, it attacks all characters on your opponent's field instead.
-- #6287 [Medabots/static] "Scout" During the battle that this card is attacking, nullify the abilities of all cards on your opponent's field.
-- #6433 [Lost World/static] This cards [Counterattack] destroys all attacking monsters with defense less than this card's power!
-- #6445 [Katana World/static] This card [Counterattack] all attacking monsters!
-- #6560 [Darkness Dragon World/triggered] When this card attacks, if a total of twenty or more cards are in your and your opponent's drop zone, destroy all cards on your opponent's f
+By cause (how the engine currently handles the text): r40ExecOnly / act: 10; r40ExecOnly / spell: 47; r40StaticOwned / static: 54; r40ExecOnly / triggered: 76; r40ExecOnly / modal: 1.
 
-## Gauge / life change (35)
-- #304 [Katana World/triggered] When this card is called from your drop zone, put the top card of your deck into your gauge.
-- #348 [Legend World/static] You do not have to pay the life in [Cast Cost] of cards you use with Great Spell in its card name.
-- #725 [Generic/triggered] When you call a «Tarot» monster other than "Actor Knights High Priest", you gain 1 life. This ability can only be used once per turn.
-- #1003 [Legend World/triggered] When this card is put into your drop zone from your hand or field, put a card from your opponent's gauge into the drop zone.
-- #1151 [Danger World/act] [Act] If you have 5 life or less put this card from your field into the soul of your Weapon.
-- #1687 [Star Dragon World/static] If this card is in the soul of a card with "Jackknife" in its card name, the cost for "Devotion Wall" is reduced by 1 gauge.
-- #1872 [Magic World/triggered] [Counter] When your opponent casts a spell and you have a "Messenger of Moonlight, Luna" on your field, you may discard a Wizard from your h
-- #1961 [Magic World/spell] The amount of gauge written on the [Call Cost] is reduced by the number of 72 Pillars on your field.
-- #1962 [Magic World/triggered] When this card enters the field due to an effect, put the top card of your deck into the gauge and gain 1 life.
-- #1987 [Hero World/triggered] When this card is put into your drop zone from hand, either put the top card of your deck in your gauge, or put a card from your opponent's 
-- #2368 [Danger World/act] [Counter] [Act] Pay up to five life. If you do, for this turn, this card gets critical equal to the life paid. This ability can only be used
-- #2566 [Hero World/triggered] When you are [Ride] on this card, put a card from your opponent's gauge into his or her drop zone.
-- #2762 [Hero World/static] [Impact Transform] [Pay 3 gauge & Put a card you are [Transform] into, into the drop zone]
-- #2889 [Star Dragon World/triggered] When the «Prism Dragon» with this card in its soul is attacked, put the top card of your deck into your gauge. This ability only activates o
-- #3250 [Hero World/triggered] When this card is discarded from your hand by an effect of a card with "Battle Poet" in its card name, put the top card of your deck into yo
-- #3289 [Dungeon World / Star Dragon World/triggered] At the beginning of your attack phase, put up to one card from your drop zone into this card's soul or your gauge.
-- #3644 [Darkness Dragon World/triggered] At the end of your opponent's turn if there's a Black Dragon [Set] on your field, put 2 cards from the top of your deck into gauge and you g
-- #3648 [Star Dragon World/triggered] When this card attacks, put the number of cards from the top of your deck into your gauge equal to the number of different world names of ca
-- #3662 [Danger World/triggered] When this card destroys an opponents monster or deals damage to your opponent, you gain life equal to this card`s critical!
-- #3920 [Magic World/spell] If an item on your field has six or more «Plague» spells in its soul, the gauge cost written in this card's [Cast Cost] is reduced by 3.
-- #4066 [Dungeon World/triggered] When this card enters the field, you gain 1 life equal to the number of items you have equipped.
-- #4154 [Star Dragon World/static] The gauge cost of this card's [Call Cost] is reduced by 3 if you used [Overturn] during this game.
-- #4188 [Magic World/triggered] During your opponent's turn, when this card is put into the drop zone from the soul, put the top card from your deck into your gauge, you ga
-- #4315 [Generic/triggered] When this card enters the field, you gain 1 life for every «Deity Dragon Tribe» monster on your field!
-- #4503 [Hero World/triggered] When this card enters the field or [Ride], you gain 2 life! Then, if it entered the field or was [Ride] by another «Battle Building» effect,
-- #4764 [Star Dragon World/static] This card's [Call Cost] is reduced by 4 gauge if you have used [Overturn] during this fight.
-- #4788 [Katana World/static] If a «Skull Warrior» on your field attacks and deals damage to your opponent, you may destroy that card. If you do, drop 1 of your opponent'
-- #5022 [Ancient World/static] "[Call Cost] [Pay 3 gauge & Put the top card of your deck into its soul]
-- #5041 [Ancient World/static] [D] [Counter] [Act] You may pay 2 gauge. If you do, [Stand] this card.
-- #5163 [Darkness Dragon World/act] [Overthrow] [During each player's attack phase, put a Black Dragon with [Set] from your drop zone on the bottom of your deck & Pay 1 gauge] 
-- #5317 [Detective Conan/triggered] During your opponent's turn, when this card is put into your drop zone from soul, put the top card of your deck into your gauge, you gain 1 
-- #5433 [BanG Dream! Girls Band Party! PICO/triggered] At the end of the battle that a Hello, Happy World! character with this card in its soul attacked, you gain 2 life!
-- #5966 [Magic World/triggered] When your opponent is dealt damage by the effect of a «Shadow Shade» with this card in its soul, drop 1 of your opponent's gauge.
-- #6105 [Sword Art Online/triggered] [Counter] [Act] When you are being attacked, you may put this card from your drop zone on the bottom of your deck, and pay 1 gauge. If you d
-- #6215 [Hero World/triggered] When this card enters the field or [Ride], you gain 3 life! Then, if it entered the field or was [Ride] by another «Battle Building» or «Sup
+Note: the audit overcounts. Some cards work through text handlers in game.js even though their line does not parse (check with a quick test before building).
 
 ## Draw / hand / deck / drop zone (32)
 - #91 [Magic World/triggered] "Cabal Preparations" When this card enters the field, you may cast a <Magic World> spell with Set from your hand without paying the [Cast Co
@@ -117,7 +40,38 @@ Source: dead_audit.js (223 fully-dead abilities). Build one family per session, 
 - #6223 [Hero World/triggered] When this card enters the field or [Impact Transform], look at the top five cards of your deck, put up to one card with "Gaigrander" in its 
 - #6357 [Darkness Dragon World/triggered] When this card is [Set] , if another «Dark Burial» is on your field, draw a card.
 
-## Cannot / restriction (30)
+## Link / attack condition (29)
+- #209 [Dungeon World/spell] You may cast this during an attack on your opponent's turn.
+- #291 [Katana World/triggered] When you are being attacked by a monster with power 5000 or more on your opponent's field, if this card is in the soul of a card with "Secre
+- #292 [Katana World/triggered] When you are being link attacked, if this card is in the soul of a card with "Secret Sword" in its card name, you may cast it. (You may not 
+- #296 [Katana World/triggered] When you are being attacked by an opponent's Weapon, if this card is in the soul of "Secret Sword, Lethal Formation", you may cast it. (You 
+- #857 [Katana World/static] Remote Punishment If this card attacks and destroys your opponent's monster, this card deals damage equal to the number of monsters destroye
+- #870 [Danger World/triggered] When this card attacks, for this battle, increase the critical of this card by the sum of the critical of your item on your field and the it
+- #1154 [Dungeon World/triggered] When this card is attacked, for this turn, nullify the [Penetrate] of all cards on your opponent's field.
+- #1351 [Hero World/spell] For this turn, a card you are [Ride] on can attack your opponent even if there is a monster in his or her center.
+- #1504 [Magic World/triggered] "It Takes Two to Clap" When this card enters the field, you and your opponent may discard a card from hand. Deal 2 damage to the fighter who
+- #1546 [Dungeon World/triggered] When an item on your field attacks, put the top card of your deck into this card's soul face down.
+- #2014 [Danger World/triggered] At the end of the attack of this card, you may stand your Weapon, if you do, put this card and a card from your drop zone into the soul of t
+- #2553 [Dungeon World/triggered] When this card link attacks with another «Knight» and if you have "Thunder Beast Spear, Bestia" equipped, deal 1 damage to your opponent!
+- #2554 [Dungeon World/triggered] When this card link attacks with another «Knight» and if you have "Wind Scaled Spear, Eskamal" equipped, destroy a monster or item on your o
+- #2637 [Darkness Dragon World/triggered] When this card's attack destroys an opponent's monster, put the top two cards of your opponent's deck into his or her drop zone.
+- #2683 [Hero World/triggered] "Demonic Child's Ploy" When this card attacks, you may discard up to two cards from your hand. If you do, draw the number of cards equal to 
+- #2783 [Dungeon World / Darkness Dragon World/triggered] "Spectral Strike" When this card's attack destroys a monster on your opponent's field, all fighters put the top card of your deck into your 
+- #3104 [Star Dragon World/triggered] When this card is attacked, you may return this card from your field, and one of the attacking monsters to their owners' hand.
+- #3242 [Dungeon World / Katana World/triggered] At the end of the battle where your Adventurer or Skull Warrior attacked, you may choose a monster on your opponent's field and destroy a mo
+- #3609 [Darkness Dragon World/triggered] When you are being attacked, choose one of the attacking cards, and you may put this card from the field into your drop zone. If you do, put
+- #3664 [Danger World/triggered] When your opponent`s card attacks, charge the target of the attack to this card.
+- #5368 [Star Dragon World/triggered] At the start of each player's attack phase, put all «Astrodragon» monsters from your field to separate areas on your field.
+- #5436 [BanG Dream! Girls Band Party! PICO/triggered] At the end of the battle that an Afterglow character with this card in its soul attacked, destroy or return to hand a character on your oppo
+- #5702 [Dungeon World/triggered] During your final phase, when you [Set] an impact, you get another attack phase. This ability only activates once per turn.
+- #5987 [Magic World/triggered] When a card on your opponent's field is returned to hand or deck by your card effects, if your flag [Reversal] during this fight, your oppon
+- #5998 [Katana World/triggered] When this card enters the field, for this turn, the critical of a card on your opponent's field is reduced by 1 for each time your flags [Re
+- #6287 [Medabots/static] "Scout" During the battle that this card is attacking, nullify the abilities of all cards on your opponent's field.
+- #6433 [Lost World/static] This cards [Counterattack] destroys all attacking monsters with defense less than this card's power!
+- #6445 [Katana World/static] This card [Counterattack] all attacking monsters!
+- #6560 [Darkness Dragon World/triggered] When this card attacks, if a total of twenty or more cards are in your and your opponent's drop zone, destroy all cards on your opponent's f
+
+## Cannot / restriction (23)
 - #9 [Magic World/act] [Act] You may only cast this card when an opponent calls a size 2 or less monster.
 - #276 [Katana World/spell] Monsters on the left and right cannot be attacked by both players or their monsters.
 - #988 [Legend World/act] [Act] You may discard up to two Star from your hand. If you do, draw cards equal to the number of cards discarded. You may only use this abi
@@ -127,21 +81,14 @@ Source: dead_audit.js (223 fully-dead abilities). Build one family per session, 
 - #1530 [Ancient World/spell] You and your opponent cannot call monsters to the center.
 - #1554 [Dungeon World/spell] [Counter] Stand a Demon Lord on your field. You may only cast "Command of the Water Lord" once per turn.
 - #1561 [Katana World/triggered] When this card attacks and deals damage to your opponent, your opponent's item cannot [Stand] during his or her next stand phase.
-- #2276 [Ancient World/spell] If this card is in the soul of a «Dragon Chief Emperor» monster, this card cannot be put into your drop zone by effects from your opponent's
 - #2433 [Danger World/spell] Pay as much life as you like. If you do, put cards from the top of your deck into your gauge equal to the number of life you paid. (You cann
 - #2465 [Star Dragon World/static] If this card is in the soul of a monster with "Zodiac" in its card name, during your opponent's final phase, your opponent cannot use or cas
 - #2473 [Star Dragon World/spell] [Counter] During that attack phase, if your life would become 0, it becomes 1 instead. You may only cast "Jackknife Linker" once per fight.
 - #2661 [Hero World/static] This card cannot [Transform] other than by the [Act] of "Transform Belt, Card Winder" and it cannot enter the field if you do not have three
-- #2693 [Ancient World/static] The soul of this card cannot be put to the drop zone by effects from your opponent's cards.
 - #2790 [Generic/triggered] When you [Transform] into this card, your opponent cannot draw cards during their next turn.
-- #2889 [Star Dragon World/spell] The card in the soul of a «Prism Dragon» monster cannot be put into your drop zone by your opponent's card effects.
 - #3638 [Darkness Dragon World/static] The abilities of the monster in front of this monster are nullified. This ability cannot be nullified.
 - #3941 [Generic/static] This card is treated as a card on your field. It cannot be destroyed, leave the flag area, and its abilities cannot be nullified, and it can
-- #4058 [Magic World/spell] If this card is in the soul of a «Plague», this card cannot be put into the drop zone, and abilities of that card and this card cannot be nu
-- #4185 [Hero World/spell] If this card is in the soul of a «Computer», that card cannot be destroyed, and its souls cannot be put into the drop zone, by your opponent
-- #5167 [Star Dragon World/spell] Souls in the «Prism Dragon» with this card in its soul cannot be dropped by your opponent's card effects.
 - #5209 [Detective Conan/triggered] When this card attacks, if you have three or more «Junior Detective League» on your field, all characters and items on your opponent's field
-- #5380 [BanG Dream! Girls Band Party! PICO/static] All «Pastel*Palettes» on your field cannot have their souls dropped by your opponent's card effects, and damage your opponent takes by your 
 - #5856 [SSSS.GRIDMAN/spell] All cards on your opponent's field cannot attack characters on your left and right.
 - #5877 [SSSS.GRIDMAN/static] During the battle that this card in the soul of a [Gridman] or [Powered Zenon] is attacking alone, damage dealt to your opponent by that car
 - #6012 [Ancient World/spell] Put up to one «Time Dragon» monster of different sizes from your drop zone into your hand for each time your flags [Reversal] during this fi
@@ -196,6 +143,28 @@ Source: dead_audit.js (223 fully-dead abilities). Build one family per session, 
 - #6148 [Ancient World/spell] Deal damage to your opponent equal to the size of a «MAX Dragon» on your center!
 - #6171 [Magic World/act] [Counter] [Act] Call this card on top of a «Mystic Knight» monster with power 9000 or greater on your field without paying its [Call Cost].
 - #6556 [Ancient World/triggered] At the start of each player's turn. put up to two size 2 or less monsters with "Dragon Emperor" in their card names from your drop zone into
+
+## Gauge / life change (20)
+- #348 [Legend World/static] You do not have to pay the life in [Cast Cost] of cards you use with Great Spell in its card name.
+- #725 [Generic/triggered] When you call a «Tarot» monster other than "Actor Knights High Priest", you gain 1 life. This ability can only be used once per turn.
+- #1151 [Danger World/act] [Act] If you have 5 life or less put this card from your field into the soul of your Weapon.
+- #1687 [Star Dragon World/static] If this card is in the soul of a card with "Jackknife" in its card name, the cost for "Devotion Wall" is reduced by 1 gauge.
+- #1872 [Magic World/triggered] [Counter] When your opponent casts a spell and you have a "Messenger of Moonlight, Luna" on your field, you may discard a Wizard from your h
+- #2368 [Danger World/act] [Counter] [Act] Pay up to five life. If you do, for this turn, this card gets critical equal to the life paid. This ability can only be used
+- #2566 [Hero World/triggered] When you are [Ride] on this card, put a card from your opponent's gauge into his or her drop zone.
+- #2762 [Hero World/static] [Impact Transform] [Pay 3 gauge & Put a card you are [Transform] into, into the drop zone]
+- #3289 [Dungeon World / Star Dragon World/triggered] At the beginning of your attack phase, put up to one card from your drop zone into this card's soul or your gauge.
+- #3644 [Darkness Dragon World/triggered] At the end of your opponent's turn if there's a Black Dragon [Set] on your field, put 2 cards from the top of your deck into gauge and you g
+- #3648 [Star Dragon World/triggered] When this card attacks, put the number of cards from the top of your deck into your gauge equal to the number of different world names of ca
+- #3662 [Danger World/triggered] When this card destroys an opponents monster or deals damage to your opponent, you gain life equal to this card`s critical!
+- #4154 [Star Dragon World/static] The gauge cost of this card's [Call Cost] is reduced by 3 if you used [Overturn] during this game.
+- #4788 [Katana World/static] If a «Skull Warrior» on your field attacks and deals damage to your opponent, you may destroy that card. If you do, drop 1 of your opponent'
+- #5022 [Ancient World/static] "[Call Cost] [Pay 3 gauge & Put the top card of your deck into its soul]
+- #5041 [Ancient World/static] [D] [Counter] [Act] You may pay 2 gauge. If you do, [Stand] this card.
+- #5163 [Darkness Dragon World/act] [Overthrow] [During each player's attack phase, put a Black Dragon with [Set] from your drop zone on the bottom of your deck & Pay 1 gauge] 
+- #5433 [BanG Dream! Girls Band Party! PICO/triggered] At the end of the battle that a Hello, Happy World! character with this card in its soul attacked, you gain 2 life!
+- #5966 [Magic World/triggered] When your opponent is dealt damage by the effect of a «Shadow Shade» with this card in its soul, drop 1 of your opponent's gauge.
+- #6105 [Sword Art Online/triggered] [Counter] [Act] When you are being attacked, you may put this card from your drop zone on the bottom of your deck, and pay 1 gauge. If you d
 
 ## Soul / abilities of soul (15)
 - #356 [Legend World/triggered] When this card is set on the field, put two cards from the top of your deck into this card's soul.

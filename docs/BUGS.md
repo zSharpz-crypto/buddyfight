@@ -289,3 +289,14 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Hero World batch 4b (fixed): #6216 Paal Combi [Ride] cost "put a card from your field into the drop zone" is now enforced and paid (new fieldToDrop part in abilities_r15.js; also fixes other cards with the same cost line). Tests: tests/hero_d.js, transform*.js.
 - Hero World batch 4c (fixed): #6217 Kaizerion [Ride] trigger now puts up to four Brave Machine "Deity" cards from deck into its soul, then shuffles (OPS.r42DeckToSoul). Test: tests/hero_d.js.
 - Hero World batch 4d (fixed): #1985 Blue Valor Act transforms the field card into itself, paying the Transform cost (OPS.r42TransformFromField). Test: tests/hero_d.js.
+
+## Dead-ability families (2026-11-03, list: docs/DEAD_FAMILIES.md; 223 -> 188 dead)
+- [x] Attack through a center monster: #3159 #5649 #6088 (tests/attack_through.js). #1351 not done (needs a [Ride] state).
+- [x] "At the end of the battle that X attacked": #2302 #3256 #4543 #5023 #5434 #5556 (tests/battle_end_family.js). Not done: #5436 (destroy-or-return choice), #3242 (multi-step choose + destroy).
+- [x] Passive attack redirect #3841 #5380 (game.js initiateAttackWithDefenseCheck -> ABX.passiveRedirect), attack-all-instead #6282 #5928 (tests/redirect_family.js). #5380's [Counterattack] line is not done.
+- [x] Cost reductions in parseCardCost: #1961 #3920 (and #4764 verified) (tests/gauge_cost.js).
+- [x] Put-into-drop-zone triggers: #304 #1003 #1987 (tests/drop_gauge.js).
+- [x] Gain life on enter: #4066 #4315 #1962 #4503 #6215; entry-by-effect tracking via ABX.srcStack / unit.abxEnteredByEffect (tests/enter_life.js). [Ride] entry is not modeled.
+- [x] Soul to drop zone on the opponent's turn #4188 #5317, discarded by a Battle Poet effect #3250 (tests/soul_drop.js).
+- [x] Soul protections vs opponent effects: #2276 #2693 #2889 #4058 #4185 #5167 (tests/soul_protect.js).
+- [ ] Still open from these families: #1151 #1872 #2368 #2566 #3289 #3644 #3648 #3662 #4788 #5433 #5966 #6105 (gauge/life), the rest of the "cannot" group (#276 #1530 #5856 #6237 ...), draw/hand/deck/drop zone (32), size/call rules (22), soul abilities (15), "would" replacements (13).

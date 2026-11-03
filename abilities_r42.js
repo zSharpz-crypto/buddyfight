@@ -3297,4 +3297,41 @@
     }, check: () => true
   };
   OV42.push([3250, /when this card is discarded from your hand by an effect of a card with .?battle poet/i, () => ({ kind: "triggered", trigger: { event: "discardedFromHand", self: true }, conds: [], steps: [{ op: "r42Discard3250" }] })]);
+  /* ---- soul protections vs the opponent's effects (tests/soul_protect.js): #2276 #2693 #2889 #4058 #4185 #5167 ---- */
+  const prevProt44 = core.isProtected;
+  core.isProtected = function (unit, side, kind, ctx) {
+    if (prevProt44.apply(this, arguments)) return true;
+    try {
+      if (!unit || !unit.card) return false;
+      if (!(!ctx || !ctx.side || ctx.side !== side)) return false;   // only the opponent's effects
+      const has = (id) => (unit.soul || []).some(e => soulIdOf(e) === id);
+      if (kind === "souls dropped") {
+        if (unit.card.id === 2693) return true;                                     // #2693 "The soul of this card cannot be put to the drop zone by effects from your opponent's cards"
+        if (has(5167) && hasTribe(unit.card, "PrismDragon")) return true;           // #5167 souls in the «Prism Dragon» with this card in its soul
+        if (has(4185) && hasTribe(unit.card, "Computer")) return true;              // #4185 its souls cannot be put into the drop zone
+      }
+      if (kind === "destroyed" && has(4185) && hasTribe(unit.card, "Computer")) return true;   // #4185 that card cannot be destroyed
+      if (kind === "nullified" && has(4058) && hasTribe(unit.card, "Plague")) return true;     // #4058 abilities of that card cannot be nullified
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  // single protected soul cards: the opponent's "drop a soul" skips them (#2889 Prism Dragon host, #2276 Dragon Chief Emperor host, #4058 Plague host)
+  const SOUL_KEEP = { 2889: "PrismDragon", 2276: "DragonChiefEmperor", 4058: "Plague" };
+  const prevDropSoulRun = OPS.dropSoul.run;
+  OPS.dropSoul.run = async function (s, ctx) {
+    const stash = [];
+    try {
+      core.fieldUnits(F(otherSide(ctx.side)), true).forEach(x => {
+        const u = x.unit; if (!u || !Array.isArray(u.soul)) return;
+        const keep = [];
+        u.soul = u.soul.filter(e => { const id = soulIdOf(e); if (SOUL_KEEP[id] && hasTribe(u.card, SOUL_KEEP[id])) { keep.push(e); return false; } return true; });
+        if (keep.length) stash.push([u, keep]);
+      });
+    } catch (e) { /* ignore */ }
+    try { return await prevDropSoulRun.apply(this, arguments); } finally { stash.forEach(([u, keep]) => { u.soul = keep.concat(u.soul); }); }
+  };
+  [[2276, /if this card is in the soul of a .?dragon chief emperor/i], [2693, /the soul of this card cannot be put to the drop zone by effects from your opponent/i],
+   [2889, /the card in the soul of a .?prism dragon.? monster cannot be put into your drop zone/i], [4058, /if this card is in the soul of a .?plague/i],
+   [4185, /if this card is in the soul of a .?computer/i], [5167, /souls in the .?prism dragon.? with this card in its soul cannot be dropped/i]]
+    .forEach(([id, re]) => OV42.push([id, re, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
 })(typeof window !== "undefined" ? window : globalThis);
