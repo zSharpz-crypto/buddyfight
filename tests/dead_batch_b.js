@@ -101,5 +101,9 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("2148: item survives once, barrier dropped", val(`return pr1===true&&sl1===0&&pr2===false&&battle.plr.drop.includes(2148)`), val(`return [pr1,sl1,pr2]`));
   run(`fresh(); battle.plr.item={card:wp,rested:false,soul:[],tempCrit:0}; battle.plr.setSpells=[card(2148)]; globalThis.pr3=ABX.core.isProtected(battle.plr.item,'plr','destroyed',{side:'plr',card:card(21)})`);
   ck("2148: own effects do not trigger it", val(`return pr3===false&&battle.plr.setSpells.length===1`));
+  run(`fresh(); globalThis.oz=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.size<=1&&/ozon/i.test(c.name)&&c.id!==2545); battle.plr.drop=[2545,oz.id]; battle.plr.monsters.left=null; battle.plr.monsters.center=null; battle.plr.monsters.right=null;
+    ABX.core.runAbility('plr',card(21),{kind:'spell',steps:[{op:'call',np:ABX.parseNP('up to one size 1 or less monster with "Ozon" in its card name from your drop zone')}]},null,{})`); await settle();
+  globalThis.__ids = val(`return Object.values(battle.plr.monsters).filter(Boolean).map(u=>u.card.id)`);
+  ck("2545: Ozon-C revives from drop when an Ozon enters from drop", __ids.includes(oz_id=val(`return oz.id`))&&__ids.includes(2545), [__ids, val(`return battle.plr.drop`)]);
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

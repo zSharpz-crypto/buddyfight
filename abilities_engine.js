@@ -1008,7 +1008,7 @@
     (f.drop || []).forEach((id, idx) => {
       if (seen.has(id)) return; seen.add(id);
       const c = cardOf(id);
-      if (c && abilitiesOf(c, a => a.kind === "triggered" && dropOnlyTrigger(a)).length) out.push({ unit: null, card: c, hostArea: "drop", selfRef: { k: "zone", side, area: "drop", idx: f.drop.lastIndexOf(id), id, card: c } });
+      if (c && abilitiesOf(c, a => a.kind === "triggered" && (dropOnlyTrigger(a) || a.fromDrop)).length) out.push({ unit: null, card: c, hostArea: "drop", selfRef: { k: "zone", side, area: "drop", idx: f.drop.lastIndexOf(id), id, card: c } });
     });
     return out;
   }

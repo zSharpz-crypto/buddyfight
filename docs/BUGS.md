@@ -323,3 +323,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch E: call/spell nullify counters #9 #1273 #1872 (ABX.castPending lets castBlock see the card being cast/called; castBlock enforces their timing rules). #5192 #6171 (counter-act call from hand) still open. Test: dead_batch_b.
 - Batch F: #5192 #6171 counter-act call from hand (parsed call op). Test: dead_batch_b. #6105 needs a drop-zone counter-act path (defense options only scan hand) - open.
 - Batch G: #2148 (isProtected wrapper consumes the Set spell; automatic, not optional; may be consumed by speculative checks). Test: dead_batch_b.
+- Batch H: #2545 (drop-zone trigger support: OV42 fromDrop:true + FROM_DROP_IDS + engine sources()). #1878 (needs destroy cause), #2269 (needs soulToDrop host data) still open.

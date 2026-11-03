@@ -926,6 +926,7 @@
           if (!o) continue;
           ab.kind = o.kind; ab.steps = o.steps; ab.unparsed = []; ab.parsed = true; ab.r42 = true;
           if (o.options) ab.options = o.options;
+          if (o.fromDrop) ab.fromDrop = true;
           if (o.costKind) ab.costKind = o.costKind;
           if (o.parts) ab.parts = o.parts;
           if (o.action) ab.action = o.action;
@@ -1230,13 +1231,15 @@
     (f.setSpells || []).forEach(c => out.push({ card: c, unit: null, host: null }));
     return out;
   };
+  const FROM_DROP_IDS = new Set([2545]);   // cards whose triggered ability works from the drop zone (fromDrop:true overrides)
+  const dropSources = (side) => { const seen = new Set(), out = []; F(side).drop.forEach(id => { if (seen.has(id) || !FROM_DROP_IDS.has(id)) return; seen.add(id); const c = core.cardOf(id); if (c) out.push({ card: c, unit: null, host: null, dropSrc: true }); }); return out; };
   const soulSources = (side) => {
     const out = [];
     core.fieldUnits(F(side), true).forEach(x => { if (x.unit) (x.unit.soul || []).forEach((id, idx) => { const c = core.cardOf(id); if (c) out.push({ card: c, unit: null, host: x.unit, idx, id }); }); });
     return out;
   };
   // run the abilities with trigger.event === ev on the given sources; `test(t, src)` decides whether the trigger matches
-  async function fireNew(side, ev, test, srcs) {
+  async function fireNew(side, ev, test, srcs, evData) {
     const f = F(side);
     for (const src of srcs) {
       for (const ab of core.abilitiesOf(src.card, a => a.kind === "triggered" && a.trigger && a.trigger.event === ev && ABX.isExecutable(a))) {
@@ -1244,11 +1247,12 @@
         if (!test(ab.trigger, src)) continue;
         const holder = src.unit || src.host;
         if (core.onceUsed(f, src.card, ab, holder)) continue;
-        const selfRef = src.host ? { k: "soul", side, unit: src.host, idx: Math.max(0, src.host.soul.indexOf(src.id)), id: src.id, card: src.card } : null;
-        const probe = { side, f, e: F(otherSide(side)), card: src.card, unit: src.unit || null, ab, soulHost: src.host || null, hostArea: src.host ? "soul" : "field", selfRef, bind: { chosen: src.host ? [{ k: "unit", side, unit: src.host, card: src.host.card, id: src.host.card.id }] : [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [] };
+        if (src.dropSrc && !ab.fromDrop) continue;
+        const selfRef = src.dropSrc ? { k: "zone", side, area: "drop", idx: f.drop.lastIndexOf(src.card.id), id: src.card.id, card: src.card } : src.host ? { k: "soul", side, unit: src.host, idx: Math.max(0, src.host.soul.indexOf(src.id)), id: src.id, card: src.card } : null;
+        const probe = { side, f, e: F(otherSide(side)), card: src.card, unit: src.unit || null, ab, soulHost: src.host || null, hostArea: src.dropSrc ? "drop" : src.host ? "soul" : "field", selfRef, bind: { chosen: src.host ? [{ k: "unit", side, unit: src.host, card: src.host.card, id: src.host.card.id }] : [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [] };
         if (!(ab.conds || []).every(c => core.evalCond(c, probe))) continue;
         core.markOnce(f, src.card, ab, holder);
-        await core.runAbility(side, src.card, ab, src.unit || null, { event: { name: ev }, hostArea: src.host ? "soul" : "field", soulHost: src.host || null, selfRef });
+        await core.runAbility(side, src.card, ab, src.unit || null, { event: { name: ev, cards: evData && evData.cards }, hostArea: src.dropSrc ? "drop" : src.host ? "soul" : "field", soulHost: src.host || null, selfRef });
         if (B.matchOver) return;
       }
     }
@@ -1666,7 +1670,7 @@
   }
   async function fire42(ev, data) {
     for (const side of ["plr", "opp"]) {
-      await fireNew(side, ev, (t, src) => matchEv(t, src, side, data), fieldSources(side).concat(soulSources(side)));
+      await fireNew(side, ev, (t, src) => matchEv(t, src, side, data), fieldSources(side).concat(soulSources(side), dropSources(side)), data);
       if (B.matchOver) return;
     }
   }
@@ -4146,6 +4150,14 @@
       };
     }
     OV42.push([2148, /when an item would leave your field by the effect of your opponent/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    // #2545 Ozon-C "Tag Along Resurrection": a size 1 or less "Ozon" monster enters from your drop zone -> may call this card from the drop zone (once per turn)
+    OPS.r42OzonRevive = { async run(s, ctx) {
+      const f = ctx.f, ev = ctx.event || {};
+      if (ctx.hostArea !== "drop" || !ctx.selfRef) return false;
+      if (!(ev.cards || []).some(c => c && c.type === "Monster" && (c.size || 0) <= 1 && /ozon/i.test(c.name || "") && c.id !== ctx.card.id)) return false;
+      if (!f.drop.includes(ctx.card.id)) return false;
+      return await OPS.call.run({ op: "call", np: { self: true, raw: "this card", qty: { n: 1 }, filter: {}, zone: { area: "drop zone" } }, pay: false }, ctx); }, check: () => true };
+    OV42.push([2545, /tag along resurrection/i, () => ({ kind: "triggered", fromDrop: true, once: "turn", trigger: { event: "enterFromDrop", owner: "you" }, conds: [], steps: [{ op: "r42OzonRevive" }] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
