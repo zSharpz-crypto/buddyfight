@@ -34,6 +34,26 @@
     const openPos = open(f)[0] || (typeof canPlaceSecondCenter === "function" && canPlaceSecondCenter(f, c) ? "center2" : null);
     let pos = opts.onTop ? posOfUnit(f, opts.onTop) : (opts.pos && !f.monsters[opts.pos] ? opts.pos : (opts.pos === "center" && f.monsters.center && typeof canPlaceSecondCenter === "function" && canPlaceSecondCenter(f, c) ? "center2" : openPos));
     if (!pos || pos === "item") return null;
+    // size limit (same rule as a normal call): a monster bigger than the limit is never called; if it doesn't fit, other monsters go to the drop zone.
+    // The monster it is called on top of leaves its zone, so its size doesn't count. size0 calls ("its size becomes 0") are exempt.
+    if (!opts.size0 && typeof getEffectiveCardSize === "function") {
+      const max = f.maxSize || 3, sz = getEffectiveCardSize(f, c);
+      if (sz > max) return null;
+      const hostSz = () => (opts.onTop ? getEffectiveCardSize(f, opts.onTop.card, opts.onTop) : 0);
+      const label = { left: "Left", center: "Center", right: "Right", center2: "Center (2nd)" };
+      for (let guard = 0; guard < 6 && B.getCurrentSizeUsed(f) - hostSz() + sz > max; guard++) {
+        const occ = ["left", "center", "right", "center2"].filter(p => f.monsters[p] && p !== pos);
+        if (!occ.length) return null;
+        let k = 0;
+        if (!auto(side) && ABX.ui && ABX.ui.pickCards) {
+          const idxs = await ABX.ui.pickCards({ title: `${c.name} — over your size limit: choose a monster to put into your drop zone`, subtitle: `Calling it needs ${B.getCurrentSizeUsed(f) - hostSz() + sz - max} more Size free.`, cards: occ.map(p => ({ card: f.monsters[p].card, badge: label[p] })), min: 1, max: 1 });
+          if (idxs && idxs[0] != null && occ[idxs[0]]) k = idxs[0];
+        }
+        const p = occ[k], u = f.monsters[p], retO = u.oppressedBy || side;
+        B.sendMonsterToDropWithAnimation(side, p, true);
+        if (ABX.fireLeave) ABX.fireLeave(retO, u.card, false, true);
+      }
+    }
     if (opts.pay) {
       const cost = callCost(f, c);
       if (f.gauge.length < (cost.gauge || 0) || (cost.life > 0 && f.life <= cost.life)) return null;
@@ -204,7 +224,7 @@
   OPS.r32Garga6562 = {
     async run(s, ctx) {
       const f = ctx.f, u = ctx.unit; if (!u || f.gauge.length < 1) return false;
-      const cands = zoneRefs(ctx.side, "drop", c => c.type === "Monster" && ((nameHas(c, "Garga") && sizeOf(c) === 2) || nameHas(c, "Destroyer")));
+      const cands = zoneRefs(ctx.side, "drop", c => c.type === "Monster" && ((nameHas(c, "Garga") && sizeOf(c) === 2) || nameHas(c, "Destroyer")) && sizeOf(c) <= (f.maxSize || 3));
       const ch = await pickN(cands, 1, ctx, `${ctx.card.name} — call on top of this card`);
       if (!ch[0]) return false;
       if (!auto(ctx.side) && !(await ABX.ui.confirm({ title: ctx.card.name, text: "Pay 1 gauge?" }))) return false;
