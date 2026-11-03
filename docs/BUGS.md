@@ -322,3 +322,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch D: #1151 (into Weapon soul at <=5 life) #6212 (final-phase soul drop -> damage) #128 (callBlockExtra size<=2 center). Open: #719 (spell goes to drop after cast, buddy-soul placement unverified), counters that nullify calls/spells (#9 #1273 #1872), #1687.
 - Batch E: call/spell nullify counters #9 #1273 #1872 (ABX.castPending lets castBlock see the card being cast/called; castBlock enforces their timing rules). #5192 #6171 (counter-act call from hand) still open. Test: dead_batch_b.
 - Batch F: #5192 #6171 counter-act call from hand (parsed call op). Test: dead_batch_b. #6105 needs a drop-zone counter-act path (defense options only scan hand) - open.
+- Batch G: #2148 (isProtected wrapper consumes the Set spell; automatic, not optional; may be consumed by speculative checks). Test: dead_batch_b.

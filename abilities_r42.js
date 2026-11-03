@@ -4130,6 +4130,22 @@
         if (!p2 || (p2.unparsed && p2.unparsed.length) || !p2.steps.length) return null;
         return { kind: "act", tags: ["act", "counter"], conds: [], steps: p2.steps };
       }]));
+    // #2148 Activate Barrier!: when an item would leave your field by the opponent's card effect, drop this Set spell -> the item stays
+    {
+      const prevIP = core.isProtected;
+      core.isProtected = function (unit, side, kind, ctx) {
+        if (prevIP.apply(this, arguments)) return true;
+        try {
+          const f = F(side);
+          if (unit && (unit === f.item || unit === f.item2) && ctx && ctx.side && ctx.side !== side && ["destroyed", "returned to hand", "put into the drop zone", "put into soul", "put into deck", "put to other areas"].includes(kind)) {
+            const i = (f.setSpells || []).findIndex(c => c && c.id === 2148);
+            if (i >= 0) { const c = f.setSpells.splice(i, 1)[0]; f.drop.push(c.id, ...(c.soul || [])); return true; }
+          }
+        } catch (e) { /* ignore */ }
+        return false;
+      };
+    }
+    OV42.push([2148, /when an item would leave your field by the effect of your opponent/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

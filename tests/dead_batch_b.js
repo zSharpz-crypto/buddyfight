@@ -97,5 +97,9 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   run(`fresh(); battle.plr.hand=[5192]; battle.plr.gauge=[21,22,23]; battle.plr.monsters.left=null; battle.plr.monsters.center=null; go(5192,'act',null,null,{selfRef:{k:'zone',side:'plr',area:'hand',idx:0,id:5192,card:card(5192)}})`); await settle();
   ck("5192: called from hand by paying cost", val(`return Object.values(battle.plr.monsters).some(u=>u&&u.card.id===5192)&&!battle.plr.hand.includes(5192)`), val(`return [Object.values(battle.plr.monsters).map(u=>u&&u.card.id),battle.plr.hand]`));
   ck("6171: act parsed as executable call", val(`const a=ab(6171,'act'); return !!a&&a.steps.some(s=>s.op==='call')&&ABX.isExecutable(a)`));
+  run(`fresh(); battle.plr.item={card:wp,rested:false,soul:[],tempCrit:0}; battle.plr.setSpells=[card(2148)]; globalThis.pr1=ABX.core.isProtected(battle.plr.item,'plr','destroyed',{side:'opp',card:card(21)}); globalThis.sl1=battle.plr.setSpells.length; globalThis.pr2=ABX.core.isProtected(battle.plr.item,'plr','destroyed',{side:'opp',card:card(21)})`);
+  ck("2148: item survives once, barrier dropped", val(`return pr1===true&&sl1===0&&pr2===false&&battle.plr.drop.includes(2148)`), val(`return [pr1,sl1,pr2]`));
+  run(`fresh(); battle.plr.item={card:wp,rested:false,soul:[],tempCrit:0}; battle.plr.setSpells=[card(2148)]; globalThis.pr3=ABX.core.isProtected(battle.plr.item,'plr','destroyed',{side:'plr',card:card(21)})`);
+  ck("2148: own effects do not trigger it", val(`return pr3===false&&battle.plr.setSpells.length===1`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
