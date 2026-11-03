@@ -1,0 +1,28 @@
+// node tests/link_attack.js - link/attack family: #2637 #870 #1154 #2783 #2554
+const { createEnv } = require("./headless.js");
+let pass = 0, fail = 0;
+const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : JSON.stringify(extra ?? "")); };
+const env = createEnv(); const run = (c) => env.run('{' + c + '\n}'); const val = (c) => env.run('(function(){' + c + '\n})()');
+const settle = async () => { for (let i = 0; i < 60; i++) { env.flush(); await new Promise(r => setTimeout(r, 2)); } };
+env.run(`ABX.fast=true; ABX.autoPlay=true; globalThis.card=id=>window.BUDDYFIGHT_CARDS.find(c=>c.id===id);
+globalThis.mk=(id)=>({card:card(id),rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0});
+globalThis.fresh=function(){ battle.start('hotseat', generateFlagDeck(447,'T',571,true), generateFlagDeck(447,'O',571,true)); battle.renderBattle=function(){}; ['plr','opp'].forEach(sd=>{const f=battle.getFighter(sd); ['left','center','right'].forEach(p=>f.monsters[p]=null); f.item=null;f.item2=null;f.life=10;}); };
+globalThis.trig=(id,ev)=>ABX.get(card(id)).abilities.find(a=>a.kind==='triggered'&&a.trigger&&a.trigger.event===ev);
+globalThis.go=(id,ev,unit)=>ABX.runAbility('plr',card(id),trig(id,ev),unit||null,{});`);
+(async () => {
+  run(`fresh(); battle.opp.deck=[11,12,13,14]; globalThis.d0=battle.opp.drop.length; globalThis.u=mk(2637); battle.plr.monsters.center=u; go(2637,'attackDestroys',u)`); await settle();
+  ck("2637: opp deck top 2 -> opp drop", val(`return battle.opp.drop.length-d0===2&&battle.opp.deck.length===2`), val(`return [battle.opp.drop.length-d0,battle.opp.deck.length]`));
+  run(`fresh(); globalThis.u=mk(870); battle.plr.monsters.center=u; battle.plr.item=mk(46); battle.opp.item=mk(46); go(870,'attack',u)`); await settle();
+  ck("870: crit + sum of both items' crit", val(`return u.tempCrit===card(46).crit*2`), val(`return [u.tempCrit,card(46).crit]`));
+  run(`fresh(); globalThis.u=mk(1154); battle.plr.monsters.center=u; globalThis.e=mk(1); battle.opp.monsters.center=e; go(1154,'attacked',u)`); await settle();
+  ck("1154: opp cards' Penetrate nullified this turn", val(`return ABX.kwNullified(e,'penetrate')`));
+  run(`fresh(); globalThis.u=mk(2783); battle.plr.monsters.center=u; battle.plr.deck=[1,2]; battle.opp.deck=[1,2]; go(2783,'attackDestroys',u)`); await settle();
+  ck("2783: both fighters mill 1", val(`return battle.plr.deck.length===1&&battle.opp.deck.length===1`));
+  run(`fresh(); globalThis.mon=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'); battle.plr.deck=[mon.id,2]; battle.opp.deck=[mon.id,2]; globalThis.u=mk(2783); battle.plr.monsters.center=u; go(2783,'attackDestroys',u)`); await settle();
+  ck("2783: milled monster -> 2 damage to that fighter", val(`return battle.plr.life===8&&battle.opp.life===8`), val(`return [battle.plr.life,battle.opp.life]`));
+  run(`fresh(); globalThis.u=mk(2554); battle.plr.item=u; battle.plr.item2=mk(2553); battle.opp.monsters.left=mk(ALL_CARDS.find(x=>x.type==='Monster'&&x.size===1&&!x.skill).id); go(2554,'link',u)`); await settle();
+  ck("2554 with Eskamal equipped: destroys opp monster/item", val(`return !battle.opp.monsters.left`));
+  run(`fresh(); globalThis.u=mk(2554); battle.plr.item=u;`);
+  ck("2554 without Eskamal: condition false", val(`return !ABX.core.evalCond(trig(2554,'link').conds[0],{side:'plr',f:battle.plr,e:battle.opp,card:card(2554),unit:u,bind:{}})`));
+  console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
+})();

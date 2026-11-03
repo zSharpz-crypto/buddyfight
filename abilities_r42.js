@@ -3370,4 +3370,49 @@
   }
 
   TG(2536, "when this card is put into your drop zone from your field or hand", LEAVE_SELF, "Put the top two cards of your deck into your drop zone and put the top card of your deck into your gauge.", { also: [{ event: "discardedFromHand", self: true }] });
+
+  /* link/attack family: #2637 mill opp on kill, #870 crit from items, #1154 nullify Penetrate, #2783 Spectral Strike, #2554 destroy */
+  {
+    const stOf = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    OPS.r42ItemCritBoost = {
+      run(s, ctx) {
+        const items = [F("plr").item, F("plr").item2, F("opp").item, F("opp").item2].filter(Boolean);
+        const n = items.reduce((a, u) => a + (Number(u.card && u.card.crit) || 0), 0);
+        if (ctx.unit && n) ctx.unit.tempCrit = (ctx.unit.tempCrit || 0) + n;
+        fresh();
+        return n > 0;
+      }
+    };
+    OPS.r42NullPenOpp = {
+      run(s, ctx) {
+        const es = otherSide(ctx.side);
+        core.fieldUnits(F(es), true).forEach(r => { if (r.unit) { r.unit.abxNoKw = r.unit.abxNoKw || {}; r.unit.abxNoKw.penetrate = B.turnCount; } });
+        fresh();
+        return true;
+      }
+    };
+    OPS.r42SpectralStrike = {
+      async run(s, ctx) {
+        for (const sd of [ctx.side, otherSide(ctx.side)]) {
+          const f = F(sd);
+          if (!f.deck.length) continue;
+          const id = f.deck.shift();
+          f.drop.push(id);
+          const c = core.cardOf(id);
+          if (c && c.type === "Monster") core.applyDamage(sd, 2, { kind: "effect", sourceCard: ctx.card });
+          else f.life += 2;
+        }
+        fresh();
+        return true;
+      }
+    };
+    const eqHas = (n) => has({ names: [n], namesExact: [n] }, "field");
+    TG(2553, "when this card link attacks with another", { event: "link", self: true, with: NPT("another «Knight»") }, "Deal 1 damage to your opponent!", { conds: [eqHas("thunder beast spear, bestia")] });
+    TG(2554, "when this card link attacks with another", { event: "link", self: true, with: NPT("another «Knight»") }, "Destroy a monster or item on your opponent's field.", { conds: [eqHas("wind scaled spear, eskamal")] });
+    const keepTrig = (steps) => (ab) => steps && { kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps };
+    OV42.push([2637, /put the top two cards of your opponent's deck/i, keepTrig(stOf("Put the top two cards of your opponent's deck into their drop zone."))]);
+    OV42.push([870, /increase the critical of this card by the sum/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42ItemCritBoost" }] })]);
+    OV42.push([1154, /nullify the \[penetrate\] of all cards/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42NullPenOpp" }] })]);
+    OV42.push([2783, /all fighters put the top card/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42SpectralStrike" }] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);
