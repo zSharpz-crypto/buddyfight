@@ -67,6 +67,9 @@
         else if ((m = p.match(/^put (?:this|it)(?: card)? on top of (?:a |an )?(.+?) you are \[(?:transform|ride|station)\](?: into| on| at| as)?(?: on your field)?$/i)) ||
                  (m = p.match(/^put (?:this|it)(?: card)? on top of your equipped (.+)$/i)))
           out.parts.push({ kind: "onTopItem", np: /^card$/i.test(m[1].trim()) ? null : NP(m[1]), raw: p });
+        // "Put a card with "X" in its card name from your field into the drop zone" (monster or item on your field)
+        else if ((m = p.match(/^put (?:a |an |one )?(.+?) from your field into (?:the|your) drop zone$/i)))
+          out.parts.push({ kind: "fieldToDrop", np: NP(m[1]), raw: p });
         // "Discard / Drop a «X» from your hand"
         else if ((m = p.match(/^(?:discard|drop) (?:a |an |one )?(.+?) from your hand$/i)))
           out.parts.push({ kind: "discard", np: NP(m[1]), raw: p });
@@ -97,6 +100,12 @@
     return null;
   }
 
+  // a field card (monster zone first, then the item) matching a "put X from your field into the drop zone" cost part
+  function fieldDropPick(f, p) {
+    for (const pos of ["left", "center", "right"]) { const u = f.monsters[pos]; if (u && (!p.np || matchFilter(u.card, p.np.filter || {}, null, { f }))) return { pos, unit: u }; }
+    if (f.item && !f.item.isEndrulerFlag && (!p.np || matchFilter(f.item.card, p.np.filter || {}, null, { f }))) return { item: true, unit: f.item };
+    return null;
+  }
   // can `side` pay this card's mode cost right now? -> { ok, reasons, cost }
   function canModeEquip(side, card, byEffect) {
     const f = F(side), cost = modeCost(card), reasons = [];
@@ -109,6 +118,7 @@
       if ((p.kind === "returnItem" && !p.optional) || p.kind === "itemToDrop" || p.kind === "onTopItem") {
         if (!itemMatches(f, p.np)) reasons.push(`You must be [${MODES[cost.mode]}] into ${p.np && p.np.raw ? p.np.raw : "the required card"}`);
       }
+      if (p.kind === "fieldToDrop" && !fieldDropPick(f, p)) reasons.push(`You need ${p.np && p.np.raw ? p.np.raw : "a card"} on your field`);
       if (p.kind === "discard" && !discardPick(f, card, p)) reasons.push(`You need ${p.np && p.np.raw ? p.np.raw : "a card"} in your hand to discard`);
     });
     return { ok: reasons.length === 0, reasons, cost };
@@ -141,6 +151,7 @@
       if (cost && !free) {
         for (let i = 0; i < cost.gauge; i++) f.drop.push(f.gauge.pop());
         if (cost.life > 0) f.life = Math.max(1, f.life - cost.life);
+        parts.filter(p => p.kind === "fieldToDrop").forEach(p => { const d = fieldDropPick(f, p); if (!d) return; if (d.item) { /* the ridden item is handled below as the old item */ } else { f.drop.push(d.unit.card.id); (d.unit.soul || []).forEach(sid => f.drop.push(sid && sid.id ? sid.id : sid)); f.monsters[d.pos] = null; } });
         parts.filter(p => p.kind === "discard").forEach(p => { const d = discardPick(f, c, p); if (d) f.drop.push(f.hand.splice(d.idx, 1)[0]); });
       }
       const soul = [];

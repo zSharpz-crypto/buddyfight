@@ -25,5 +25,10 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("2152 act: D-Wing ridden from deck, old Burn + Wyvern dropped", val(`return battle.plr.item&&battle.plr.item.card.id===2107 && battle.plr.drop.includes(950) && battle.plr.drop.includes(2152) && !battle.plr.monsters.center`), val(`return [battle.plr.item&&battle.plr.item.card.id, battle.plr.drop, battle.plr.monsters.center&&battle.plr.monsters.center.card.id]`));
   run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(2152)); me.deck.unshift(2107); ABX.useAct('plr',CARD_MAP.get(2152),me.monsters.center); }`); await settle();
   ck("2152 act when not riding Burn: nothing", val(`return battle.plr.monsters.center&&battle.plr.monsters.center.card.id===2152 && !battle.plr.item`), val(`return [battle.plr.item]`));
+  // #6216 Paal Combi: [Ride] cost = put a "Card Burn" card from your field into the drop zone & pay 4 gauge
+  run(`{ const me=setup(); me.monsters.left=mk(CARD_MAP.get(943)); me.hand=[6216]; globalThis.__g=me.gauge.length; globalThis.__r=battle.equipCardFromHand('plr',0,'Ride'); }`); await settle();
+  ck("6216 ride with Card Burn on field: ridden, Burn dropped, 4 gauge paid", val(`return battle.plr.item&&battle.plr.item.card.id===6216 && !battle.plr.monsters.left && battle.plr.drop.includes(943) && battle.plr.gauge.length===__g-4`), val(`return [battle.plr.item&&battle.plr.item.card.id, battle.plr.monsters.left&&battle.plr.monsters.left.card.id, battle.plr.drop, battle.plr.gauge.length, __g]`));
+  run(`{ const me=setup(); me.hand=[6216]; battle.equipCardFromHand('plr',0,'Ride'); }`); await settle();
+  ck("6216 ride without Card Burn: refused", val(`return !battle.plr.item && battle.plr.hand.includes(6216)`), val(`return [battle.plr.item, battle.plr.hand]`));
   console.log("pass", pass, "fail", fail);
 })();
