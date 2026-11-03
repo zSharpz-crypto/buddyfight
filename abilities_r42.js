@@ -4122,6 +4122,14 @@
       if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, ch[0].card);
       fresh(); return true; }, check: () => true };
     OV42.push([1872, /when your opponent casts a spell and you have a/i, () => ({ kind: "triggered", tags: ["counter"], once: "turn", trigger: { event: "oppCast", np: { raw: "a spell", qty: { n: 1 }, filter: { types: ["spell"] }, zone: null } }, conds: [{ t: "gauge", who: "you", n: 1, cmp: "ge" }], steps: [{ op: "r42SolNullify" }, { op: "nullifyCast", what: "spell", gate: "ifYouDo" }] })]);
+    // #5192 Vermouth / #6171 Sync: [Counter] [Act] call this card from your hand (with or without paying)
+    [[5192, /call this card from your hand by paying its \[call cost\]/i, "call this card from your hand by paying its [Call Cost]"],
+     [6171, /call this card on top of a .mystic knight. monster/i, "call this card on top of a \u00abMystic Knight\u00bb monster with power 9000 or greater on your field without paying its [Call Cost]"]]
+      .forEach(([id, re, txt]) => OV42.push([id, re, () => {
+        const p2 = ABX.parseSentenceSteps(txt, {});
+        if (!p2 || (p2.unparsed && p2.unparsed.length) || !p2.steps.length) return null;
+        return { kind: "act", tags: ["act", "counter"], conds: [], steps: p2.steps };
+      }]));
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

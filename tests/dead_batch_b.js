@@ -94,5 +94,8 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("1273: nullifies a call", val(`return nl===true`));
   run(`fresh(); battle.plr.monsters.left=mk(1873); battle.plr.hand=[42]; battle.plr.gauge=[21,22]; ABX.castCtx={active:true,side:'opp',card:card(21),kind:'spell',nullified:false}; go(1872,'triggered','oppCast',null)`); await settle(); run(`globalThis.nl2=ABX.castCtx.nullified; ABX.castCtx=null`);
   ck("1872: discards Wizard + 1 gauge, nullifies spell", val(`return nl2===true&&battle.plr.drop.includes(42)&&battle.plr.gauge.length===1`), val(`return [nl2,battle.plr.hand,battle.plr.gauge.length]`));
+  run(`fresh(); battle.plr.hand=[5192]; battle.plr.gauge=[21,22,23]; battle.plr.monsters.left=null; battle.plr.monsters.center=null; go(5192,'act',null,null,{selfRef:{k:'zone',side:'plr',area:'hand',idx:0,id:5192,card:card(5192)}})`); await settle();
+  ck("5192: called from hand by paying cost", val(`return Object.values(battle.plr.monsters).some(u=>u&&u.card.id===5192)&&!battle.plr.hand.includes(5192)`), val(`return [Object.values(battle.plr.monsters).map(u=>u&&u.card.id),battle.plr.hand]`));
+  ck("6171: act parsed as executable call", val(`const a=ab(6171,'act'); return !!a&&a.steps.some(s=>s.op==='call')&&ABX.isExecutable(a)`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
