@@ -3961,6 +3961,32 @@
     OV42.push([3662, /you gain life equal to this card.s critical/i, () => ({ kind: "triggered", trigger: { event: "attackDestroys", self: true }, conds: [], also: [{ event: "dealsDamage", self: true }], steps: [{ op: "r42LifeCrit" }] })]);
     // #5433: at the end of a battle in which a Hello, Happy World character with this card in its soul attacked -> +2 life
     TG(5433, "at the end of the battle", { event: "battleEnd", attFilter: { tribes: ["HelloHappyWorld"], soul: true } }, "you gain 2 life");
+    // #2368 Ogar: pay up to 5 life -> this item gets critical equal to the life paid (once per turn)
+    OPS.r42LifeForCrit = { async run(s, ctx) {
+      const f = ctx.f, it = ctx.unit || f.item; if (!it) return false;
+      let n = 0;
+      if (!ABX.autoPlay && !f.isBot && ABX.ui && ABX.ui.pickOption) {
+        const max = Math.min(5, Math.max(0, f.life - 1));
+        const opts = []; for (let i = 0; i <= max; i++) opts.push({ label: i === 0 ? "Pay no life" : "Pay " + i + " life" });
+        const j = await ABX.ui.pickOption({ title: ctx.card.name + " \u2014 pay up to five life", options: opts });
+        n = Math.max(0, Math.min(max, +j || 0));
+      }
+      if (!n) return false;
+      f.life -= n; it.tempCrit = (it.tempCrit || 0) + n; fresh(); return true; }, check: () => true };
+    OV42.push([2368, /pay up to five life/i, () => ({ kind: "act", tags: ["act", "counter"], once: "turn", conds: [], steps: [{ op: "r42LifeForCrit" }] })]);
+    // #3289: attack phase start -> up to one drop card into this card's soul or your gauge
+    OPS.r42DropSoulOrGauge = { async run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u || !f.drop.length) return false;
+      const cands = f.drop.map((id, idx) => ({ k: "zone", side: ctx.side, area: "drop", idx, id, card: core.cardOf(id) })).filter(x => x.card);
+      const ch = (await core.pick(cands, { qty: { n: 1, upTo: true }, raw: "up to one card from your drop zone" }, ctx, { intent: "move", title: ctx.card.name + " \u2014 drop card to soul or gauge" })) || [];
+      if (!ch.length) return false;
+      let toGauge = false;
+      if (!ABX.autoPlay && !f.isBot && ABX.ui && ABX.ui.pickOption) toGauge = (await ABX.ui.pickOption({ title: ctx.card.name, subtitle: "Put it into this card's soul or your gauge?", options: ["Soul", "Gauge"] })) === 1;
+      const i = f.drop.indexOf(ch[0].id); if (i < 0) return false;
+      const id = f.drop.splice(i, 1)[0];
+      if (toGauge) f.gauge.push(id); else (u.soul = u.soul || []).push(id);
+      fresh(); return true; }, check: () => true };
+    OV42.push([3289, /put up to one card from your drop zone into this card.s soul or your gauge/i, () => ({ kind: "triggered", trigger: { event: "phaseStart", phase: "attack", who: "you" }, conds: [], steps: [{ op: "r42DropSoulOrGauge" }] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

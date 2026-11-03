@@ -42,5 +42,10 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("3662: gain life = critical", val(`return battle.plr.life===4+(getUnitEffectiveCombatStats(battle.plr,u2).crit)`), val(`return battle.plr.life`));
 
   ck("5433: battleEnd trigger parsed (+2 life)", val(`const a=ab(5433,'triggered','battleEnd'); return !!a&&JSON.stringify(a.steps).includes('life')&&!!a.trigger.attFilter`));
+  run(`fresh(); battle.plr.life=10; ABX.autoPlay=false; ABX.ui=ABX.ui||{}; globalThis.__po=ABX.ui.pickOption; ABX.ui.pickOption=async()=>3; globalThis.it=mk(21); battle.plr.item={card:card(2368),rested:false,soul:[],tempCrit:0}; go(2368,'act',null,battle.plr.item)`); await settle();
+  ck("2368: pay 3 life -> +3 critical", val(`return battle.plr.life===7&&battle.plr.item.tempCrit===3`), val(`return [battle.plr.life,battle.plr.item.tempCrit]`));
+  run(`ABX.ui.pickOption=__po; ABX.autoPlay=true`);
+  run(`fresh(); globalThis.u3=mk(3289); battle.plr.monsters.center=u3; battle.plr.drop=[21,22]; go(3289,'triggered','phaseStart',u3)`); await settle();
+  ck("3289: drop card goes into soul (auto)", val(`return u3.soul.length===1&&battle.plr.drop.length===1`), val(`return [u3.soul,battle.plr.drop]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
