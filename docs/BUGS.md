@@ -310,3 +310,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch 4 (#3103 #3104): abilities_r42.js, tests/dead_batch2.js.
 - Link/attack batch 5 (#291 #292 #296 #1351 #3242 #5436): abilities_r42.js, tests/secret_sword.js. #1351 does not enforce the 'must be Ride' cast rule.
 - Link/attack batch 6 (#3664 #1546 #2014): abilities_r42.js, tests/secret_sword.js. Not built: #6445 (item Counterattack semantics unclear), #5368 'separate areas' line.
+- Draw/hand last two (#3566 Spectral Strike damage hook, #5552 returns to hand when milled by opp): abilities_r42.js, tests/secret_sword.js. #3566 matches any damage dealt while a card with a "Spectral Strike" ability is running; #5552 returns automatically (no optional prompt).

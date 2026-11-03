@@ -8,6 +8,7 @@ env.run(`ABX.fast=true; ABX.autoPlay=true; globalThis.card=id=>window.BUDDYFIGHT
 globalThis.mk=(id)=>({card:card(id),rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0});
 globalThis.fresh=function(){ battle.start('hotseat', generateFlagDeck(447,'T',571,true), generateFlagDeck(447,'O',571,true)); battle.renderBattle=function(){}; ['plr','opp'].forEach(sd=>{const f=battle.getFighter(sd); ['left','center','right'].forEach(p=>f.monsters[p]=null); f.item=null;f.item2=null;f.life=10;f.setSpells=[];f.hand=[];f.drop=[];f.gauge=[1,2,3,4,5,6]}); };
 globalThis.setSS=(id)=>{ battle.plr.setSpells=[Object.assign({},card(290),{soul:[id]})]; };
+globalThis.go=(id,ev,unit)=>ABX.runAbility('plr',card(id),ABX.get(card(id)).abilities.find(a=>a.kind==='triggered'&&a.trigger&&a.trigger.event===ev),unit||null,{});
 globalThis.big=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.power>=5000&&c.size<=3&&!c.skill);
 globalThis.small=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.power<=3000&&c.size===1&&!c.skill);`);
 (async () => {
@@ -44,5 +45,13 @@ globalThis.small=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.power<=30
   // #2014 Cerberus
   run(`fresh(); globalThis.cu=mk(2014); battle.plr.monsters.center=cu; globalThis.wpn=mk(window.BUDDYFIGHT_CARDS.find(c=>c.type==='Item'&&(c.attrs||[]).includes('Weapon')).id); wpn.rested=true; battle.plr.item=wpn; battle.plr.drop=[7,8]; ABX.fireBattleEnd('plr',[{unit:cu}])`); await settle();
   ck("2014: Weapon stood, Cerberus + a drop card are in its soul", val(`return !wpn.rested&&!battle.plr.monsters.center&&wpn.soul.includes(2014)&&wpn.soul.length===2&&battle.plr.drop.length===1`), val(`return [wpn.rested,wpn.soul,battle.plr.drop]`));
+  // #3566 Phantom Getter
+  run(`fresh(); battle.plr.setSpells=[card(3566)]; battle.opp.hand=[7,8,9]; battle.plr.hand=[]; battle.plr.deck=[21,22]; globalThis.u=mk(2783); battle.plr.monsters.center=u; battle.plr.deck=[21,22]; battle.opp.deck=[card(2783).id]; go(2783,'attackDestroys',u)`); await settle();
+  ck("3566: Spectral Strike damage -> opp discards random card, I draw", val(`return battle.opp.hand.length===2&&battle.plr.hand.length>=1`), val(`return [battle.opp.hand.length,battle.plr.hand.length,battle.opp.life]`));
+  // #5552 Promise of Rainbow
+  run(`fresh(); battle.plr.deck=[5552,22,23]; battle.plr.hand=[]; ABX.OPS.tmill={run(s,ctx){ const f=battle.plr; f.drop.push(f.deck.shift()); return true; }}; ABX.core.runAbility('opp',card(2783),{kind:'spell',steps:[{op:'tmill'}]},null,{})`); await settle();
+  ck("5552: milled by the opponent's effect -> returns to my hand", val(`return battle.plr.hand.includes(5552)&&!battle.plr.drop.includes(5552)`), val(`return [battle.plr.hand,battle.plr.drop]`));
+  run(`fresh(); battle.plr.deck=[5552,22,23]; battle.plr.hand=[]; ABX.core.runAbility('plr',card(2783),{kind:'spell',steps:[{op:'tmill'}]},null,{})`); await settle();
+  ck("5552: milled by my own effect -> stays in drop", val(`return battle.plr.drop.includes(5552)&&!battle.plr.hand.includes(5552)`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

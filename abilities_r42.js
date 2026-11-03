@@ -1674,6 +1674,8 @@
       const b = before[owner], a = snapSide(owner);
       const dropGain = msDiff(a.drop, b.drop), d2d = inter(msDiff(b.deck, a.deck), dropGain);
       if (d2d.length) evs.push(["deckToDrop", { owner, actor, cards: d2d.map(core.cardOf) }]);
+      // #5552 Promise of Rainbow: put into the drop zone from your deck by your opponent's card effects -> may put it into your hand
+      if (actor && actor !== owner && d2d.includes(5552)) { const of = F(owner), di = of.drop.lastIndexOf(5552); if (di >= 0) { of.hand.push(of.drop.splice(di, 1)[0]); fresh(); } }
       const disc = inter(msDiff(b.hand, a.hand), msDiff(dropGain, d2d));
       if (disc.length) evs.push(["handDiscard", { owner, actor, cards: disc.map(core.cardOf) }]);
       const back = inter(msDiff(b.field, a.field), msDiff(a.hand, b.hand));
@@ -3769,4 +3771,32 @@
     }
   };
   OV42.push([2014, /at the end of the attack of this card/i, () => ({ kind: "triggered", trigger: { event: "battleEnd", self: true }, conds: [], optional: true, steps: [{ op: "r42CerberusSoul" }] })]);
+
+  /* #3566 Phantom Getter ([Set]): when the opponent receives damage from a "Spectral Strike" ability, they discard a random hand card; if you do, draw (once per turn) */
+  {
+    const prevAD = core.applyDamage;
+    core.applyDamage = function (side, n, src) {
+      const dealt = prevAD.apply(this, arguments);
+      try {
+        const top = (ABX.srcStack || [])[(ABX.srcStack || []).length - 1];
+        const card = (src && src.sourceCard) || top;
+        if (dealt > 0 && card && /"spectral strike"/i.test(String(card.skill || ""))) {
+          const owner = otherSide(side), of = F(owner);
+          if ((of.setSpells || []).some(c => c && c.id === 3566) && of.r42PhantomTurn !== B.turnCount) {
+            const df = F(side);
+            if (df.hand.length) {
+              of.r42PhantomTurn = B.turnCount;
+              const id = df.hand.splice(Math.floor(Math.random() * df.hand.length), 1)[0];
+              df.drop.push(id);
+              if (ABX.fireDiscarded) ABX.fireDiscarded(side, core.cardOf(id));
+              if (of.deck.length) of.hand.push(of.deck.shift());
+              fresh();
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return dealt;
+    };
+  }
+  OV42.push([5552, /put into the drop zone from your deck by your opponent's card effects/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
 })(typeof window !== "undefined" ? window : globalThis);
