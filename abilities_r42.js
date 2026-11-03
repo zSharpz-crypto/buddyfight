@@ -4043,6 +4043,15 @@
         const r = prevCBb ? prevCBb.apply(this, arguments) : null;
         if (r) return r;
         try {
+          const cc = ABX.castPending || ABX.castCtx;
+          if (card && card.id === 9 && !(cc && cc.side !== (fighter === B.plr ? "plr" : "opp") && cc.kind === "call" && (cc.card.size || 0) <= 2)) return `"${card.name}" can only be cast when your opponent calls a size 2 or less monster`;
+          if (card && card.id === 1273) {
+            const me = fighter === B.plr ? "plr" : "opp";
+            const ok = cc && cc.side !== me && ((cc.kind === "call" && (cc.card.size || 0) === 3) || cc.kind === "spell");
+            if (!ok) return `"${card.name}" can only be cast when your opponent calls a size 3 monster or casts a spell`;
+            if (core.fieldUnits(fighter, false).filter(x => x.unit && x.unit.card && hasTribe(x.unit.card, "WydarSarkal")).length < 2) return `"${card.name}" needs two or more Wydar Sarkal on your field`;
+            if (fighter.r42TrollTurn === B.turnCount) return `"${card.name}" can only be cast once per turn`;
+          }
           if (card && card.id === 765 && B.phase === "final") return `"${card.name}" cannot be cast during a final phase`;
           if (card && card.id === 3904 && Object.values(fighter.monsters || {}).some(Boolean)) return `"${card.name}" can only be cast with no monsters on your field`;
           if (card && card.id === 1141 && core.fieldUnits(fighter, false).filter(x => x.unit && x.unit.card && x.unit.card.type === "Monster" && (x.unit.card.attrs || []).some(a => /^blackdragon$/i.test(a))).length < 2) return `"${card.name}" needs two or more Black Dragon on your field`;
@@ -4087,6 +4096,32 @@
       for (let i = 0; i < n; i++) f.drop.push(u.soul.pop());
       core.applyDamage(ctx.side === "plr" ? "opp" : "plr", n, { kind: "effect" }); fresh(); return true; }, check: () => true };
     OV42.push([6212, /during your final phase, you may drop any number of souls/i, () => ({ kind: "act", tags: ["act", "counter"], once: "turn", conds: [], steps: [{ op: "r42DropSoulsDamage" }] })]);
+    {
+      const prevCW = ABX.castWindow;
+      ABX.castWindow = async function (casterSide, card, kind) {
+        const prev = ABX.castPending;
+        ABX.castPending = { side: casterSide, card, kind };
+        try { return await prevCW.apply(this, arguments); } finally { ABX.castPending = prev; }
+      };
+    }
+    OV42.push([9, /you may only cast this card when an opponent calls/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    // #9 Begone!! / #1273 Annoying Ways of the Troll: nullify a call (and a spell for #1273)
+    OV42.push([9, /^\[?counter\]? ?nullify the call/i, () => ({ kind: "spell", steps: [{ op: "nullifyCast", what: "call" }] })]);
+    OPS.r42TrollMark = { run(s, ctx) { ctx.f.r42TrollTurn = B.turnCount; return true; }, check: () => true };
+    OV42.push([1273, /if there are two or more wydar sarkal on your field, nullify/i, () => ({ kind: "spell", steps: [{ op: "r42TrollMark" }, { op: "nullifyCast", what: "call" }, { op: "nullifyCast", what: "spell" }] })]);
+    // #1872 Sol: opponent casts a spell, with Luna on your field: discard a Wizard + pay 1 gauge -> nullify (once per turn)
+    OPS.r42SolNullify = { async run(s, ctx) {
+      const f = ctx.f;
+      if (!core.fieldUnits(f, true).some(x => x.unit && x.unit.card.id === 1873) || f.gauge.length < 1) return false;
+      const cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(x => x.card && (x.card.attrs || []).some(a => /^wizard$/i.test(a)));
+      if (!cands.length) return false;
+      const ch = (await core.pick(cands, { qty: { n: 1, upTo: false }, raw: "a Wizard from your hand" }, ctx, { intent: "cost", title: ctx.card.name + " \u2014 discard a Wizard" })) || [];
+      if (!ch.length) return false;
+      const i = f.hand.indexOf(ch[0].id); if (i < 0) return false;
+      f.drop.push(f.hand.splice(i, 1)[0]); f.drop.push(f.gauge.pop());
+      if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, ch[0].card);
+      fresh(); return true; }, check: () => true };
+    OV42.push([1872, /when your opponent casts a spell and you have a/i, () => ({ kind: "triggered", tags: ["counter"], once: "turn", trigger: { event: "oppCast", np: { raw: "a spell", qty: { n: 1 }, filter: { types: ["spell"] }, zone: null } }, conds: [{ t: "gauge", who: "you", n: 1, cmp: "ge" }], steps: [{ op: "r42SolNullify" }, { op: "nullifyCast", what: "spell", gate: "ifYouDo" }] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

@@ -85,5 +85,14 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("6212: drop 3 souls -> 3 damage", val(`return nm.soul.length===0&&battle.opp.life===7`), val(`return [nm.soul.length,battle.opp.life]`));
   run(`fresh(); battle.plr.setSpells=[card(128)]; globalThis.cs=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.size<=2); globalThis.cb7=ABX.callBlockExtra('plr',cs,'center'); globalThis.cb8=ABX.callBlockExtra('plr',cs,'left')`);
   ck("128: size<=2 blocked at center only", val(`return !!cb7&&!cb8`), val(`return [cb7,cb8]`));
+  run(`fresh(); battle.plr.hand=[9,1273]; globalThis.small=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.size<=2); globalThis.big=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.size===4); battle.plr.gauge=[21,22,23,24,25]; globalThis.nulled=null`);
+  run(`globalThis.p1=null; ABX.castPending={side:'opp',card:small,kind:'call'}; globalThis.b9a=ABX.core.castBlock(battle.plr,card(9)); ABX.castPending={side:'opp',card:big,kind:'call'}; globalThis.b9b=ABX.core.castBlock(battle.plr,card(9)); ABX.castPending=null; globalThis.b9c=ABX.core.castBlock(battle.plr,card(9))`);
+  ck("9: castable only vs a size<=2 call", val(`return !b9a&&!!b9b&&!!b9c`), val(`return [b9a,b9b,b9c]`));
+  run(`globalThis.ws=window.BUDDYFIGHT_CARDS.filter(c=>c.type==='Monster'&&(c.attrs||[]).includes('WydarSarkal')).slice(0,2); ABX.castPending={side:'opp',card:card(21),kind:'spell'}; globalThis.t1=ABX.core.castBlock(battle.plr,card(1273)); battle.plr.monsters.left=mk(ws[0].id); battle.plr.monsters.right=mk((ws[1]||ws[0]).id); globalThis.t2=ABX.core.castBlock(battle.plr,card(1273)); ABX.castPending=null`);
+  ck("1273: needs two Wydar Sarkal", val(`return !!t1&&!t2`), val(`return [t1,t2,ws.length]`));
+  run(`fresh(); ABX.castCtx={active:true,side:'opp',card:card(21),kind:'call',nullified:false}; go(1273,'spell')`); await settle(); run(`globalThis.nl=ABX.castCtx.nullified; ABX.castCtx=null`);
+  ck("1273: nullifies a call", val(`return nl===true`));
+  run(`fresh(); battle.plr.monsters.left=mk(1873); battle.plr.hand=[42]; battle.plr.gauge=[21,22]; ABX.castCtx={active:true,side:'opp',card:card(21),kind:'spell',nullified:false}; go(1872,'triggered','oppCast',null)`); await settle(); run(`globalThis.nl2=ABX.castCtx.nullified; ABX.castCtx=null`);
+  ck("1872: discards Wizard + 1 gauge, nullifies spell", val(`return nl2===true&&battle.plr.drop.includes(42)&&battle.plr.gauge.length===1`), val(`return [nl2,battle.plr.hand,battle.plr.gauge.length]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
