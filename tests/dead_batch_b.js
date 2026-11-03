@@ -105,5 +105,9 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
     ABX.core.runAbility('plr',card(21),{kind:'spell',steps:[{op:'call',np:ABX.parseNP('up to one size 1 or less monster with "Ozon" in its card name from your drop zone')}]},null,{})`); await settle();
   globalThis.__ids = val(`return Object.values(battle.plr.monsters).filter(Boolean).map(u=>u.card.id)`);
   ck("2545: Ozon-C revives from drop when an Ozon enters from drop", __ids.includes(oz_id=val(`return oz.id`))&&__ids.includes(2545), [__ids, val(`return battle.plr.drop`)]);
+  run(`fresh(); battle.plr.drop=[1878]; battle.plr.monsters.left=null; battle.plr.monsters.center=null; battle.plr.monsters.right=null; battle.plr.gauge=[21,22,23]; globalThis.vic=mk(21); vic.abxDestroyedBy='plr'; B=battle; battle._destroyByAttack=false; ABX.fireOtherDestroyed('opp',card(21),vic,'left')`); await settle();
+  ck("1878: called from drop after opp monster destroyed by my effect", val(`return Object.values(battle.plr.monsters).some(u=>u&&u.card.id===1878)`), val(`return [battle.plr.drop,Object.values(battle.plr.monsters).map(u=>u&&u.card.id)]`));
+  run(`fresh(); battle.plr.drop=[1878]; battle.plr.monsters.left=null; vic=mk(21); vic.abxDestroyedBy='plr'; battle._destroyByAttack=true; ABX.fireOtherDestroyed('opp',card(21),vic,'left'); battle._destroyByAttack=false`); await settle();
+  ck("1878: not by battle", val(`return battle.plr.drop.includes(1878)`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

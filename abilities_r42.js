@@ -4158,6 +4158,33 @@
       if (!f.drop.includes(ctx.card.id)) return false;
       return await OPS.call.run({ op: "call", np: { self: true, raw: "this card", qty: { n: 1 }, filter: {}, zone: { area: "drop zone" } }, pay: false }, ctx); }, check: () => true };
     OV42.push([2545, /tag along resurrection/i, () => ({ kind: "triggered", fromDrop: true, once: "turn", trigger: { event: "enterFromDrop", owner: "you" }, conds: [], steps: [{ op: "r42OzonRevive" }] })]);
+    // #1878 Black Wolf "Homing Instinct": an opponent's monster destroyed by the effect of one of your cards -> may call this from your drop zone (once per turn)
+    OV42.push([1878, /homing instinct/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    {
+      const prevFODw = ABX.fireOtherDestroyed;
+      ABX.fireOtherDestroyed = function (side, card, unit, pos) {
+        const r = prevFODw.apply(this, arguments);
+        try {
+          const eff = unit && unit.abxDestroyedBy;
+          if (eff && eff !== side && !B._destroyByAttack) {
+            const f = F(eff);
+            if (f.drop.includes(1878) && f.r42WolfTurn !== B.turnCount) {
+              f.r42WolfTurn = B.turnCount;
+              ABX.queue(async () => {
+                const c = core.cardOf(1878), i = f.drop.lastIndexOf(1878); if (i < 0) return;
+                let yes = true;
+                if (!f.isBot && !ABX.autoPlay && ABX.ui && ABX.ui.pickOption) yes = (await ABX.ui.pickOption({ title: c.name + " \u2014 call it from the drop zone?", options: ["Call", "No"] })) === 0;
+                if (!yes) return;
+                const ctx = { side: eff, f, e: F(otherSide(eff)), card: c, unit: null, bind: { chosen: [], revealed: [] }, lastDone: true, auto: true, log: [], hostArea: "drop", selfRef: { k: "zone", side: eff, area: "drop", idx: i, id: 1878, card: c } };
+                await OPS.call.run({ op: "call", np: { self: true, raw: "this card", qty: { n: 1 }, filter: {}, zone: { area: "drop zone" } }, pay: true }, ctx);
+                fresh();
+              });
+            }
+          }
+        } catch (e) { /* ignore */ }
+        return r;
+      };
+    }
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
