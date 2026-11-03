@@ -53,5 +53,14 @@ globalThis.small=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.power<=30
   ck("5552: milled by the opponent's effect -> returns to my hand", val(`return battle.plr.hand.includes(5552)&&!battle.plr.drop.includes(5552)`), val(`return [battle.plr.hand,battle.plr.drop]`));
   run(`fresh(); battle.plr.deck=[5552,22,23]; battle.plr.hand=[]; ABX.core.runAbility('plr',card(2783),{kind:'spell',steps:[{op:'tmill'}]},null,{})`); await settle();
   ck("5552: milled by my own effect -> stays in drop", val(`return battle.plr.drop.includes(5552)&&!battle.plr.hand.includes(5552)`));
+  // #6445 KANESADA
+  run(`fresh(); battle.plr.item=mk(6445); globalThis.a=mk(small.id); globalThis.b=mk(small.id); battle.opp.monsters.center=a; battle.opp.monsters.left=b; ABX.fireAttack('opp',[{zone:'center',unit:a},{zone:'left',unit:b}],'plr','fighter')`); await settle();
+  ck("6445: link attack -> both attackers (def <= 15000) destroyed", val(`return !battle.opp.monsters.center&&!battle.opp.monsters.left`), val(`return [!!battle.opp.monsters.center,!!battle.opp.monsters.left]`));
+  run(`fresh(); battle.plr.item=mk(6445); globalThis.a=mk(small.id); battle.opp.monsters.center=a; ABX.fireAttack('opp',[{zone:'center',unit:a}],'plr','fighter')`); await settle();
+  ck("6445: single normal attack -> no counter", val(`return !!battle.opp.monsters.center`));
+  run(`fresh(); battle.plr.item=mk(6445); globalThis.a=mk(small.id); a.card=Object.assign({},a.card,{da:true}); battle.opp.monsters.center=a; ABX.fireAttack('opp',[{zone:'center',unit:a}],'plr','fighter')`); await settle();
+  ck("6445: Double Attack card -> counter destroys it", val(`return !battle.opp.monsters.center`), val(`return !!battle.opp.monsters.center`));
+  run(`fresh(); battle.plr.item=mk(6445); globalThis.a=mk(small.id); globalThis.b=mk(small.id); b.card=Object.assign({},b.card,{defense:20000}); battle.opp.monsters.center=a; battle.opp.monsters.left=b; ABX.fireAttack('opp',[{zone:'center',unit:a},{zone:'left',unit:b}],'plr','fighter')`); await settle();
+  ck("6445: only units weaker than 15000 are destroyed", val(`return !battle.opp.monsters.center&&!!battle.opp.monsters.left`), val(`return [!!battle.opp.monsters.center,!!battle.opp.monsters.left]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

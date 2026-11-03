@@ -3799,4 +3799,25 @@
     };
   }
   OV42.push([5552, /put into the drop zone from your deck by your opponent's card effects/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+
+  /* #6445 Excelblade, Godslash KANESADA: when the opponent link attacks or attacks with a multi-attack card, its [Counterattack] compares its power
+     with the defense of ALL attacking units at once and destroys every one it beats */
+  OPS.r42KanesadaCounter = {
+    async run(s, ctx) {
+      const es = otherSide(ctx.side), ef = F(es);
+      const us = ((ctx.event && ctx.event.attUnits) || (ABX.battleCtx && ABX.battleCtx.attUnits) || []).filter(Boolean);
+      if (!us.length) return false;
+      const stats = us.map(u => getUnitEffectiveCombatStats(ef, u));
+      const multi = us.length > 1 || stats.some(st => st.da || st.ta || st.qa);
+      if (!multi) return false;
+      const power = Number(ctx.card.power) || 0;
+      const refs = us.map((u, i) => { const pos = core.posOfUnit(ef, u); return pos && !String(pos).startsWith("item") && stats[i].defense <= power ? { k: "unit", side: es, pos, unit: u, card: u.card, id: u.card.id } : null; }).filter(Boolean);
+      if (!refs.length) return false;
+      ctx.bind = ctx.bind || {}; ctx.bind.chosen = refs;
+      await OPS.destroy.run({ op: "destroy", np: { qty: { n: 99, all: true }, ref: "chosen", self: false, filter: {}, zone: null } }, ctx);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([6445, /counterattack.{0,3} all attacking monsters/i, () => ({ kind: "triggered", trigger: { event: "oppAttack" }, conds: [], steps: [{ op: "r42KanesadaCounter" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
