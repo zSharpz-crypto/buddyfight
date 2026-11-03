@@ -3093,4 +3093,31 @@
   OV42.push([2566, /when you are \[ride\] on this card/i, () => ({ kind: "triggered", trigger: { event: "equipped", self: true }, conds: [], steps: parseS("put a card from your opponent's gauge into their drop zone") })]);
   // #3282 Megadroid, Larger: put up to two "Droid" monsters from your drop zone on top of your deck
   OV42.push([3282, /put up to two monsters with .droid. in their card names/i, () => ({ kind: "triggered", trigger: ENTER, conds: [], steps: parseS("put up to two monsters with \"Droid\" in their card names from your drop zone on the top of your deck") })]);
+
+  /* ---- [r42] Hero World batch 4: Act chains that drop named field cards, then [Ride] a named card from hand/deck ---- */
+  // s: {gauge, need:[names that must be on your field, "@self" = this card], rideId, areas:["hand","deck"], needRide: name you must be riding/equipped on}
+  OPS.r42RideChain = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side, field = () => ["left", "center", "right"].map(p => ({ p, u: f.monsters[p] })).filter(x => x.u);
+      const found = [];
+      for (const n of s.need) {
+        if (n === "@self") { const x = field().find(x => x.u === ctx.unit || x.u.card.id === ctx.card.id); if (!x) return false; found.push(x); continue; }
+        const x = field().find(x => x.u.card.name === n && !found.includes(x)) || (f.item && f.item.card.name === n && !f.item.isEndrulerFlag ? { item: true, u: f.item } : null);
+        if (!x) return false; found.push(x);
+      }
+      if (s.needRide && !(f.item && f.item.card.name === s.needRide) && !field().some(x => x.u.card.name === s.needRide)) return false;
+      const src = ["hand", "deck"].find(a => (s.areas || ["hand", "deck"]).includes(a) && f[a].includes(s.rideId));
+      if (!src) return false;
+      if (f.gauge.length < (s.gauge || 0)) return false;
+      for (let i = 0; i < (s.gauge || 0); i++) f.drop.push(f.gauge.pop());
+      found.forEach(x => { if (x.item) { f.drop.push(x.u.card.id); f.item = null; } else { f.drop.push(x.u.card.id); (x.u.soul || []).forEach(sid => f.drop.push(sid.id || sid)); f.monsters[x.p] = null; } });
+      f[src].splice(f[src].indexOf(s.rideId), 1); f.hand.push(s.rideId);
+      ABX._modeByEffect = true; ABX._modeFree = true;
+      let ok; try { ok = battle.equipCardFromHand(side, f.hand.lastIndexOf(s.rideId), "Ride") !== false; } finally { ABX._modeByEffect = false; ABX._modeFree = false; }
+      if (src === "deck" && battle.shuffleFighterDeck) battle.shuffleFighterDeck(side);
+      fresh(); return ok;
+    }, check: () => true
+  };
+  OV42.push([943, /put a "card serpent"/i, () => ({ kind: "act", steps: [{ op: "r42RideChain", gauge: 4, need: ["Card Serpent", "Card Rhino", "@self"], rideId: 950 }] })]);
+  OV42.push([2152, /ultimate card burn.*d-wing/i, () => ({ kind: "act", tags: ["counter"], steps: [{ op: "r42RideChain", gauge: 2, need: ["Ultimate Card Burn", "@self"], rideId: 2107 }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
