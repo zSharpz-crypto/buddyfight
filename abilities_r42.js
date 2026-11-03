@@ -3571,4 +3571,50 @@
     // #5536 Liim: returned at the final phase by ABX.fireTurnEvent (engine special case)
     OV42.push([5536, /at the start of the final phase of a turn that this card is dropped from your hand/i, MARK]);
   }
+
+  /* batch 3: #6213 #6223 #6216 #2129 #5368(enter part) #5702 */
+  {
+    const stOf = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    const attrHas = (c, re) => (c.attrs || []).some(a => re.test(String(a).replace(/\s+/g, "").toLowerCase()));
+    // #6213 Primary Addition (once per turn)
+    OPS.r42PrimaryAddition = {
+      async run(s, ctx) {
+        const f = ctx.f;
+        const cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(x => x.card && (attrHas(x.card, /^quartetfive$/) || attrHas(x.card, /^superwarrior$/)));
+        if (!cands.length) return false;
+        const ch = await core.pick(cands, { qty: { n: 1, upTo: true }, raw: "a Quartet Five or Super Warrior" }, ctx, { intent: "cost", title: ctx.card.name + " \u2014 you may drop a card" });
+        const r = ch && ch[0]; if (!r) return false;
+        const i = f.hand.indexOf(r.id); if (i < 0) return false;
+        f.drop.push(f.hand.splice(i, 1)[0]); if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, core.cardOf(r.id));
+        for (const x of stOf("Put the top two cards of your deck into your gauge, and draw two cards.")) await OPS[x.op].run(x, ctx);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([6213, /you may drop a .{0,3}quartet five/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], once: "turn", steps: [{ op: "r42PrimaryAddition" }] })]);
+    // #6223 look at top five, take one Gaigrander (non-impact) or a size 3 impact monster; rest to the bottom
+    OPS.r42GaigranderLook = {
+      async run(s, ctx) {
+        const f = ctx.f, n = Math.min(5, f.deck.length);
+        if (!n) return false;
+        const top = f.deck.splice(0, n);
+        const cands = top.map((id, idx) => ({ k: "zone", side: ctx.side, area: "looked", idx, id, card: core.cardOf(id) })).filter(x => x.card && ((/gaigrander/i.test(x.card.name) && x.card.type !== "Impact") || (x.card.type === "Impact" && x.card.size === 3)));
+        let took = null;
+        if (cands.length) { const ch = await core.pick(cands, { qty: { n: 1, upTo: true }, raw: "a card" }, ctx, { intent: "help", title: ctx.card.name + " \u2014 take up to one card" }); took = ch && ch[0]; }
+        if (took) { const i = top.indexOf(took.id); if (i >= 0) f.hand.push(top.splice(i, 1)[0]); }
+        f.deck.push(...top);
+        fresh();
+        return !!took;
+      }
+    };
+    OV42.push([6223, /look at the top five cards/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42GaigranderLook" }] })]);
+    // #6216 [Ride] from hand as a Counter [Act]
+    OV42.push([6216, /\[ride\] into this card from your hand/i, () => ({ kind: "act", tags: ["counter", "act"], conds: [], steps: [{ op: "transformSelf" }] })]);
+    // #2129 when destroyed: [Transform]/[Ride] from hand for free
+    OV42.push([2129, /when this card is destroyed, you may \[transform\]/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true }, conds: [], steps: [{ op: "transformFrom", areas: ["hand"], free: true, np: { filter: {} } }] })]);
+    // #5368 Formation Clear: Astrodragon enters -> top deck to gauge, +1 life (once per turn)
+    OV42.push([5368, /when an .{0,3}astrodragon.{0,3} monster enters your field/i, () => { const st = stOf("Put the top card of your deck into your gauge, and you gain 1 life."); return st && { kind: "triggered", trigger: { event: "otherEnter", np: ABX.parseNP("«Astrodragon» monster") }, conds: [], once: "turn", steps: st }; }]);
+    // #5702 Miserea: Set an impact in your final phase -> another attack phase (once per turn)
+    OV42.push([5702, /during your final phase, when you .{0,3}set.{0,3} an impact/i, () => ({ kind: "triggered", trigger: { event: "youCast", np: ABX.parseNP("impact") }, conds: [{ t: "phase", phase: "final", who: "you" }], once: "turn", steps: [{ op: "extraPhase", what: "attack" }] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);

@@ -47,5 +47,19 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.runAbility('plr',card(id),ab(id,k,ev),uni
   ck("5987: no Reversal -> nothing", val(`return battle.opp.hand.length===2`));
   run(`battle.plr.godclock.reversalCount=1; battle.opp.deck=[9]; go(5987,'triggered','fieldToHand')`); await settle();
   ck("5987: Reversal -> opp hand card to deck bottom", val(`return battle.opp.hand.length===1&&battle.opp.deck.length===2`), val(`return [battle.opp.hand.length,battle.opp.deck.length]`));
+  // ---- batch 3 ----
+  run(`fresh(); globalThis.qf=mon(c=>(c.attrs||[]).includes('QuartetFive')); battle.plr.hand=[qf.id]; battle.plr.deck=[21,22,23,24,25]; globalThis.g0=battle.plr.gauge.length; go(6213,'triggered','enter',mk(6213))`); await settle();
+  ck("6213: drop Quartet Five -> +2 gauge, draw 2", val(`return battle.plr.gauge.length===g0+2&&battle.plr.hand.length===2&&battle.plr.drop.includes(qf.id)`), val(`return [qf&&qf.id,battle.plr.gauge.length-g0,battle.plr.hand.length]`));
+  run(`fresh(); battle.plr.hand=[7]; battle.plr.deck=[21,22,23]; go(6213,'triggered','enter',mk(6213))`); await settle();
+  ck("6213: no Quartet Five/Super Warrior in hand -> nothing", val(`return battle.plr.hand.length===1`));
+  run(`fresh(); globalThis.gg=window.BUDDYFIGHT_CARDS.find(c=>/gaigrander/i.test(c.name)&&c.type!=='Impact'); battle.plr.deck=[21,gg.id,22,23,24,25,26]; go(6223,'triggered','enter',mk(6223))`); await settle();
+  ck("6223: Gaigrander card from top 5 to hand, rest to bottom", val(`return battle.plr.hand.includes(gg.id)&&battle.plr.deck.length===6&&battle.plr.deck[0]===25`), val(`return [gg&&gg.id,battle.plr.hand,battle.plr.deck]`));
+  ck("6216: Ride is a counter act (transformSelf)", val(`const a=ab(6216,'act'); return !!a&&a.steps[0].op==='transformSelf'&&a.tags.includes('counter')`));
+  run(`fresh(); globalThis.tr=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.tr&&!c.cost||false); `);
+  ck("2129: leave -> transformFrom hand (free)", val(`const a=ab(2129,'triggered','leave'); return a.steps[0].op==='transformFrom'&&a.steps[0].free===true`));
+  run(`fresh(); battle.plr.setSpells=[card(5368)]; battle.plr.deck=[21,22]; globalThis.g0=battle.plr.gauge.length; globalThis.l0=battle.plr.life; go(5368,'triggered','otherEnter',mk(5368),{event:{name:'otherEnter',unit:mk(1)}})`); await settle();
+  ck("5368: gauge +1 and life +1", val(`return battle.plr.gauge.length===g0+1&&battle.plr.life===l0+1`), val(`return [battle.plr.gauge.length-g0,battle.plr.life-l0]`));
+  run(`fresh(); battle.phase='final'; battle.activeSide='plr'; battle.plr.monsters.center=mk(5702); globalThis.imp=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Impact'); ABX.fireCast('plr',imp)`); await settle();
+  ck("5702: Set impact in final phase -> extra attack phase", val(`const x=battle.plr.abxExtraAttack; return !!x&&x.n===1`), val(`return battle.plr.abxExtraAttack`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

@@ -306,3 +306,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Link/attack family (#2637 #870 #1154 #2783 #2553 #2554 #2683 #3609): fixed in abilities_r42.js, test tests/link_attack.js. #870 crit boost lasts the rest of the turn, not only the battle. Still dead: #209 #291 #292 #296 #857 #1351 #1504 #1546 #2014 #2683 #3104 #3242 #3609 #3664 #5368 #5436 #5702 #5987 #5998 #6445 #6560.
 - Batch (#3656 #1595 #5285 #5998 #3899 #209): abilities_r42.js, tests/dead_batch2.js. #5285 drop-hand-card cost is applied as a step (cast is not blocked when the hand is empty).
 - Batch 2 (#857 #6560 #1504 #91 #1959 #5987 #5536): abilities_r42.js; attack outcome now reports destroyedCount (game.js, abilities_engine.js); tests/dead_batch2.js.
+- Batch 3 (#6213 #6223 #6216 #2129 #5368 enter-line #5702): abilities_r42.js, tests/dead_batch2.js. Not built: #5368 'separate areas' line, #6445, #2014.
