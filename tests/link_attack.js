@@ -24,5 +24,9 @@ globalThis.go=(id,ev,unit)=>ABX.runAbility('plr',card(id),trig(id,ev),unit||null
   ck("2554 with Eskamal equipped: destroys opp monster/item", val(`return !battle.opp.monsters.left`));
   run(`fresh(); globalThis.u=mk(2554); battle.plr.item=u;`);
   ck("2554 without Eskamal: condition false", val(`return !ABX.core.evalCond(trig(2554,'link').conds[0],{side:'plr',f:battle.plr,e:battle.opp,card:card(2554),unit:u,bind:{}})`));
+  run(`fresh(); battle.plr.hand=[7,8,9]; battle.plr.deck=[21,22,23,24]; go(2683,'attack',mk(2683))`); await settle();
+  ck("2683: discard 2, draw 2", val(`return battle.plr.hand.length===3&&battle.plr.drop.length===2&&battle.plr.deck.length===2`), val(`return [battle.plr.hand.length,battle.plr.drop.length,battle.plr.deck.length]`));
+  run(`fresh(); battle.plr.deck=[21,22]; battle.opp.deck=[21,22]; globalThis.u=mk(3609); battle.plr.monsters.center=u; globalThis.a=mk(2637); battle.opp.monsters.center=a; ABX.runAbility('plr',card(3609),trig(3609,'oppAttack'),u,{event:{name:'oppAttack',attUnits:[a]}})`); await settle();
+  ck("3609: Izmain dropped, attacker destroyed, both decks milled 1", val(`return !battle.plr.monsters.center&&!battle.opp.monsters.center&&battle.plr.deck.length===1&&battle.opp.deck.length===1&&battle.plr.drop.includes(3609)`), val(`return [!!battle.plr.monsters.center,!!battle.opp.monsters.center,battle.plr.deck.length,battle.opp.deck.length]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

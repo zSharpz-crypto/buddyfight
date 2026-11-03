@@ -3415,4 +3415,40 @@
     OV42.push([1154, /nullify the \[penetrate\] of all cards/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42NullPenOpp" }] })]);
     OV42.push([2783, /all fighters put the top card/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42SpectralStrike" }] })]);
   }
+
+  /* #2683 discard up to two, draw that many (once per turn); #3609 Izmain trade */
+  {
+    OPS.r42DiscardDraw = {
+      async run(s, ctx) {
+        const np = ABX.parseSentenceSteps("Put up to two cards in your hand into your drop zone.", {}).steps[0].np;
+        const cands = core.refsFor(np, ctx);
+        if (!cands.length) return false;
+        const refs = (await core.pick(cands, np, ctx, { intent: "help", title: ctx.card.name + " \u2014 discard up to two", subtitle: "Discard up to two cards, then draw that many" })) || [];
+        const f = ctx.f; let n = 0;
+        for (const r of refs) { const i = f.hand.indexOf(r.id); if (i >= 0) { f.drop.push(f.hand.splice(i, 1)[0]); n++; if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, core.cardOf(r.id)); } }
+        if (n) await OPS.draw.run({ op: "draw", n }, ctx);
+        fresh();
+        return n > 0;
+      }
+    };
+    OV42.push([2683, /you may discard up to two cards/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], once: "turn", steps: [{ op: "r42DiscardDraw" }] })]);
+    OPS.r42IzmainTrade = {
+      async run(s, ctx) {
+        const units = ((ctx.event && ctx.event.attUnits) || (ABX.battleCtx && ABX.battleCtx.attUnits) || []).filter(Boolean);
+        if (!units.length || !ctx.unit) return false;
+        const es = otherSide(ctx.side);
+        const refs = units.map(u => { const pos = core.posOfUnit(F(es), u); return pos ? { k: (pos.startsWith("item")) ? "item" : "unit", side: es, pos, unit: u, card: u.card, id: u.card.id } : null; }).filter(Boolean);
+        const chosen = refs.length > 1 ? await core.pick(refs, { qty: { n: 1 } }, ctx, { intent: "harm", title: ctx.card.name + " \u2014 choose an attacking card" }) : refs;
+        if (!chosen || !chosen.length) return false;
+        const ok = await OPS.moveSelf.run({ op: "moveSelf", to: { area: "drop zone", owner: "you", end: "top" } }, ctx);
+        if (!ok) return false;
+        [ctx.side, es].forEach(sd => { const f = F(sd); if (f.deck.length) f.drop.push(f.deck.shift()); });
+        ctx.bind = ctx.bind || {}; ctx.bind.chosen = chosen;
+        await OPS.destroy.run({ op: "destroy", np: { qty: { n: 1 }, ref: "chosen", self: false, filter: {}, zone: null } }, ctx);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([3609, /choose one of the attacking cards/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], optional: true, steps: [{ op: "r42IzmainTrade" }] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);
