@@ -3729,4 +3729,44 @@
     };
     OV42.push([5436, /at the end of the battle that an afterglow character/i, () => ({ kind: "triggered", trigger: { event: "battleEnd", self: false, attFilter: { tribes: ["Afterglow"], soul: true } }, conds: [], steps: [{ op: "r42RedMesh" }] })]);
   }
+
+  /* #3664 Thunderbolt Fighting Dragon, Demongodol: when the opponent's card attacks, the attack's target becomes this card */
+  OV42.push([3664, /charge the target of the attack to this card/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "redirectAttack", toSelf: true }] })]);
+
+  /* #1546 Mission Card "Earn Experience Points!": an item of yours attacks -> top deck card face down into this card's soul */
+  OPS.r42MissionSoul = {
+    run(s, ctx) {
+      const f = ctx.f; if (!f.deck.length) return false;
+      const host = (f.setSpells || []).find(c => c && c.id === ctx.card.id) || ctx.card;
+      if (!Array.isArray(host.soul)) host.soul = [];
+      const id = f.deck.shift();
+      host.soul.push(typeof createSoulEntry === "function" ? createSoulEntry(id, true) : id);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([1546, /when an item on your field attacks/i, () => ({ kind: "triggered", trigger: { event: "otherAttack", np: ABX.parseNP("item") }, conds: [], steps: [{ op: "r42MissionSoul" }] })]);
+
+  /* #2014 GIGA Armorknight Cerberus, "A"!: end of its attack -> stand your Weapon, put this card + a drop card into that Weapon's soul;
+     (the 'cannot be destroyed / attacks in final phase' static line already exists) */
+  OPS.r42CerberusSoul = {
+    async run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u) return false;
+      const wp = [f.item, f.item2].find(x => x && x.card && x.card.type === "Item" && !x.isEndrulerFlag);
+      if (!wp) return false;
+      wp.rested = false;
+      const pos = ["left", "center", "right", "center2"].find(p => f.monsters[p] === u);
+      if (pos) { f.monsters[pos] = null; (u.soul || []).forEach(id => f.drop.push(typeof getSoulCardId === "function" ? getSoulCardId(id) : id)); }
+      if (!Array.isArray(wp.soul)) wp.soul = [];
+      wp.soul.push(ctx.card.id);
+      if (f.drop.length) {
+        const np = ABX.parseSentenceSteps("Put a card in your drop zone into the soul of your Weapon.", {}).steps[0].np;
+        const refs = await core.pick(core.refsFor(np.zone ? np : np, ctx), np, ctx, { intent: "help", title: ctx.card.name + " \u2014 choose a drop zone card" });
+        const r = refs && refs[0]; if (r) { const i = f.drop.indexOf(r.id); if (i >= 0) wp.soul.push(f.drop.splice(i, 1)[0]); }
+      }
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([2014, /at the end of the attack of this card/i, () => ({ kind: "triggered", trigger: { event: "battleEnd", self: true }, conds: [], optional: true, steps: [{ op: "r42CerberusSoul" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);

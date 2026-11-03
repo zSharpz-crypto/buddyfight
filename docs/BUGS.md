@@ -309,3 +309,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch 3 (#6213 #6223 #6216 #2129 #5368 enter-line #5702): abilities_r42.js, tests/dead_batch2.js. Not built: #5368 'separate areas' line, #6445, #2014.
 - Batch 4 (#3103 #3104): abilities_r42.js, tests/dead_batch2.js.
 - Link/attack batch 5 (#291 #292 #296 #1351 #3242 #5436): abilities_r42.js, tests/secret_sword.js. #1351 does not enforce the 'must be Ride' cast rule.
+- Link/attack batch 6 (#3664 #1546 #2014): abilities_r42.js, tests/secret_sword.js. Not built: #6445 (item Counterattack semantics unclear), #5368 'separate areas' line.

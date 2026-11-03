@@ -34,5 +34,15 @@ globalThis.small=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.power<=30
   // #5436 Red Mesh
   run(`fresh(); globalThis.ag=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('Afterglow')); globalThis.agu=mk(ag.id); agu.soul=[5436]; battle.plr.monsters.center=agu; battle.opp.monsters.center=mk(small.id); ABX.fireBattleEnd('plr',[{unit:agu}])`); await settle();
   ck("5436: Afterglow attacker with Red Mesh in soul -> opp card destroyed", val(`return !battle.opp.monsters.center`));
+  // #3664 Demongodol redirect
+  run(`fresh(); globalThis.dg=mk(3664); battle.plr.monsters.right=dg; ABX.battleCtx={active:true}; ABX.runAbility('plr',card(3664),ABX.get(card(3664)).abilities.find(a=>a.kind==='triggered'&&a.trigger.event==='oppAttack'),dg,{event:{name:'attack'}})`); await settle();
+  ck("3664: attack target redirected to Demongodol's area", val(`return ABX.battleCtx.redirectTo==='right'`), val(`return ABX.battleCtx`));
+  run(`ABX.battleCtx=null`);
+  // #1546 Mission Card soul fill
+  run(`fresh(); battle.plr.setSpells=[Object.assign({},card(1546),{soul:[]})]; battle.plr.deck=[21,22]; ABX.runAbility('plr',battle.plr.setSpells[0],ABX.get(card(1546)).abilities.find(a=>a.kind==='triggered'),null,{})`); await settle();
+  ck("1546: top deck card goes into the Mission Card's soul", val(`return battle.plr.setSpells[0].soul.length===1&&battle.plr.deck.length===1`), val(`return [battle.plr.setSpells[0].soul,battle.plr.deck.length]`));
+  // #2014 Cerberus
+  run(`fresh(); globalThis.cu=mk(2014); battle.plr.monsters.center=cu; globalThis.wpn=mk(window.BUDDYFIGHT_CARDS.find(c=>c.type==='Item'&&(c.attrs||[]).includes('Weapon')).id); wpn.rested=true; battle.plr.item=wpn; battle.plr.drop=[7,8]; ABX.fireBattleEnd('plr',[{unit:cu}])`); await settle();
+  ck("2014: Weapon stood, Cerberus + a drop card are in its soul", val(`return !wpn.rested&&!battle.plr.monsters.center&&wpn.soul.includes(2014)&&wpn.soul.length===2&&battle.plr.drop.length===1`), val(`return [wpn.rested,wpn.soul,battle.plr.drop]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
