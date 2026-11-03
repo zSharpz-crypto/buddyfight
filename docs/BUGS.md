@@ -325,3 +325,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch G: #2148 (isProtected wrapper consumes the Set spell; automatic, not optional; may be consumed by speculative checks). Test: dead_batch_b.
 - Batch H: #2545 (drop-zone trigger support: OV42 fromDrop:true + FROM_DROP_IDS + engine sources()). #1878 (needs destroy cause), #2269 (needs soulToDrop host data) still open.
 - Batch I: #1878 (fireOtherDestroyed wrapper using unit.abxDestroyedBy + !_destroyByAttack; pays call cost; prompts human). Test: dead_batch_b.
+- Batch J: #3440 (item act: rest -> call 0-power Death from drop, paying cost) #5867 (turnEnd from drop after A destroyed this turn; call B from hand/deck, size limit bypassed; random deck order instead of true shuffle-only-if-looked). Test: dead_batch_b.

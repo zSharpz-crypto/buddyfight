@@ -4185,6 +4185,39 @@
         return r;
       };
     }
+    // #3440 DEATH Pen: [Rest] this item -> call a 0-power «Death» monster from your drop zone by paying its Call Cost
+    OPS.r42DeathPen = { async run(s, ctx) {
+      const f = ctx.f, it = ctx.unit || f.item; if (!it || it.rested) return false;
+      const cands = f.drop.map((id, idx) => ({ k: "zone", side: ctx.side, area: "drop", idx, id, card: core.cardOf(id) })).filter(x => x.card && x.card.type === "Monster" && (x.card.power || 0) === 0 && (x.card.attrs || []).some(a => /^death$/i.test(a)));
+      if (!cands.length) return false;
+      const ch = (await core.pick(cands, { qty: { n: 1, upTo: false }, raw: "a \u00abDeath\u00bb monster with 0 power from your drop zone" }, ctx, { intent: "help", title: ctx.card.name + " \u2014 call a Death monster" })) || [];
+      if (!ch.length) return false;
+      it.rested = true;
+      const c2 = Object.assign({}, ctx, { bind: Object.assign({}, ctx.bind, { chosen: ch }) });
+      const ok = await OPS.call.run({ op: "call", np: { ref: "chosen", raw: "the chosen card", qty: { n: 1 }, filter: {}, zone: null }, pay: true }, c2);
+      if (!ok) it.rested = false;
+      fresh(); return !!ok; }, check: () => true };
+    OV42.push([3440, /choose a .death. monster with 0 power/i, () => ({ kind: "act", tags: ["act"], conds: [], steps: [{ op: "r42DeathPen" }] })]);
+    // #5867 Anonymous A: at the end of the turn it was destroyed -> call up to one Anonymous B from hand or deck
+    OPS.r42AnonCall = { async run(s, ctx) {
+      const f = ctx.f; if (f.r42AnonA !== B.turnCount) return false;
+      let area = "hand", i = f.hand.indexOf(5866);
+      if (i < 0) { area = "deck"; i = f.deck.indexOf(5866); }
+      if (i < 0) return false;
+      const c = core.cardOf(5866);
+      const c2 = Object.assign({}, ctx, { bind: Object.assign({}, ctx.bind, { chosen: [{ k: "zone", side: ctx.side, area, idx: i, id: 5866, card: c }] }) });
+      const ms = f.maxSize; f.maxSize = Math.max(ms || 3, c.size || 0);   // Anonymous B is size 4; its own text lets A's effect call it
+      let ok; try { ok = await OPS.call.run({ op: "call", np: { ref: "chosen", raw: "the chosen card", qty: { n: 1 }, filter: {}, zone: null }, pay: true }, c2); } finally { f.maxSize = ms; }
+      if (area === "deck") f.deck.sort(() => Math.random() - 0.5);
+      fresh(); return !!ok; }, check: () => true };
+    OV42.push([5867, /at the end of the turn that this card is destroyed/i, () => ({ kind: "triggered", fromDrop: true, trigger: { event: "turnEnd", who: "any" }, conds: [{ t: "selfIn", area: "drop" }], steps: [{ op: "r42AnonCall" }] })]);
+    {
+      const prevFODa = ABX.fireOtherDestroyed;
+      ABX.fireOtherDestroyed = function (side, card, unit, pos) {
+        if (card && card.id === 5867) F(side).r42AnonA = B.turnCount;
+        return prevFODa.apply(this, arguments);
+      };
+    }
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
