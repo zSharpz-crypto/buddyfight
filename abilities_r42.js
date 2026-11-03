@@ -2986,4 +2986,73 @@
   OV42.push([6558, /return all cards from each player'?s gauge into their owner'?s decks/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42GagnarVortex" }] })]);
   // #725 Actor Knights High Priest: "When you call a «Tarot» monster other than 'Actor Knights High Priest', you gain 1 life. (once per turn)" - was read as an enter trigger of itself
   OV42.push([725, /when you call a .tarot. monster other than/i, () => ({ kind: "triggered", trigger: { event: "otherEnter", np: np({ tribes: ["Tarot"], types: ["monster"], notNames: ["actor knights high priest"] }, "field") }, conds: [], once: "turn", steps: [{ op: "life", who: "you", n: 1 }] })]);
+
+  /* ---- [r42] Hero World batch 1: «Battle Poet» discard cards ----
+   * "When this card is discarded from hand due to the effect of a card with 'Battle Poet' in its card name" (#2662 #3250) was read as an ENTER trigger (so it fired on the call, not on the discard),
+   * and the "You may discard a Battle Poet card. If you do ..." act clauses (#2113 #4663) ran their result BEFORE the discard. */
+  (function () {
+    const prevFD = ABX.fireDiscarded;
+    ABX.fireDiscarded = function (side, card) {
+      try { if (card) { const f = F(side); f.discardSrc = f.discardSrc || {}; f.discardSrc[card.id] = (ABX.curEffectCard && ABX.curEffectCard.name) || ""; } } catch (e) { /* ignore */ }
+      return prevFD.apply(this, arguments);
+    };
+    const XCd = ABX.extraCond = ABX.extraCond || {};
+    XCd.xDiscardByName = (c, ctx) => String(((ctx.f.discardSrc || {})[ctx.card && ctx.card.id]) || "").toLowerCase().includes(c.name);
+    ABX.COND_OK.add("xDiscardByName");
+  })();
+  const POET_HAND = () => np({ names: ["battle poet"] }, "hand");
+  const POET_FIELD = () => { const n = np({ names: ["battle poet"] }, "field"); n.qty.all = true; return n; };
+  const DISCARD_POET = () => ({ op: "discard", n: 1, optional: true, np: POET_HAND(), src: "discard a card with \"Battle Poet\" in its card name" });
+  OV42.push([2662, /when this card is discarded from hand due to the effect/i, () => ({ kind: "triggered", trigger: { event: "discardedFromHand", self: true }, conds: [{ t: "xDiscardByName", name: "battle poet" }], steps: [{ op: "draw", who: "you", n: 1 }] })]);
+  OV42.push([3250, /when this card is discarded from your hand by an effect/i, () => ({ kind: "triggered", trigger: { event: "discardedFromHand", self: true }, conds: [{ t: "xDiscardByName", name: "battle poet" }], steps: [{ op: "mill", who: "you", n: 1, to: "gauge" }, { op: "life", who: "you", n: 1 }] })]);
+  OV42.push([2113, /you may discard a card with .battle poet. in its card name/i, () => ({ kind: "act", tags: ["act"], once: "turn", conds: [], steps: [DISCARD_POET(),
+    { op: "boost", np: POET_FIELD(), mods: { power: 0, defense: 0, critical: 0, kws: ["double attack"] }, gate: "ifYouDo", src: "for this turn, a card with Battle Poet in its card name on your field gets [Double Attack]" }] })]);
+  OV42.push([4663, /you may drop a hand card with .battle poet. in its card name/i, (ab) => ({ kind: "act", tags: ["counter", "act"], conds: [], steps: [{ op: "discard", n: 1, optional: true, np: POET_HAND(), src: "drop a hand card with Battle Poet in its card name" }, clone(ab.steps.find(x => x.op === "stand"))] })]);
+
+  /* ---- [r42] Hero World batch 2: «Battle Building» "if it entered the field by a «Battle Building» effect" ----
+   * The bonus half of #4465 #4494 #4503 #4523 #4528 #6215 #6418 ran through the keyword guesser (draw/destroy/gauge happened every time or never). The engine now remembers which card's
+   * effect called a monster (battle.completeMonsterCall with isAbilityCall), and the bonus steps are gated on that card's tribe. */
+  (function () {
+    const prevCMC = B.completeMonsterCall;
+    if (typeof prevCMC === "function") {
+      B.completeMonsterCall = function (side, pos, handIdx, isBuddy, isAbility) {
+        try {
+          const f = F(side), cid = f.hand[handIdx];
+          f.enterSrc = f.enterSrc || {};
+          if (isAbility && cid != null) f.enterSrc[cid] = { card: ABX.curEffectCard || null, turn: B.turnCount }; else if (cid != null) delete f.enterSrc[cid];
+        } catch (e) { /* ignore */ }
+        return prevCMC.apply(this, arguments);
+      };
+    }
+    const norm = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const XCe = ABX.extraCond = ABX.extraCond || {};
+    XCe.xEnteredByTribe = (c, ctx) => {
+      const src = (ctx.f.enterSrc || {})[ctx.card && ctx.card.id];
+      if (!src || src.turn !== B.turnCount || !src.card || src.card.id === ctx.card.id) return false;
+      return (c.tribes || []).some(tb => (src.card.attrs || []).some(a => norm(a) === norm(tb)));
+    };
+    ABX.COND_OK.add("xEnteredByTribe");
+  })();
+  OPS.r42NoStandChosen = {
+    async run(s, ctx) {
+      const cands = core.fieldUnits(otherSide(ctx.side), true).map(r => ({ k: r.pos === "item" || r.pos === "item2" ? "item" : "unit", side: otherSide(ctx.side), pos: r.pos, unit: r.unit, card: r.card, id: r.card.id }));
+      if (!cands.length) return false;
+      const ch = (await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "harm", title: `${ctx.card.name} - choose a card: it cannot [Stand] this turn and the next turn` })) || [];
+      ch.forEach(r => { r.unit.abxNo = r.unit.abxNo || {}; r.unit.abxNo.stand = true; });   // skips the next stand phase
+      fresh(); return ch.length > 0;
+    }, check: () => true
+  };
+  const BBC = { t: "xEnteredByTribe", tribes: ["Battle Building"] };
+  const parseS = (t) => { const r = ABX.parseSentenceSteps(t, {}); return (r && r.steps) || []; };
+  const withCond = (steps, cond) => steps.map(x => Object.assign({}, x, { cond: clone(cond) }));
+  const ENTER = { event: "enter", self: true };
+  OV42.push([4465, /if this card entered the field by a .battle building. effect/i, (ab) => ({ kind: "triggered", trigger: ENTER, conds: [], steps: [clone(ab.steps.find(x => x.op === "shield")), ...withCond(parseS("draw a card"), BBC)] })]);
+  OV42.push([4494, /if it entered the field by a .battle building. effect/i, (ab) => ({ kind: "triggered", trigger: ENTER, conds: [], steps: [clone(ab.steps.find(x => x.op === "draw")), { op: "r42NoStandChosen", cond: clone(BBC) }] })]);
+  OV42.push([4523, /if it entered the field by a .battle building. effect/i, (ab) => ({ kind: "triggered", trigger: ENTER, conds: [], steps: [clone(ab.steps[0]), ...withCond(parseS("destroy a card on your opponent's field"), BBC)] })]);
+  OV42.push([4528, /if it entered the field by a .battle building. effect/i, (ab) => ({ kind: "triggered", trigger: ENTER, conds: [], steps: [clone(ab.steps[0]), ...withCond(parseS("put the top two cards of your deck into your gauge"), BBC)] })]);
+  OV42.push([4503, /if it entered the field or was \[ride\] by another/i, () => ({ kind: "triggered", trigger: ENTER, also: [{ event: "equipped", self: true }], conds: [], steps: [...parseS("you gain 2 life"), ...withCond(parseS("you gain 3 life"), BBC)] })]);
+  OV42.push([6418, /if this card entered the field by the effect of/i, (ab) => ({ kind: "triggered", trigger: ENTER, conds: [], steps: [clone(ab.steps[0]), Object.assign(clone(ab.steps[1]), { cond: clone(BBC) })] })]);
+  OV42.push([6215, /if it entered the field or was \[ride\] by another/i, () => ({ kind: "triggered", trigger: ENTER, also: [{ event: "equipped", self: true }], conds: [], steps: [...parseS("you gain 3 life"),
+    ...withCond(parseS("put up to one «Battle Building» or «Super Robot» monster from your deck into your drop zone"), { t: "xEnteredByTribe", tribes: ["Battle Building", "Super Robot"] }),
+    Object.assign(parseS("draw a card")[0], { gate: "ifYouDo" }), { op: "shuffle", who: "you", cond: { t: "xEnteredByTribe", tribes: ["Battle Building", "Super Robot"] } }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
