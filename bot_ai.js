@@ -76,6 +76,7 @@
       const restCrit = rest.reduce((s, z) => s + stats[z].crit, 0);
       const usageCost = group.length * 0.5;
       const consider = (target, gain, why) => {
+        try { const us = group.map(z => bot.monsters[z] || bot[z]).filter(Boolean); if (window.ABX && ABX.core && ABX.core.attackBlocked && ABX.core.attackBlocked(side, us, foeSide, target)) return; } catch (e) { /* ignore */ }
         const score = gain - usageCost;
         if (!best || score > best.score) best = { zones: group, target, score, why, power: g.power, crit: g.crit };
       };

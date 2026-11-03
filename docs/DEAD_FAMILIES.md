@@ -1,8 +1,8 @@
 # Dead ability families (audit 2026-11-03, after the session fixes)
 
-Source: dead_audit.js. 188 abilities still dead (223 at the start of the session). Build one family per session, test first.
+Source: dead_audit.js. 184 abilities still dead (223 at the start of the session). Build one family per session, test first.
 
-By cause (how the engine currently handles the text): r40ExecOnly / act: 10; r40ExecOnly / spell: 47; r40StaticOwned / static: 54; r40ExecOnly / triggered: 76; r40ExecOnly / modal: 1.
+By cause (how the engine currently handles the text): r40ExecOnly / act: 10; r40ExecOnly / spell: 44; r40StaticOwned / static: 53; r40ExecOnly / triggered: 76; r40ExecOnly / modal: 1.
 
 Note: the audit overcounts. Some cards work through text handlers in game.js even though their line does not parse (check with a quick test before building).
 
@@ -70,31 +70,6 @@ Note: the audit overcounts. Some cards work through text handlers in game.js eve
 - #6433 [Lost World/static] This cards [Counterattack] destroys all attacking monsters with defense less than this card's power!
 - #6445 [Katana World/static] This card [Counterattack] all attacking monsters!
 - #6560 [Darkness Dragon World/triggered] When this card attacks, if a total of twenty or more cards are in your and your opponent's drop zone, destroy all cards on your opponent's f
-
-## Cannot / restriction (23)
-- #9 [Magic World/act] [Act] You may only cast this card when an opponent calls a size 2 or less monster.
-- #276 [Katana World/spell] Monsters on the left and right cannot be attacked by both players or their monsters.
-- #988 [Legend World/act] [Act] You may discard up to two Star from your hand. If you do, draw cards equal to the number of cards discarded. You may only use this abi
-- #1158 [Legend World/static] If you have a total of seven or more Hero and Fairy in your drop zone, nullify all abilities of monsters on your opponent's field. This abil
-- #1273 [Legend World/spell] [Counter] If there are two or more Wydar Sarkal on your field, nullify the call or nullify the spell cast by your opponent. You may only cas
-- #1420 [Hero World/spell] You cannot put cards into this card's soul other than by this card's ability.
-- #1530 [Ancient World/spell] You and your opponent cannot call monsters to the center.
-- #1554 [Dungeon World/spell] [Counter] Stand a Demon Lord on your field. You may only cast "Command of the Water Lord" once per turn.
-- #1561 [Katana World/triggered] When this card attacks and deals damage to your opponent, your opponent's item cannot [Stand] during his or her next stand phase.
-- #2433 [Danger World/spell] Pay as much life as you like. If you do, put cards from the top of your deck into your gauge equal to the number of life you paid. (You cann
-- #2465 [Star Dragon World/static] If this card is in the soul of a monster with "Zodiac" in its card name, during your opponent's final phase, your opponent cannot use or cas
-- #2473 [Star Dragon World/spell] [Counter] During that attack phase, if your life would become 0, it becomes 1 instead. You may only cast "Jackknife Linker" once per fight.
-- #2661 [Hero World/static] This card cannot [Transform] other than by the [Act] of "Transform Belt, Card Winder" and it cannot enter the field if you do not have three
-- #2790 [Generic/triggered] When you [Transform] into this card, your opponent cannot draw cards during their next turn.
-- #3638 [Darkness Dragon World/static] The abilities of the monster in front of this monster are nullified. This ability cannot be nullified.
-- #3941 [Generic/static] This card is treated as a card on your field. It cannot be destroyed, leave the flag area, and its abilities cannot be nullified, and it can
-- #5209 [Detective Conan/triggered] When this card attacks, if you have three or more «Junior Detective League» on your field, all characters and items on your opponent's field
-- #5856 [SSSS.GRIDMAN/spell] All cards on your opponent's field cannot attack characters on your left and right.
-- #5877 [SSSS.GRIDMAN/static] During the battle that this card in the soul of a [Gridman] or [Powered Zenon] is attacking alone, damage dealt to your opponent by that car
-- #6012 [Ancient World/spell] Put up to one «Time Dragon» monster of different sizes from your drop zone into your hand for each time your flags [Reversal] during this fi
-- #6230 [Medabots/static] "Break Hammer" During the battle that this card is attacking alone, its damage cannot be reduced, and all cards on your opponent's field can
-- #6237 [Medabots/static] "Press" During the battle that this card is attacking, your opponent cannot call characters.
-- #6274 [Medabots/static] "Conceal" All «Kuwagata» on your field cannot be destroyed or returned to hand by your opponent's event effects.
 
 ## Other (22)
 - #119 [Danger World/spell] [Counter] One of those cards remain on the field.
@@ -165,6 +140,27 @@ Note: the audit overcounts. Some cards work through text handlers in game.js eve
 - #5433 [BanG Dream! Girls Band Party! PICO/triggered] At the end of the battle that a Hello, Happy World! character with this card in its soul attacked, you gain 2 life!
 - #5966 [Magic World/triggered] When your opponent is dealt damage by the effect of a «Shadow Shade» with this card in its soul, drop 1 of your opponent's gauge.
 - #6105 [Sword Art Online/triggered] [Counter] [Act] When you are being attacked, you may put this card from your drop zone on the bottom of your deck, and pay 1 gauge. If you d
+
+## Cannot / restriction (19)
+- #9 [Magic World/act] [Act] You may only cast this card when an opponent calls a size 2 or less monster.
+- #988 [Legend World/act] [Act] You may discard up to two Star from your hand. If you do, draw cards equal to the number of cards discarded. You may only use this abi
+- #1158 [Legend World/static] If you have a total of seven or more Hero and Fairy in your drop zone, nullify all abilities of monsters on your opponent's field. This abil
+- #1273 [Legend World/spell] [Counter] If there are two or more Wydar Sarkal on your field, nullify the call or nullify the spell cast by your opponent. You may only cas
+- #1420 [Hero World/spell] You cannot put cards into this card's soul other than by this card's ability.
+- #1554 [Dungeon World/spell] [Counter] Stand a Demon Lord on your field. You may only cast "Command of the Water Lord" once per turn.
+- #1561 [Katana World/triggered] When this card attacks and deals damage to your opponent, your opponent's item cannot [Stand] during his or her next stand phase.
+- #2433 [Danger World/spell] Pay as much life as you like. If you do, put cards from the top of your deck into your gauge equal to the number of life you paid. (You cann
+- #2465 [Star Dragon World/static] If this card is in the soul of a monster with "Zodiac" in its card name, during your opponent's final phase, your opponent cannot use or cas
+- #2473 [Star Dragon World/spell] [Counter] During that attack phase, if your life would become 0, it becomes 1 instead. You may only cast "Jackknife Linker" once per fight.
+- #2661 [Hero World/static] This card cannot [Transform] other than by the [Act] of "Transform Belt, Card Winder" and it cannot enter the field if you do not have three
+- #2790 [Generic/triggered] When you [Transform] into this card, your opponent cannot draw cards during their next turn.
+- #3638 [Darkness Dragon World/static] The abilities of the monster in front of this monster are nullified. This ability cannot be nullified.
+- #3941 [Generic/static] This card is treated as a card on your field. It cannot be destroyed, leave the flag area, and its abilities cannot be nullified, and it can
+- #5209 [Detective Conan/triggered] When this card attacks, if you have three or more «Junior Detective League» on your field, all characters and items on your opponent's field
+- #5877 [SSSS.GRIDMAN/static] During the battle that this card in the soul of a [Gridman] or [Powered Zenon] is attacking alone, damage dealt to your opponent by that car
+- #6012 [Ancient World/spell] Put up to one «Time Dragon» monster of different sizes from your drop zone into your hand for each time your flags [Reversal] during this fi
+- #6230 [Medabots/static] "Break Hammer" During the battle that this card is attacking alone, its damage cannot be reduced, and all cards on your opponent's field can
+- #6274 [Medabots/static] "Conceal" All «Kuwagata» on your field cannot be destroyed or returned to hand by your opponent's event effects.
 
 ## Soul / abilities of soul (15)
 - #356 [Legend World/triggered] When this card is set on the field, put two cards from the top of your deck into this card's soul.

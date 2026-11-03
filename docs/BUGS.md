@@ -299,4 +299,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - [x] Gain life on enter: #4066 #4315 #1962 #4503 #6215; entry-by-effect tracking via ABX.srcStack / unit.abxEnteredByEffect (tests/enter_life.js). [Ride] entry is not modeled.
 - [x] Soul to drop zone on the opponent's turn #4188 #5317, discarded by a Battle Poet effect #3250 (tests/soul_drop.js).
 - [x] Soul protections vs opponent effects: #2276 #2693 #2889 #4058 #4185 #5167 (tests/soul_protect.js).
-- [ ] Still open from these families: #1151 #1872 #2368 #2566 #3289 #3644 #3648 #3662 #4788 #5433 #5966 #6105 (gauge/life), the rest of the "cannot" group (#276 #1530 #5856 #6237 ...), draw/hand/deck/drop zone (32), size/call rules (22), soul abilities (15), "would" replacements (13).
+- [x] Call and attack restrictions: #276 #5856 (attacks on left/right blocked, core.attackBlocked), #1530 (no call to the center, both players), #6237 (opponent cannot call during its battle; game.js sets battle.r42Battle). The bot skips blocked targets (bot_ai.js) (tests/call_attack_block.js).
+- [ ] Still open from these families: #1151 #1872 #2368 #2566 #3289 #3644 #3648 #3662 #4788 #5433 #5966 #6105 (gauge/life), the rest of the "cannot" group, draw/hand/deck/drop zone (32), size/call rules (22), soul abilities (15), "would" replacements (13).

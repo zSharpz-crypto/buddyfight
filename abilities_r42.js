@@ -3334,4 +3334,30 @@
    [2889, /the card in the soul of a .?prism dragon.? monster cannot be put into your drop zone/i], [4058, /if this card is in the soul of a .?plague/i],
    [4185, /if this card is in the soul of a .?computer/i], [5167, /souls in the .?prism dragon.? with this card in its soul cannot be dropped/i]]
     .forEach(([id, re]) => OV42.push([id, re, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
+  /* ---- call + attack restrictions (tests/call_attack_block.js): #276 #5856 attack blocks, #1530 #6237 call blocks ---- */
+  const setHas = (fx, id) => !!fx && (fx.setSpells || []).some(c => c && c.id === id);
+  const prevAB2 = core.attackBlocked;
+  core.attackBlocked = function (attSide, units, defSide, targetPos) {
+    const r = prevAB2 ? prevAB2.apply(this, arguments) : null;
+    if (r) return r;
+    try {
+      if (targetPos === "left" || targetPos === "right") {
+        if ([B.plr, B.opp].some(fx => setHas(fx, 276))) return `"Final Showdown on the Great Gojo Bridge": monsters on the left and right cannot be attacked`;   // #276
+        if (setHas(F(defSide), 5856)) return `"Memories of Only Us Two": your opponent's cards cannot attack characters on the left and right`;   // #5856
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  };
+  ABX.callBlockExtra = function (side, card, pos) {
+    try {
+      if (!card || card.type !== "Monster") return null;
+      if (pos === "center" && [B.plr, B.opp].some(fx => setHas(fx, 1530))) return `"No Matter Where, Dragon Rules Supreme": nobody can call monsters to the center`;   // #1530
+      const bt = B.r42Battle;
+      if (bt && bt.turn === B.turnCount && bt.attSide !== side && (bt.units || []).some(u => u && u.card && u.card.id === 6237 && u.abxNullified !== B.turnCount && F(bt.attSide).monsters && Object.values(F(bt.attSide).monsters).includes(u))) return `"Robo-Emperor": you cannot call characters during this battle`;   // #6237
+    } catch (e) { /* ignore */ }
+    return null;
+  };
+  [[276, /monsters on the left and right cannot be attacked by both players/i], [1530, /you and your opponent cannot call monsters to the center/i],
+   [5856, /all cards on your opponent's field cannot attack characters on your left and right/i], [6237, /during the battle that this card is attacking, your opponent cannot call characters/i]]
+    .forEach(([id, re]) => OV42.push([id, re, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
 })(typeof window !== "undefined" ? window : globalThis);

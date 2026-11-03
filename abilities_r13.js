@@ -391,6 +391,8 @@
   // --- call restrictions ---
   function callBlock(side, card, pos) {
     if (!card || card.type !== "Monster") return null;
+    const extra = ABX.callBlockExtra && ABX.callBlockExtra(side, card, pos);
+    if (extra) return extra;
     for (const { st, src } of activeStatics(side, st => st.op === "static" && ["callOnly", "noCallPos"].includes(st.kind))) {
       if (st.kind === "callOnly" && st.np && !matchFilter(card, st.np.filter || {}, null, { side, f: F(side) })) return `"${src.card.name}": you cannot call monsters other than ${ABX.clean(st.np.raw || "").replace(/^an? /, "")}`;
       if (st.kind === "noCallPos" && pos && pos === st.pos) return `"${src.card.name}": you cannot call monsters to your ${st.pos}`;

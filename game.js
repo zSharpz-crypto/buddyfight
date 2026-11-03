@@ -8552,6 +8552,7 @@ const battle = {
   fireAttackPhaseEnd(side) { if (window.ABX && ABX.fireTurnEvent) ABX.fireTurnEvent("phaseEnd", "attack", side); },
 
   abxCheckEndAttack(attSide) {
+    this.r42Battle = null;
     if (!(window.ABX && ABX.attackPhaseEnded && ABX.attackPhaseEnded())) return false;
     if (this.activeSide !== attSide || this.phase !== "attack") return false;
     this.fireAttackPhaseEnd(attSide);
@@ -8575,6 +8576,7 @@ const battle = {
     const units = attackerZones.map(zp => unitAt(attFighter, zp)).filter(Boolean);
     if (units.length === 0) return;
     if (window.ABX && ABX.passiveRedirect) { const rp = ABX.passiveRedirect(defSide, targetPos, units); if (rp) { targetPos = rp; this.setPrompt("🎯 The attack's target was changed to the center monster!"); } }
+    this.r42Battle = { attSide, units: units.slice(), turn: this.turnCount };   // "during the battle that this card is attacking, your opponent cannot call characters" (#6237)
     if (window.ABX && ABX.core && units.some(u => ABX.core.isRestricted && ABX.core.isRestricted(u, "attack"))) {
       this.pendingAction = null; this.linkAttackers = [];
       this.setPrompt("✖ That card cannot attack this turn (card effect).");
