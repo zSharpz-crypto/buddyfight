@@ -3617,4 +3617,46 @@
     // #5702 Miserea: Set an impact in your final phase -> another attack phase (once per turn)
     OV42.push([5702, /during your final phase, when you .{0,3}set.{0,3} an impact/i, () => ({ kind: "triggered", trigger: { event: "youCast", np: ABX.parseNP("impact") }, conds: [{ t: "phase", phase: "final", who: "you" }], once: "turn", steps: [{ op: "extraPhase", what: "attack" }] })]);
   }
+
+  /* batch 4: #3103 Vivid Move, #3104 Eternal Guardian Dragon, Aettir */
+  {
+    const stOf = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    const askOpt = async (ctx, title, labels) => {
+      if (!ctx.auto && !ctx.f.isBot && !ABX.autoPlay && ABX.ui && ABX.ui.pickOption) return ABX.ui.pickOption({ title, options: labels.map(l => ({ label: l })) });
+      return 0;
+    };
+    OPS.r42VividMove = {
+      async run(s, ctx) {
+        const toHand = stOf("Return a \u00abCosmo Dragoon\u00bb on your field to your hand.");
+        const toTop = stOf("Put a \u00abCosmo Dragoon\u00bb on your field on the top of your deck.");
+        const has = core.refsFor(toHand[0].np, ctx).length > 0;
+        if (!has) return false;
+        const i = await askOpt(ctx, ctx.card.name + " \u2014 choose", ["Return a \u00abCosmo Dragoon\u00bb to your hand", "Put it on the top of your deck"]);
+        const st = i === 1 ? toTop : toHand;
+        for (const x of st) await OPS[x.op].run(x, ctx);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([3103, /return a .{0,3}cosmo dragoon.{0,3} from your field/i, () => ({ kind: "spell", steps: [{ op: "r42VividMove" }] })]);
+    OPS.r42AettirSwap = {
+      async run(s, ctx) {
+        const units = ((ctx.event && ctx.event.attUnits) || (ABX.battleCtx && ABX.battleCtx.attUnits) || []).filter(Boolean);
+        if (!units.length || !ctx.unit) return false;
+        const es = otherSide(ctx.side);
+        const refs = units.map(u => { const pos = core.posOfUnit(F(es), u); return pos ? { k: pos.startsWith("item") ? "item" : "unit", side: es, pos, unit: u, card: u.card, id: u.card.id } : null; }).filter(Boolean);
+        if (!refs.length) return false;
+        const ch = refs.length > 1 ? await core.pick(refs, { qty: { n: 1 } }, ctx, { intent: "harm", title: ctx.card.name + " \u2014 choose an attacking monster" }) : refs;
+        if (!ch || !ch.length) return false;
+        const i = await askOpt(ctx, ctx.card.name + " \u2014 return this card and the attacker to hand?", ["Yes", "No"]);
+        if (i === 1) return false;
+        const mv = { op: "moveSelf", to: { area: "hand", owner: "owner" } };
+        if (!(await OPS.moveSelf.run(mv, ctx))) return false;
+        await core.moveRefs(ch, { area: "hand", owner: "owner" }, ctx);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([3104, /you may return this card from your field/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42AettirSwap" }] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);

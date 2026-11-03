@@ -307,3 +307,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch (#3656 #1595 #5285 #5998 #3899 #209): abilities_r42.js, tests/dead_batch2.js. #5285 drop-hand-card cost is applied as a step (cast is not blocked when the hand is empty).
 - Batch 2 (#857 #6560 #1504 #91 #1959 #5987 #5536): abilities_r42.js; attack outcome now reports destroyedCount (game.js, abilities_engine.js); tests/dead_batch2.js.
 - Batch 3 (#6213 #6223 #6216 #2129 #5368 enter-line #5702): abilities_r42.js, tests/dead_batch2.js. Not built: #5368 'separate areas' line, #6445, #2014.
+- Batch 4 (#3103 #3104): abilities_r42.js, tests/dead_batch2.js.
