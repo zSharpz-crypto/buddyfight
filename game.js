@@ -1083,6 +1083,17 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
     if (rm && (fighter.overUsed ? fighter.overUsed[rm[2].toLowerCase()] : fighter.overturnUsed)) gauge = Math.max(0, gauge - parseInt(rm[1], 10));
   }
 
+  // #1961 Great Spell, Demons Concert: the gauge is reduced by the number of 72 Pillars on your field; #3920 Narcolepsy: -3 gauge if an item on your field has 6+ «Plague» spells in its soul
+  if (fighter && cardObj && cardObj.type === "Spell" && gauge > 0 && (cardObj.id === 1961 || cardObj.id === 3920)) {
+    if (cardObj.id === 1961) {
+      const n = getAllFieldUnits(fighter).filter(u => u && u.card && u.card.type === "Monster" && (u.card.attrs || []).some(a => /^(?:72)?pillars$/i.test(a))).length;
+      gauge = Math.max(0, gauge - n);
+    } else {
+      const plague = (it) => it && (it.soul || []).filter(e => { const sc = window.BUDDYFIGHT_CARDS.find(c => c.id === getSoulCardId(e)); return sc && (sc.attrs || []).some(a => /^plague$/i.test(a)); }).length >= 6;
+      if (["item", "item2", "item3", "item4"].some(k => plague(fighter[k]))) gauge = Math.max(0, gauge - 3);
+    }
+  }
+
   return { gauge, life, soul };
 }
 
@@ -7862,6 +7873,7 @@ const battle = {
 
       const s = (c.skill || "").toLowerCase();
       if (window.ABX && ABX.fireOtherEnter) ABX.fireOtherEnter(side, unit);
+      unit.abxCalledFromHand = true;
       if (window.ABX && ABX.ownsEnter && ABX.ownsEnter(c)) {
         ABX.fireEnter(side, c, unit);
       } else if (s.includes("when this card enters the field") || (parseDeckSearchCriteria(c) && !deckSearchIsNotEnterTimed(c))) {
@@ -8562,6 +8574,7 @@ const battle = {
 
     const units = attackerZones.map(zp => unitAt(attFighter, zp)).filter(Boolean);
     if (units.length === 0) return;
+    if (window.ABX && ABX.passiveRedirect) { const rp = ABX.passiveRedirect(defSide, targetPos, units); if (rp) { targetPos = rp; this.setPrompt("🎯 The attack's target was changed to the center monster!"); } }
     if (window.ABX && ABX.core && units.some(u => ABX.core.isRestricted && ABX.core.isRestricted(u, "attack"))) {
       this.pendingAction = null; this.linkAttackers = [];
       this.setPrompt("✖ That card cannot attack this turn (card effect).");

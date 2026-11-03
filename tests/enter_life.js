@@ -1,0 +1,34 @@
+// node tests/enter_life.js - gain-life-on-enter cards #4066 #4315 #1962 #4503 #6215 (entry by another card's effect is tracked via ABX.srcStack)
+const { createEnv } = require("./headless.js");
+let pass = 0, fail = 0;
+const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : JSON.stringify(extra ?? "")); };
+const env = createEnv(); const run = (c) => env.run('{' + c + '\n}'); const val = (c) => env.run('(function(){' + c + '\n})()');
+const settle = async () => { for (let i = 0; i < 60; i++) { env.flush(); await new Promise(r => setTimeout(r, 2)); } };
+env.run(`ABX.fast=true; ABX.autoPlay=true; globalThis.card=id=>window.BUDDYFIGHT_CARDS.find(c=>c.id===id);
+globalThis.mk=(id,soul)=>({card:card(id),rested:false,attacksLeft:1,soul:soul||[],tempPower:0,tempDef:0,tempCrit:0});
+globalThis.fresh=function(){ battle.start('hotseat', generateFlagDeck(447,'T',571,true), generateFlagDeck(447,'O',571,true)); battle.renderBattle=function(){};
+ ['plr','opp'].forEach(sd=>{ const f=battle.getFighter(sd); ['left','center','right'].forEach(p=>f.monsters[p]=null); f.item=null; f.item2=null; f.setSpells=[]; f.hand=[1]; f.life=5; }); ABX.srcStack=[]; };
+globalThis.enter=(id,srcId)=>{ globalThis.u=mk(id); battle.plr.monsters.center=u; ABX.srcStack=srcId?[card(srcId)]:[]; globalThis.l0=battle.plr.life; ABX.fireEnter('plr',card(id),u); };
+globalThis.mon=(re,not)=>window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).some(a=>re.test(a))&&c.id!==not);`);
+(async () => {
+  run(`fresh(); battle.plr.item=mk(46); battle.plr.item2=mk(46); enter(4066)`); await settle();
+  ck("4066 with 2 items: +2 life", val(`return battle.plr.life===l0+2`), val(`return [l0,battle.plr.life]`));
+  run(`fresh(); enter(4066)`); await settle();
+  ck("4066 no items: +0", val(`return battle.plr.life===l0`));
+  run(`fresh(); battle.plr.monsters.left=mk(mon(/^deitydragontribe$/i,4315).id); battle.plr.monsters.right=mk(mon(/^deitydragontribe$/i,4315).id); enter(4315)`); await settle();
+  ck("4315 itself + 2 others: +3 life", val(`return battle.plr.life===l0+3`), val(`return [l0,battle.plr.life]`));
+  run(`fresh(); globalThis.g0=battle.plr.gauge.length; enter(1962)`); await settle();
+  ck("1962 called normally: nothing", val(`return battle.plr.life===l0&&battle.plr.gauge.length===g0`));
+  run(`fresh(); globalThis.g0=battle.plr.gauge.length; enter(1962,46)`); await settle();
+  ck("1962 entered by an effect: +1 gauge +1 life", val(`return battle.plr.life===l0+1&&battle.plr.gauge.length===g0+1`), val(`return [l0,battle.plr.life,g0,battle.plr.gauge.length]`));
+  const bb = val(`return (mon(/^battlebuilding$/i,4503)||{}).id||0`);
+  run(`fresh(); enter(4503)`); await settle();
+  ck("4503 normal: +2 life", val(`return battle.plr.life===l0+2`));
+  run(`fresh(); enter(4503,${bb})`); await settle();
+  ck("4503 by another Battle Building effect: +5 life", val(`return battle.plr.life===l0+5`), val(`return [l0,battle.plr.life]`));
+  run(`fresh(); battle.plr.deck=[${bb},46,46]; globalThis.h0=battle.plr.hand.length; globalThis.d0=battle.plr.drop.length; enter(6215,${bb})`); await settle();
+  ck("6215 by Battle Building effect: +3 life, deck BB -> drop, draw", val(`return battle.plr.life===l0+3&&battle.plr.drop.length===d0+1&&battle.plr.hand.length===h0+1`), val(`return [l0,battle.plr.life,d0,battle.plr.drop.length,h0,battle.plr.hand.length]`));
+  run(`fresh(); battle.plr.deck=[${bb},46,46]; globalThis.d0=battle.plr.drop.length; enter(6215)`); await settle();
+  ck("6215 normal: +3 life only", val(`return battle.plr.life===l0+3&&battle.plr.drop.length===d0`));
+  console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
+})();

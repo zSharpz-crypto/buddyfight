@@ -3156,4 +3156,145 @@
     }, check: () => true
   };
   OV42.push([1985, /if you are not \[transform\] into this card/i, () => ({ kind: "act", tags: ["counter"], steps: [{ op: "r42TransformFromField" }] })]);
+  /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
+  OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
+  OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
+  const prevCAT3 = ABX.canAttackThrough;
+  ABX.canAttackThrough = function (side, unit, which) {
+    if (prevCAT3 && prevCAT3.apply(this, arguments)) return true;
+    try {
+      if (which === "own" || !unit || !unit.card) return false;
+      const f = F(side), g = f.abxThroughTurn;
+      if (g && g.turn === B.turnCount && monsList(f).includes(unit) && hasTribe(unit.card, g.tribe)) return true;                    // #3159
+      if (monsList(f).includes(unit) && /that girl/i.test(unit.card.name || "") && fieldHas(f, 5649)) return true;                  // #5649
+      if (equippedItems(f).includes(unit) && hasTribe(unit.card, "MoonlitBlackCats") && (f.setSpells || []).some(c => c && c.id === 6088)) return true;   // #6088
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  /* ---- "At the end of the battle that X attacked" family (tests/battle_end_family.js): #2302 #3256 #4543 #5023 #5434 #5556 ---- */
+  ABX.attFilterOK = function (t, src, units) {
+    const g = t && t.attFilter; if (!g) return true;
+    const cid = src && ((src.card && src.card.id) || src.cardId);
+    return (units || []).some(x => {
+      const u = x && (x.unit || x); if (!u || !u.card) return false;
+      if (g.tribes && !g.tribes.some(n => hasTribe(u.card, n))) return false;
+      if (g.nameHas && !lc(u.card.name || "").includes(lc(g.nameHas))) return false;
+      if (g.soul && !(u === src.unit || u === src.soulHost || (u.soul || []).includes(cid))) return false;
+      return true;
+    });
+  };
+  OPS.r42BEAttacker = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      let u;
+      if (s.self) u = ctx.unit;
+      else u = (B.r42BEUnits || []).map(x => x && (x.unit || x)).find(x => x && ABX.attFilterOK({ attFilter: s.attFilter }, { unit: ctx.unit, soulHost: ctx.soulHost, card: ctx.card }, [{ unit: x }]));
+      if (!u) return false;
+      if (s.needSoulTribe && !core.fieldUnits(f, true).some(x => x.unit && hasTribe(x.unit.card, s.needSoulTribe) && (x.unit.soul || []).length)) return false;
+      if (s.mode === "da") { u.tempDA = true; ABX.grantAttacks(u, 2); return true; }
+      if (s.mode === "hand") {
+        const pos = ["left", "center", "right", "center2"].find(p => f.monsters[p] === u);
+        if (!pos) return false;
+        f.monsters[pos] = null; (u.soul || []).forEach(id => f.drop.push(id)); f.hand.push(u.card.id);
+        return true;
+      }
+      return false;
+    },
+    check: () => true
+  };
+  [
+    [2302, /end of the battle that a monster with "zodiac"/i, { event: "battleEnd", self: false, attFilter: { nameHas: "Zodiac", soul: true } }, [{ op: "r42BEAttacker", mode: "da", attFilter: { nameHas: "Zodiac", soul: true } }]],
+    [3256, /end of the battle that a «?superheroine»? on your field attacked/i, { event: "battleEnd", self: false, attFilter: { tribes: ["Superheroine"] } }, [{ op: "r42BEAttacker", mode: "hand", optional: true, attFilter: { tribes: ["Superheroine"] } }]],
+    [4543, /end of the battle of that this card attacked/i, { event: "battleEnd", self: true }, [{ op: "r42BEAttacker", mode: "da", self: true, needSoulTribe: "Electrodeity" }]],
+    [5023, /end of the battle that this card attacked, put up to one card from the top/i, { event: "battleEnd", self: true }, [{ op: "r40CallTopDeckToken", name: "«Dragod»", power: 6000, defense: 6000, crit: 2, size: 0, attrs: ["Dragod"] }]],
+    [5434, /end of the battle that a pastel palettes character/i, { event: "battleEnd", self: false, attFilter: { tribes: ["PastelPalettes"], soul: true } }, [{ op: "damage", who: "opp", n: 1 }]],
+    [5556, /end of the battle that the «?adventurer»? or «?dungeon enemy»?/i, { event: "battleEnd", self: false, attFilter: { tribes: ["Adventurer", "DungeonEnemy"], soul: true } }, null]
+  ].forEach(([id, re, trigger, steps]) => OV42.push([id, re, () => ({ kind: "triggered", trigger, steps: steps || ABX.parseSentenceSteps("destroy up to one card on your opponent's field", {}).steps })]));
+  /* ---- redirect + attack-all family (tests/redirect_family.js): #3841 #5380 passive "change the target of the attacks", #6282 Gatling, #5928 soul Gatling ---- */
+  ABX.passiveRedirect = function (defSide, targetPos, units) {
+    try {
+      if (targetPos === "center") return null;
+      const f = F(defSide), c = f.monsters.center;
+      if (!c || !c.card) return null;
+      if (hasTribe(c.card, "PrismDragon") && (f.setSpells || []).some(x => x && x.id === 3841)) return "center";            // #3841
+      if (hasTribe(c.card, "PastelPalettes") && fieldHas(f, 5380)) return "center";                                       // #5380
+    } catch (e) { /* ignore */ }
+    return null;
+  };
+  OV42.push([6282, /when this card attacks a character alone, it attacks all characters on your opponent's field instead/i, () => ({ kind: "triggered", trigger: { event: "attack", self: true, alone: true, targetPos: ["left", "center", "right"] }, conds: [], steps: [{ op: "static", kind: "attackAllOpp", includeFighter: false, instead: true }] })]);
+  OV42.push([5928, /when this card in the soul of a \[?gridman\]? or \[?powered zenon\]? is attacking a character alone/i, () => ({ kind: "triggered", trigger: { event: "attack", self: true, soulSelf: true, alone: true, hostNames: ["gridman", "powered zenon"], targetPos: ["left", "center", "right"] }, conds: [], steps: [{ op: "static", kind: "attackAllOpp", includeFighter: false, instead: true }] })]);
+  /* ---- cost reductions handled inside game.js parseCardCost (tests/gauge_cost.js): #1961 #3920 #4764; marks the text lines as built ---- */
+  [[1961, /amount of gauge written on the \[call cost\] is reduced by the number of 72 pillars/i], [3920, /gauge cost written in this card's \[cast cost\] is reduced by 3/i], [4764, /\[call cost\] is reduced by 4 gauge if you have used \[overturn\]/i]]
+    .forEach(([id, re]) => OV42.push([id, re, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
+  /* ---- put-into-drop-zone triggers that feed the gauge (tests/drop_gauge.js): #304 #1003 #1987 ---- */
+  TG(1003, "when this card is put into your drop zone from your hand or field", LEAVE_SELF, "put a card from your opponent's gauge into the drop zone", { also: [{ event: "discardedFromHand", self: true }] });
+  TG(1987, "when this card is put into your drop zone from hand", { event: "discardedFromHand", self: true }, "either put the top card of your deck in your gauge, or put a card from your opponent's gauge into his or her drop zone");
+  TG(304, "when this card is called from your drop zone", { event: "enterFromDrop", owner: "you", np: { filter: { namesExact: [String((core.cardOf(304) || {}).name || "?").toLowerCase()] } } }, "put the top card of your deck into your gauge");
+  /* ---- gain-life-on-enter cards (tests/enter_life.js): #4066 #4315 #1962 #4503 #6215; entry-by-effect tracking (unit.abxEnteredByEffect / abxEnteredBy) ---- */
+  const prevFE42 = ABX.fireEnter;
+  ABX.fireEnter = function (side, card, unit) {
+    if (unit && !unit.abxCalledFromHand) { const st = ABX.srcStack || []; unit.abxEnteredByEffect = st.length > 0; unit.abxEnteredBy = st.length ? st[st.length - 1] : null; }
+    return prevFE42.apply(this, arguments);
+  };
+  const bySrcTribe = (unit, ctx, tribes) => !!(unit && unit.abxEnteredBy && unit.abxEnteredBy.id !== ctx.card.id && tribes.some(t => hasTribe(unit.abxEnteredBy, t)));
+  OPS.r42LifePer = {
+    run(s, ctx) {
+      const f = ctx.f;
+      const n = s.per === "items" ? equippedItems(f).length : core.fieldUnits(f, true).filter(x => x.unit && x.unit.card.type === "Monster" && hasTribe(x.unit.card, s.tribe)).length;
+      if (n > 0) f.life += n;
+      fresh(); return n > 0;
+    }, check: () => true
+  };
+  OPS.r42Enter1962 = {
+    run(s, ctx) {
+      if (!(ctx.unit && ctx.unit.abxEnteredByEffect)) return false;
+      const f = ctx.f; if (f.deck.length) f.gauge.push(f.deck.shift());
+      f.life += 1; fresh(); return true;
+    }, check: () => true
+  };
+  OPS.r42EnterBB4503 = {
+    run(s, ctx) {
+      const f = ctx.f; f.life += 2;
+      if (bySrcTribe(ctx.unit, ctx, ["BattleBuilding"])) f.life += 3;
+      fresh(); return true;
+    }, check: () => true
+  };
+  OPS.r42EnterBB6215 = {
+    run(s, ctx) {
+      const f = ctx.f; f.life += 3;
+      if (bySrcTribe(ctx.unit, ctx, ["BattleBuilding", "SuperRobot"])) {
+        const i = f.deck.findIndex(id => { const c = core.cardOf(id); return c && c.type === "Monster" && (hasTribe(c, "BattleBuilding") || hasTribe(c, "SuperRobot")); });
+        if (i >= 0) {
+          f.drop.push(f.deck.splice(i, 1)[0]);
+          for (let k = f.deck.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [f.deck[k], f.deck[j]] = [f.deck[j], f.deck[k]]; }
+          if (f.deck.length) f.hand.push(f.deck.shift());
+        }
+      }
+      fresh(); return true;
+    }, check: () => true
+  };
+  [[4066, /you gain 1 life equal to the number of items you have equipped/i, { op: "r42LifePer", per: "items" }],
+   [4315, /you gain 1 life for every .?deity dragon tribe.? monster on your field/i, { op: "r42LifePer", per: "tribe", tribe: "DeityDragonTribe" }],
+   [1962, /when this card enters the field due to an effect/i, { op: "r42Enter1962" }],
+   [4503, /when this card enters the field or \[?ride\]?, you gain 2 life/i, { op: "r42EnterBB4503" }],
+   [6215, /when this card enters the field or \[?ride\]?, you gain 3 life/i, { op: "r42EnterBB6215" }]]
+    .forEach(([id, re, step]) => OV42.push([id, re, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [step] })]));
+  /* ---- "put into the drop zone from a soul" (tests/soul_drop.js): #4188 #5317; "discarded by a «Battle Poet» effect": #3250 ---- */
+  TG(4188, "when this card is put into the drop zone from the soul", { event: "soulToDrop", self: true }, "put the top card of your deck into your gauge, you gain 1 life, and draw a card", { conds: [{ t: "turn", who: "opp" }] });
+  TG(5317, "when this card is put into your drop zone from soul", { event: "soulToDrop", self: true }, "put the top card of your deck into your gauge, you gain 1 life, and draw a card", { conds: [{ t: "turn", who: "opp" }] });
+  // #3250: remember which card's effect discarded a card from the hand
+  const prevFD42 = ABX.fireDiscarded;
+  ABX.fireDiscarded = function (side, card) {
+    try { const st = ABX.srcStack || []; const f = F(side); f.discardedBy = f.discardedBy || {}; if (card) f.discardedBy[card.id] = st.length ? st[st.length - 1] : null; } catch (e) { /* ignore */ }
+    return prevFD42.apply(this, arguments);
+  };
+  OPS.r42Discard3250 = {
+    run(s, ctx) {
+      const src = ctx.f.discardedBy && ctx.f.discardedBy[3250];
+      if (!(src && /battle poet/i.test(src.name || ""))) return false;
+      if (ctx.f.deck.length) ctx.f.gauge.push(ctx.f.deck.shift());
+      ctx.f.life += 1; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([3250, /when this card is discarded from your hand by an effect of a card with .?battle poet/i, () => ({ kind: "triggered", trigger: { event: "discardedFromHand", self: true }, conds: [], steps: [{ op: "r42Discard3250" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);

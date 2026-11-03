@@ -798,7 +798,11 @@
   }
 
   ABX.stats = ABX.stats || { runs: 0 };
-  async function runAbility(side, card, ab, unit, opts) {
+  async function runAbility(side, card, ab, unit, opts) {   // keeps a stack of the cards whose abilities are running ("entered by another X effect")
+    (ABX.srcStack = ABX.srcStack || []).push(card);
+    try { return await runAbility0(side, card, ab, unit, opts); } finally { ABX.srcStack.pop(); }
+  }
+  async function runAbility0(side, card, ab, unit, opts) {
     opts = opts || {};
     ABX.stats.runs++;
     const f = F(side), e = F(otherSide(side));
@@ -983,7 +987,7 @@
     // cards in the soul of a field monster whose trigger works from there ("if this card is in the soul of your buddy", #6563 Buddy Sky Day)
     fieldUnits(f, true).forEach(x => (x.unit.soul || []).forEach(e => {
       const sc = cardOf(typeof root.getSoulCardId === "function" ? root.getSoulCardId(e) : e);
-      if (sc && abilitiesOf(sc, a => a.kind === "triggered" && /\bif this card is in the soul of your buddy\b/i.test(a.raw || "")).length) out.push({ unit: null, card: sc, hostArea: "soul", soulHost: x.unit });
+      if (sc && abilitiesOf(sc, a => a.kind === "triggered" && (/\bif this card is in the soul of your buddy\b/i.test(a.raw || "") || (a.trigger && a.trigger.attFilter && a.trigger.attFilter.soul) || (a.trigger && a.trigger.soulSelf))).length) out.push({ unit: null, card: sc, hostArea: "soul", soulHost: x.unit });
     }));
     (f.setSpells || []).forEach(c => {
       out.push({ unit: null, card: c, hostArea: "field" });
@@ -1053,7 +1057,8 @@
       const defUnit = ["left", "center", "right"].includes(targetPos) ? F(defSide).monsters[targetPos] : null;
       const tgtOK = (t) => (!t.targetPos || t.targetPos.includes(targetPos)) && (!t.target || (defUnit && matchFilter(defUnit.card, t.target.filter || {}, { unit: defUnit, side: defSide }, { f: F(defSide) })));
       if (ABX.applyBattleNullify) ABX.applyBattleNullify(attSide, units.map(u => u.unit), defSide, defUnit);
-      await fireTriggers((t, src, side) => (t.event === "attack" && t.self && tgtOK(t) && side === attSide && us.has(src.unit)) ||
+      await fireTriggers((t, src, side) => (t.event === "attack" && t.self && tgtOK(t) && (!t.alone || units.length === 1) && side === attSide && us.has(src.unit)) ||
+        (t.event === "attack" && t.soulSelf && src.soulHost && tgtOK(t) && (!t.alone || units.length === 1) && side === attSide && us.has(src.soulHost) && (!t.hostNames || t.hostNames.some(n => lc(src.soulHost.card.name || "").includes(n)))) ||
         (t.event === "link" && t.self && units.length > 1 && side === attSide && us.has(src.unit) && (!ABX.linkWithOK || ABX.linkWithOK(t, src.unit, units, attSide))) ||
         (t.event === "otherAttack" && side === attSide && (src.unit || (src.card && (F(side).setSpells || []).includes(src.card))) && !us.has(src.unit) && !t.np.self && units.some(u => matchFilter(u.unit.card, t.np.filter || {}, { unit: u.unit, side: attSide }, { f: F(attSide) }))) ||
         (t.event === "otherLink" && units.length > 1 && side === attSide && src.unit !== undefined && units.some(u => u.unit && matchFilter(u.unit.card, t.np.filter || {}, { unit: u.unit, side: attSide }, { f: F(attSide) }))) ||
@@ -1100,8 +1105,9 @@
     });
   };
   ABX.fireBattleEnd = function (attSide, units) {
+    B.r42BEUnits = units;
     if (ABX.clearBattleNullify) ABX.clearBattleNullify();
-    return ABX.queue(() => fireTriggers((t, src, side) => t.event === "battleEnd" && side === attSide && (!t.self || units.some(u => u.unit === src.unit)) && (!t.link || units.length > 1) && (!t.with || !ABX.linkWithOK || ABX.linkWithOK(t, src.unit, units, attSide)), { name: "battleEnd" }));
+    return ABX.queue(() => fireTriggers((t, src, side) => t.event === "battleEnd" && side === attSide && (!t.self || units.some(u => u.unit === src.unit)) && (!t.link || units.length > 1) && (!t.attFilter || !ABX.attFilterOK || ABX.attFilterOK(t, src, units)) && (!t.with || !ABX.linkWithOK || ABX.linkWithOK(t, src.unit, units, attSide)), { name: "battleEnd" }));
   };
   ABX.fireTurnEvent = function (kind, phase, explicitActiveSide) {
     const activeAtFire = explicitActiveSide || B.activeSide;
