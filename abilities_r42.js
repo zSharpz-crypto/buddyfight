@@ -3659,4 +3659,74 @@
     };
     OV42.push([3104, /you may return this card from your field/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42AettirSwap" }] })]);
   }
+
+  /* Secret Sword soul-casts when attacked: #291 (power 5000+ attacker), #292 (link attack), #296 (opponent's Weapon) */
+  {
+    const attackersOf = (ctx) => ((ctx.event && ctx.event.attUnits) || (ABX.battleCtx && ABX.battleCtx.attUnits) || []).filter(Boolean);
+    const mkGuard = (name, test) => {
+      OPS[name] = { async run(s, ctx) { const us = attackersOf(ctx); if (!us.length || !test(us, ctx)) return false; return OPS.castSelfFromSoul.run({ op: "castSelfFromSoul", pay: true }, ctx); } };
+    };
+    mkGuard("r42SSPower5000", (us, ctx) => us.length === 1 && getUnitEffectiveCombatStats(ctx.e, us[0]).power >= 5000 && core.posOfUnit(ctx.e, us[0]) && !String(core.posOfUnit(ctx.e, us[0])).startsWith("item"));
+    mkGuard("r42SSLink", (us) => us.length > 1);
+    mkGuard("r42SSWeapon", (us, ctx) => us.some(u => String(core.posOfUnit(ctx.e, u) || "").startsWith("item")));
+    const SS = (id, re, op) => OV42.push([id, re, (ab) => ({ kind: "triggered", trigger: { event: "oppAttack" }, conds: [], optional: true, steps: [{ op }] })]);
+    SS(291, /you are being attacked by a monster with power 5000/i, "r42SSPower5000");
+    SS(292, /you are being link attacked/i, "r42SSLink");
+    SS(296, /you are being attacked by an opponent's weapon/i, "r42SSWeapon");
+  }
+
+  /* #1351 Long-range Cannon: the card you are [Ride] on can attack through the center this turn */
+  OPS.r42RideThrough = { run(s, ctx) { ctx.f.abxRideThrough = B.turnCount; return true; }, check: () => true };
+  OV42.push([1351, /a card you are .{0,3}ride.{0,3} on can attack/i, () => ({ kind: "spell", steps: [{ op: "r42RideThrough" }] })]);
+  OV42.push([1351, /you may only cast this card if you are .{0,3}ride/i, () => ({ kind: "rule", steps: [] })]);
+  {
+    const prevCAT4 = ABX.canAttackThrough;
+    ABX.canAttackThrough = function (side, unit, which) {
+      if (prevCAT4 && prevCAT4.apply(this, arguments)) return true;
+      try {
+        if (which === "own" || !unit || !unit.card) return false;
+        const f = F(side);
+        return f.abxRideThrough === B.turnCount && (f.item === unit || f.item2 === unit) && /\[ride\]/i.test(String(unit.card.skill || ""));
+      } catch (e) { return false; }
+    };
+  }
+
+  /* #3242 Jester Dark Fox, #5436 Red Mesh: end-of-battle effects */
+  {
+    const oppFieldNP = () => ABX.parseSentenceSteps("Destroy a monster on your opponent's field.", {}).steps[0].np;
+    const myFieldNP = () => ABX.parseSentenceSteps("Destroy a monster on your field.", {}).steps[0].np;
+    const destroyRef = async (ctx, ref) => { ctx.bind = ctx.bind || {}; ctx.bind.chosen = [ref]; return OPS.destroy.run({ op: "destroy", np: { qty: { n: 1 }, ref: "chosen", self: false, filter: {}, zone: null } }, ctx); };
+    OPS.r42JesterFox = {
+      async run(s, ctx) {
+        const oc = core.refsFor(oppFieldNP(), ctx).filter(r => r.unit), mc = core.refsFor(myFieldNP(), ctx).filter(r => r.unit);
+        if (!oc.length || !mc.length) return false;
+        const ch = await core.pick(oc, { qty: { n: 1 } }, ctx, { intent: "harm", title: ctx.card.name + " \u2014 choose an opponent's monster" });
+        const target = ch && ch[0]; if (!target) return false;
+        const mine = await core.pick(mc, { qty: { n: 1 } }, ctx, { intent: "cost", title: ctx.card.name + " \u2014 destroy a monster on your field" });
+        const m = mine && mine[0]; if (!m) return false;
+        await destroyRef(ctx, m);
+        if (core.fieldUnits(ctx.f, true).some(x => x.unit === m.unit)) return false;   // it was not destroyed
+        const es = otherSide(ctx.side), ef = F(es);
+        if (target.unit.soul && target.unit.soul.length) { const sid = target.unit.soul.shift(); ef.drop.push(typeof getSoulCardId === "function" ? getSoulCardId(sid) : sid); }
+        await destroyRef(ctx, target);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([3242, /adventurer.{0,6}or.{0,6}skull warrior.{0,40}attacked/i, () => ({ kind: "triggered", trigger: { event: "battleEnd", self: false, attFilter: { tribes: ["Adventurer", "SkullWarrior"] } }, conds: [], optional: true, steps: [{ op: "r42JesterFox" }] })]);
+    OPS.r42RedMesh = {
+      async run(s, ctx) {
+        const oc = core.refsFor(oppFieldNP(), ctx).filter(r => r.unit);
+        if (!oc.length) return false;
+        const ch = await core.pick(oc, { qty: { n: 1 } }, ctx, { intent: "harm", title: ctx.card.name + " \u2014 choose an opponent's character" });
+        const t = ch && ch[0]; if (!t) return false;
+        let ret = false;
+        if (!ctx.auto && !ctx.f.isBot && !ABX.autoPlay && ABX.ui && ABX.ui.pickOption) ret = (await ABX.ui.pickOption({ title: ctx.card.name + " \u2014 destroy or return to hand?", options: [{ label: "Destroy it" }, { label: "Return it to hand" }] })) === 1;
+        if (ret) await core.moveRefs([t], { area: "hand", owner: "owner" }, ctx); else await destroyRef(ctx, t);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([5436, /at the end of the battle that an afterglow character/i, () => ({ kind: "triggered", trigger: { event: "battleEnd", self: false, attFilter: { tribes: ["Afterglow"], soul: true } }, conds: [], steps: [{ op: "r42RedMesh" }] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);
