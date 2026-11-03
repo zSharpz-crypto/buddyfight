@@ -865,6 +865,11 @@ function hasDragonInCard(card) {
 
 const DEITY_GARGA_BUDDY_IDS = [4957, 5021]; // Deity Gargantua Dragon: "if it is your buddy, you may use «Dragod» monsters from all worlds!"
 
+// «Dragod» written in the card's attributes / tribe (a Flag is never a deck card)
+function hasDragodAttr(card) {
+  return !!card && card.type !== "Flag" && (card.attrs || []).some(a => String(a).toLowerCase() === "dragod");
+}
+
 function isAllFlagsRuleCard(card) {
   if (!card || card.omni || card.dragod) return false;
   return /you may use this card with all flags|this card can be used with all flags/i.test(card.skill || "");
@@ -942,9 +947,10 @@ function checkCardLegalityForFlag(card, flagCard, editingLostDeck = false, buddy
     return { allowed: true, maxCopies: 1, isOffWorldOmni: true };
   }
 
-  // [Dragod] or "You may use this card with all flags": max 4 copies with all flags
-  if (card.dragod || isAllFlagsRuleCard(card)) {
-    return { allowed: true, maxCopies: 4, isDragod: Boolean(card.dragod), isAllFlags: !card.dragod };
+  // [Dragod] keyword, a «Dragod» tribe / attribute, or "You may use this card with all flags": max 4 copies with all flags
+  if (card.dragod || hasDragodAttr(card) || isAllFlagsRuleCard(card)) {
+    const isD = Boolean(card.dragod) || hasDragodAttr(card);
+    return { allowed: true, maxCopies: 4, isDragod: isD, isAllFlags: !isD };
   }
 
   // Deity Gargantua Dragon (#4957 / #5021): "if it is your buddy, you may use «Dragod» monsters from all worlds!"
@@ -3634,7 +3640,7 @@ const app = {
       } else if (worldFilter === "FLAGS_ONLY") {
         if (c.type !== "Flag") return false;
       } else if (worldFilter === "DRAGOD_ONLY") {
-        if (!c.dragod) return false;
+        if (!c.dragod && !hasDragodAttr(c)) return false;
       } else if (worldFilter === "OMNI_LORDS") {
         if (!c.omni) return false;
       } else if (worldFilter === "") {

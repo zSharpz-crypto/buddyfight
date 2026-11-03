@@ -109,7 +109,7 @@ const ok = (c, m) => { if (!c) { fail++; console.log("FAIL:", m); } else console
       ziunOffWorldMax1: checkCardLegalityForFlag(c1006, magicFlag, false).maxCopies === 1,
       emblemAllFlagsSpell: c1399.omni === false && c1399.dragod === false && checkCardLegalityForFlag(c1399, magicFlag, false).maxCopies === 4,
       kokujoNotOmni: c3007.omni === false && !c3007.kw.includes("Omni Lord"),
-      sonicModeNotAllFlags: c4281.dragod === false && checkCardLegalityForFlag(c4281, magicFlag, false).allowed === false,
+      sonicModeAllFlags: c4281.dragod === false && checkCardLegalityForFlag(c4281, magicFlag, false).allowed === true && checkCardLegalityForFlag(c4281, magicFlag, false).maxCopies === 4,   // changed 3 Nov: a «Dragod» tribe / attribute can be used in any world (max 4)
       sonicModeWithDeityGargaBuddy: checkCardLegalityForFlag(c4281, magicFlag, false, 4957).allowed === true && checkCardLegalityForFlag(c4281, magicFlag, false, 4957).maxCopies === 4,
       trueDragod4311: c4311.dragod === true && checkCardLegalityForFlag(c4311, magicFlag, false).maxCopies === 4,
       itemSizesFixed: c6183.size === null && c6191.size === null && CARD_MAP.get(2794).size === null,
@@ -165,7 +165,7 @@ const ok = (c, m) => { if (!c) { fail++; console.log("FAIL:", m); } else console
   ok(r.exec195 && r.exec239 && r.exec261, "unquoted ability names (#195, #239) and inverted tribe count (#261) are executable");
   ok(r.juzumaru[0] === 3000 && r.juzumaru[1] === 3000 && r.juzumaru[2] === 6000, `#261 Elite Sword, Juzumaru gets +3000 with 2+ Ninjas on field (${r.juzumaru})`);
   ok(r.asmodai99[0] === 0 && !r.asmodai99[1] && !r.asmodai99[2], `#99 Champion Wrestler Asmodai discards hand and destroys opponent cards (${r.asmodai99})`);
-  ok(r.dragodOmniData.ziunOmniOnly && r.dragodOmniData.ziunOffWorldMax1 && r.dragodOmniData.emblemAllFlagsSpell && r.dragodOmniData.kokujoNotOmni && r.dragodOmniData.sonicModeNotAllFlags && r.dragodOmniData.sonicModeWithDeityGargaBuddy && r.dragodOmniData.trueDragod4311 && r.dragodOmniData.itemSizesFixed && r.dragodOmniData.mukuroCallCostFixed,
+  ok(r.dragodOmniData.ziunOmniOnly && r.dragodOmniData.ziunOffWorldMax1 && r.dragodOmniData.emblemAllFlagsSpell && r.dragodOmniData.kokujoNotOmni && r.dragodOmniData.sonicModeAllFlags && r.dragodOmniData.sonicModeWithDeityGargaBuddy && r.dragodOmniData.trueDragod4311 && r.dragodOmniData.itemSizesFixed && r.dragodOmniData.mukuroCallCostFixed,
     `Dragod, Omni Lord, Deity Gargantua Dragon buddy rule, and card size/cost fixes verified (${JSON.stringify(r.dragodOmniData)})`);
   ok(r.crossnizeFieldToSoul && r.crossnizePutIntoSoulTrigger, `[Crossnize] puts monster from field into «Neodragon» soul and fires putIntoSoul trigger`);
   ok(r.crossnizeSoulAct, `[Crossnize] «Dragonarms» in «Neodragon» soul (#1631 Nanobreak) activates soul [Act], drops from soul, and [Stand]s host`);
