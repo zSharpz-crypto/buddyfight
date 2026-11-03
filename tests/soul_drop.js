@@ -1,4 +1,4 @@
-// node tests/soul_drop.js - "put into the drop zone from a soul" (#4188 #5317) and "discarded by a Battle Poet effect" (#3250)
+// node tests/soul_drop.js - "put into the drop zone from a soul" (#4188 #5317)
 const { createEnv } = require("./headless.js");
 let pass = 0, fail = 0;
 const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : JSON.stringify(extra ?? "")); };
@@ -22,12 +22,5 @@ globalThis.fresh=function(){ battle.start('hotseat', generateFlagDeck(447,'T',57
   run(`fresh(); battle.activeSide='opp'; battle.plr.monsters.left=mk(46,[4188]); battle.plr.deck=[46,46,46]; globalThis.s0=snap(); globalThis.st=ABX.parseSentenceSteps("destroy a monster on your opponent's field",{});`);
   run(`ABX.core.runAbility('opp', card(46), {kind:'act', steps: st.steps, conds: [], unparsed: []}, null, {})`); await settle();
   ck("4188 via opponent effect: exactly once", val(`return snap().l===s0.l+1`), val(`return [s0,snap(),!!battle.plr.monsters.left]`));
-  // #3250
-  run(`fresh(); battle.plr.drop.push(3250); battle.plr.deck=[46,46]; globalThis.s0=snap(); ABX.srcStack=[{id:1,name:'Battle Poet, Test'}];`);
-  run(`ABX.fireDiscarded('plr',card(3250))`); await settle();
-  ck("3250 discarded by a Battle Poet effect: +1 life +1 gauge", val(`const s=snap(); return s.l===s0.l+1&&s.g===s0.g+1`), val(`return [s0,snap()]`));
-  run(`fresh(); battle.plr.drop.push(3250); battle.plr.deck=[46,46]; globalThis.s0=snap(); ABX.srcStack=[{id:1,name:'Other Card'}];`);
-  run(`ABX.fireDiscarded('plr',card(3250))`); await settle();
-  ck("3250 discarded by another card: nothing", val(`return snap().l===s0.l`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

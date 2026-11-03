@@ -296,8 +296,8 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - [x] Passive attack redirect #3841 #5380 (game.js initiateAttackWithDefenseCheck -> ABX.passiveRedirect), attack-all-instead #6282 #5928 (tests/redirect_family.js). #5380's [Counterattack] line is not done.
 - [x] Cost reductions in parseCardCost: #1961 #3920 (and #4764 verified) (tests/gauge_cost.js).
 - [x] Put-into-drop-zone triggers: #304 #1003 #1987 (tests/drop_gauge.js).
-- [x] Gain life on enter: #4066 #4315 #1962 #4503 #6215; entry-by-effect tracking via ABX.srcStack / unit.abxEnteredByEffect (tests/enter_life.js). [Ride] entry is not modeled.
-- [x] Soul to drop zone on the opponent's turn #4188 #5317, discarded by a Battle Poet effect #3250 (tests/soul_drop.js).
+- [x] Gain life on enter: #4066 #4315 #1962; entry-by-effect tracking via ABX.srcStack / unit.abxEnteredByEffect (tests/enter_life.js). (#4503 #6215 #3250 are covered by the Hero World batches above.)
+- [x] Soul to drop zone on the opponent's turn #4188 #5317 (tests/soul_drop.js).
 - [x] Soul protections vs opponent effects: #2276 #2693 #2889 #4058 #4185 #5167 (tests/soul_protect.js).
 - [x] Call and attack restrictions: #276 #5856 (attacks on left/right blocked, core.attackBlocked), #1530 (no call to the center, both players), #6237 (opponent cannot call during its battle; game.js sets battle.r42Battle). The bot skips blocked targets (bot_ai.js) (tests/call_attack_block.js).
 - [ ] Still open from these families: #1151 #1872 #2368 #2566 #3289 #3644 #3648 #3662 #4788 #5433 #5966 #6105 (gauge/life), the rest of the "cannot" group, draw/hand/deck/drop zone (32), size/call rules (22), soul abilities (15), "would" replacements (13).

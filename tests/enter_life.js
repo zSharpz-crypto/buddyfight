@@ -1,4 +1,4 @@
-// node tests/enter_life.js - gain-life-on-enter cards #4066 #4315 #1962 #4503 #6215 (entry by another card's effect is tracked via ABX.srcStack)
+// node tests/enter_life.js - gain-life-on-enter cards #4066 #4315 #1962 (entry by another card's effect is tracked via ABX.srcStack)
 const { createEnv } = require("./headless.js");
 let pass = 0, fail = 0;
 const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : JSON.stringify(extra ?? "")); };
@@ -21,14 +21,5 @@ globalThis.mon=(re,not)=>window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.
   ck("1962 called normally: nothing", val(`return battle.plr.life===l0&&battle.plr.gauge.length===g0`));
   run(`fresh(); globalThis.g0=battle.plr.gauge.length; enter(1962,46)`); await settle();
   ck("1962 entered by an effect: +1 gauge +1 life", val(`return battle.plr.life===l0+1&&battle.plr.gauge.length===g0+1`), val(`return [l0,battle.plr.life,g0,battle.plr.gauge.length]`));
-  const bb = val(`return (mon(/^battlebuilding$/i,4503)||{}).id||0`);
-  run(`fresh(); enter(4503)`); await settle();
-  ck("4503 normal: +2 life", val(`return battle.plr.life===l0+2`));
-  run(`fresh(); enter(4503,${bb})`); await settle();
-  ck("4503 by another Battle Building effect: +5 life", val(`return battle.plr.life===l0+5`), val(`return [l0,battle.plr.life]`));
-  run(`fresh(); battle.plr.deck=[${bb},46,46]; globalThis.h0=battle.plr.hand.length; globalThis.d0=battle.plr.drop.length; enter(6215,${bb})`); await settle();
-  ck("6215 by Battle Building effect: +3 life, deck BB -> drop, draw", val(`return battle.plr.life===l0+3&&battle.plr.drop.length===d0+1&&battle.plr.hand.length===h0+1`), val(`return [l0,battle.plr.life,d0,battle.plr.drop.length,h0,battle.plr.hand.length]`));
-  run(`fresh(); battle.plr.deck=[${bb},46,46]; globalThis.d0=battle.plr.drop.length; enter(6215)`); await settle();
-  ck("6215 normal: +3 life only", val(`return battle.plr.life===l0+3&&battle.plr.drop.length===d0`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

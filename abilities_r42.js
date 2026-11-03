@@ -3230,13 +3230,12 @@
   TG(1003, "when this card is put into your drop zone from your hand or field", LEAVE_SELF, "put a card from your opponent's gauge into the drop zone", { also: [{ event: "discardedFromHand", self: true }] });
   TG(1987, "when this card is put into your drop zone from hand", { event: "discardedFromHand", self: true }, "either put the top card of your deck in your gauge, or put a card from your opponent's gauge into his or her drop zone");
   TG(304, "when this card is called from your drop zone", { event: "enterFromDrop", owner: "you", np: { filter: { namesExact: [String((core.cardOf(304) || {}).name || "?").toLowerCase()] } } }, "put the top card of your deck into your gauge");
-  /* ---- gain-life-on-enter cards (tests/enter_life.js): #4066 #4315 #1962 #4503 #6215; entry-by-effect tracking (unit.abxEnteredByEffect / abxEnteredBy) ---- */
+  /* ---- gain-life-on-enter cards (tests/enter_life.js): #4066 #4315 #1962; entry-by-effect tracking (unit.abxEnteredByEffect / abxEnteredBy) ---- */
   const prevFE42 = ABX.fireEnter;
   ABX.fireEnter = function (side, card, unit) {
     if (unit && !unit.abxCalledFromHand) { const st = ABX.srcStack || []; unit.abxEnteredByEffect = st.length > 0; unit.abxEnteredBy = st.length ? st[st.length - 1] : null; }
     return prevFE42.apply(this, arguments);
   };
-  const bySrcTribe = (unit, ctx, tribes) => !!(unit && unit.abxEnteredBy && unit.abxEnteredBy.id !== ctx.card.id && tribes.some(t => hasTribe(unit.abxEnteredBy, t)));
   OPS.r42LifePer = {
     run(s, ctx) {
       const f = ctx.f;
@@ -3252,51 +3251,13 @@
       f.life += 1; fresh(); return true;
     }, check: () => true
   };
-  OPS.r42EnterBB4503 = {
-    run(s, ctx) {
-      const f = ctx.f; f.life += 2;
-      if (bySrcTribe(ctx.unit, ctx, ["BattleBuilding"])) f.life += 3;
-      fresh(); return true;
-    }, check: () => true
-  };
-  OPS.r42EnterBB6215 = {
-    run(s, ctx) {
-      const f = ctx.f; f.life += 3;
-      if (bySrcTribe(ctx.unit, ctx, ["BattleBuilding", "SuperRobot"])) {
-        const i = f.deck.findIndex(id => { const c = core.cardOf(id); return c && c.type === "Monster" && (hasTribe(c, "BattleBuilding") || hasTribe(c, "SuperRobot")); });
-        if (i >= 0) {
-          f.drop.push(f.deck.splice(i, 1)[0]);
-          for (let k = f.deck.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [f.deck[k], f.deck[j]] = [f.deck[j], f.deck[k]]; }
-          if (f.deck.length) f.hand.push(f.deck.shift());
-        }
-      }
-      fresh(); return true;
-    }, check: () => true
-  };
   [[4066, /you gain 1 life equal to the number of items you have equipped/i, { op: "r42LifePer", per: "items" }],
    [4315, /you gain 1 life for every .?deity dragon tribe.? monster on your field/i, { op: "r42LifePer", per: "tribe", tribe: "DeityDragonTribe" }],
-   [1962, /when this card enters the field due to an effect/i, { op: "r42Enter1962" }],
-   [4503, /when this card enters the field or \[?ride\]?, you gain 2 life/i, { op: "r42EnterBB4503" }],
-   [6215, /when this card enters the field or \[?ride\]?, you gain 3 life/i, { op: "r42EnterBB6215" }]]
+   [1962, /when this card enters the field due to an effect/i, { op: "r42Enter1962" }]]
     .forEach(([id, re, step]) => OV42.push([id, re, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [step] })]));
-  /* ---- "put into the drop zone from a soul" (tests/soul_drop.js): #4188 #5317; "discarded by a «Battle Poet» effect": #3250 ---- */
+  /* ---- "put into the drop zone from a soul" (tests/soul_drop.js): #4188 #5317 ---- */
   TG(4188, "when this card is put into the drop zone from the soul", { event: "soulToDrop", self: true }, "put the top card of your deck into your gauge, you gain 1 life, and draw a card", { conds: [{ t: "turn", who: "opp" }] });
   TG(5317, "when this card is put into your drop zone from soul", { event: "soulToDrop", self: true }, "put the top card of your deck into your gauge, you gain 1 life, and draw a card", { conds: [{ t: "turn", who: "opp" }] });
-  // #3250: remember which card's effect discarded a card from the hand
-  const prevFD42 = ABX.fireDiscarded;
-  ABX.fireDiscarded = function (side, card) {
-    try { const st = ABX.srcStack || []; const f = F(side); f.discardedBy = f.discardedBy || {}; if (card) f.discardedBy[card.id] = st.length ? st[st.length - 1] : null; } catch (e) { /* ignore */ }
-    return prevFD42.apply(this, arguments);
-  };
-  OPS.r42Discard3250 = {
-    run(s, ctx) {
-      const src = ctx.f.discardedBy && ctx.f.discardedBy[3250];
-      if (!(src && /battle poet/i.test(src.name || ""))) return false;
-      if (ctx.f.deck.length) ctx.f.gauge.push(ctx.f.deck.shift());
-      ctx.f.life += 1; fresh(); return true;
-    }, check: () => true
-  };
-  OV42.push([3250, /when this card is discarded from your hand by an effect of a card with .?battle poet/i, () => ({ kind: "triggered", trigger: { event: "discardedFromHand", self: true }, conds: [], steps: [{ op: "r42Discard3250" }] })]);
   /* ---- soul protections vs the opponent's effects (tests/soul_protect.js): #2276 #2693 #2889 #4058 #4185 #5167 ---- */
   const prevProt44 = core.isProtected;
   core.isProtected = function (unit, side, kind, ctx) {
