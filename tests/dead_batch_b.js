@@ -77,5 +77,13 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("2790: opponent cannot draw next turn", val(`return battle.opp.r42NoDraw===battle.turnCount+1`));
   run(`fresh(); battle.plr.r42SSPlus=battle.turnCount; ABX.abStack=ABX.abStack||[]; ABX.abStack.push({name:'Spectral Strike'}); ABX.core.applyDamage('opp',2,{kind:'effect'}); ABX.abStack.pop()`);
   ck("1141: Spectral Strike damage +1 (2 -> 3)", val(`return battle.opp.life===7`), val(`return battle.opp.life`));
+  run(`fresh(); globalThis.wp=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Item'&&(c.attrs||[]).includes('Weapon')); battle.plr.item={card:wp,rested:false,soul:[],tempCrit:0}; globalThis.og=mk(1151); battle.plr.monsters.left=og; battle.plr.life=4; go(1151,'act',null,og)`); await settle();
+  ck("1151: with 5 life or less, goes into Weapon soul", val(`return !battle.plr.monsters.left&&battle.plr.item.soul.includes(1151)`), val(`return [battle.plr.item.soul]`));
+  run(`fresh(); battle.plr.item={card:wp,rested:false,soul:[],tempCrit:0}; og=mk(1151); battle.plr.monsters.left=og; battle.plr.life=8; go(1151,'act',null,og)`); await settle();
+  ck("1151: not with more than 5 life", val(`return !!battle.plr.monsters.left`));
+  run(`fresh(); battle.phase='final'; globalThis.nm=mk(6212); nm.soul=[21,22,23]; battle.plr.monsters.center=nm; go(6212,'act',null,nm)`); await settle();
+  ck("6212: drop 3 souls -> 3 damage", val(`return nm.soul.length===0&&battle.opp.life===7`), val(`return [nm.soul.length,battle.opp.life]`));
+  run(`fresh(); battle.plr.setSpells=[card(128)]; globalThis.cs=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.size<=2); globalThis.cb7=ABX.callBlockExtra('plr',cs,'center'); globalThis.cb8=ABX.callBlockExtra('plr',cs,'left')`);
+  ck("128: size<=2 blocked at center only", val(`return !!cb7&&!cb8`), val(`return [cb7,cb8]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

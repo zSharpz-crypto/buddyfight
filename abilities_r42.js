@@ -3328,13 +3328,14 @@
   ABX.callBlockExtra = function (side, card, pos) {
     try {
       if (!card || card.type !== "Monster") return null;
+      if (pos === "center" && (card.size || 0) <= 2 && [B.plr, B.opp].some(fx => setHas(fx, 128))) return `"Final Battle Skill, MAJI Demon Slay": nobody can call size 2 or less monsters to the center`;   // #128
       if (pos === "center" && [B.plr, B.opp].some(fx => setHas(fx, 1530))) return `"No Matter Where, Dragon Rules Supreme": nobody can call monsters to the center`;   // #1530
       const bt = B.r42Battle;
       if (bt && bt.turn === B.turnCount && bt.attSide !== side && (bt.units || []).some(u => u && u.card && u.card.id === 6237 && u.abxNullified !== B.turnCount && F(bt.attSide).monsters && Object.values(F(bt.attSide).monsters).includes(u))) return `"Robo-Emperor": you cannot call characters during this battle`;   // #6237
     } catch (e) { /* ignore */ }
     return null;
   };
-  [[276, /monsters on the left and right cannot be attacked by both players/i], [1530, /you and your opponent cannot call monsters to the center/i],
+  [[128, /neither you nor your opponent can call size 2 or less monster to the center/i], [276, /monsters on the left and right cannot be attacked by both players/i], [1530, /you and your opponent cannot call monsters to the center/i],
    [5856, /all cards on your opponent's field cannot attack characters on your left and right/i], [6237, /during the battle that this card is attacking, your opponent cannot call characters/i]]
     .forEach(([id, re]) => OV42.push([id, re, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
 
@@ -4067,6 +4068,25 @@
     // #2790 Gaen: entering by Transform -> opponent cannot draw during their next turn
     OPS.r42NoDrawNext = { run(s, ctx) { F(otherSide(ctx.side)).r42NoDraw = B.turnCount + 1; return true; }, check: () => true };
     OV42.push([2790, /your opponent cannot draw cards during their next turn/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42NoDrawNext" }] })]);
+    // #1151 Armorknight Ogre: with 5 life or less, put this card from your field into the soul of your Weapon (the +5000 static already works)
+    OPS.r42IntoWeaponSoul = { run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u || f.life > 5) return false;
+      const w = [f.item, f.item2].find(it => it && it.card && (it.card.attrs || []).some(a => /^weapon$/i.test(a))); if (!w) return false;
+      const pos = core.posOfUnit(f, u); if (pos == null) return false;
+      f.monsters[pos] = null; (w.soul = w.soul || []).push(u.card.id, ...(u.soul || [])); fresh(); return true; }, check: () => true };
+    OV42.push([1151, /if you have 5 life or less put this card from your field into the soul of your weapon/i, () => ({ kind: "act", tags: ["act"], conds: [], steps: [{ op: "r42IntoWeaponSoul" }] })]);
+    // #6212 Netman: final phase Act -> drop any number of souls, damage equal to the number dropped (once per turn)
+    OPS.r42DropSoulsDamage = { async run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u || B.phase !== "final" || !(u.soul || []).length) return false;
+      let n = u.soul.length;
+      if (!ABX.autoPlay && !f.isBot && ABX.ui && ABX.ui.pickOption) {
+        const opts = []; for (let i = 0; i <= u.soul.length; i++) opts.push({ label: i === 0 ? "Drop none" : "Drop " + i });
+        n = Math.max(0, Math.min(u.soul.length, +(await ABX.ui.pickOption({ title: ctx.card.name + " \u2014 drop souls", options: opts })) || 0));
+      }
+      if (!n) return false;
+      for (let i = 0; i < n; i++) f.drop.push(u.soul.pop());
+      core.applyDamage(ctx.side === "plr" ? "opp" : "plr", n, { kind: "effect" }); fresh(); return true; }, check: () => true };
+    OV42.push([6212, /during your final phase, you may drop any number of souls/i, () => ({ kind: "act", tags: ["act", "counter"], once: "turn", conds: [], steps: [{ op: "r42DropSoulsDamage" }] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
