@@ -1041,6 +1041,7 @@ function parseCardCost(costStr, skillStr, fighter = null, cardObj = null) {
       skillStr = earthCard.skill;
     }
   }
+  if (fighter && fighter.r42FreeCostTurn != null && fighter.r42FreeCostTurn === battle.turnCount) return { gauge: 0, life: 0, soul: 0 };   // #4860: all [Call/Cast/Equip Cost] are lost this turn
   const combined = (costStr || "") + "\n" + (skillStr || "");
   let gauge = 0;
   let life = 0;
@@ -5744,7 +5745,7 @@ const battle = {
 
     getEquippedItems(f).forEach(({ unit: it }) => {
       if (!it) return;
-      it.rested = false;
+      if (it.abxNo && it.abxNo.stand === true) it.abxNo.stand = false; else it.rested = false;   // "cannot [Stand] during his or her next stand phase"
       it.attacksLeft = it.card.atk_max || 1;
       it.actUsed = false;
     });

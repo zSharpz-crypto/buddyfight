@@ -3876,4 +3876,113 @@
     }
   };
   OV42.push([5368, /at the start of each player's attack phase/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42AstroSeparate" }] })]);
+
+  /* ===== dead-family batch A (Size/call, Cannot, Gauge/life, Other): #4324 #1613 #4236 #6148 #4860 #2433 #3446 #2473 #1554 #988 #6012 #1561 #5209 ===== */
+  {
+    const stOf = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    const spell = (steps) => ({ kind: "spell", steps });
+    const askNum = async (ctx, title, max) => {
+      if (max <= 0) return 0;
+      if (!ctx.auto && !ctx.f.isBot && !ABX.autoPlay && ABX.ui && ABX.ui.pickOption) { const opts = []; for (let k = 0; k <= max; k++) opts.push({ label: String(k) }); return ABX.ui.pickOption({ title, options: opts }); }
+      return 0;
+    };
+    // #4324 Deal 5 damage to your opponent (typo "oppenent" in the printed text)
+    OV42.push([4324, /deal 5 damage/i, () => spell(stOf("Deal 5 damage to your opponent!"))]);
+    // #1613 / #4236 return monsters on the field to their owners' hands
+    OPS.r42BounceField = {
+      async run(s, ctx) {
+        const base = ABX.parseSentenceSteps("Destroy a monster on your field.", {}).steps[0].np;
+        let cands = core.refsFor(Object.assign(clone(base), { zone: { owner: "any", area: "field" } }), ctx, { owner: "any", area: "field" }).filter(r => r.unit && r.k === "unit");
+        if (s.maxSize != null) cands = cands.filter(r => (Number(r.card.size) || 0) <= s.maxSize);
+        if (!cands.length) return false;
+        const ch = s.all ? cands : await core.pick(cands, { qty: { n: s.n || 1, upTo: true } }, ctx, { intent: "harm", title: ctx.card.name + " \u2014 choose monsters to return to their owners' hands" });
+        if (!ch || !ch.length) return false;
+        await core.moveRefs(ch, { area: "hand", owner: "owner" }, ctx);
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([1613, /return up to 2 monsters/i, () => spell([{ op: "r42BounceField", n: 2 }])]);
+    OV42.push([4236, /return all size 1 or less monsters/i, () => spell([{ op: "r42BounceField", all: true, maxSize: 1 }])]);
+    // #6148 damage equal to the size of the MAX Dragon on your center
+    OPS.r42MaxDragonBlast = { run(s, ctx) { const c = ctx.f.monsters.center; if (!c || !hasTribe(c.card, "MAXDragon")) return false; const n = Number(c.card.size) || 0; if (!n) return false; core.applyDamage(otherSide(ctx.side), n, { kind: "effect", sourceCard: ctx.card }); fresh(); return true; } };
+    OV42.push([6148, /deal damage to your opponent equal to the size/i, () => spell([{ op: "r42MaxDragonBlast" }])]);
+    // #4860 all costs of cards in your hand are lost this turn
+    OPS.r42FreeCostTurn = { run(s, ctx) { ctx.f.r42FreeCostTurn = B.turnCount; fresh(); return true; } };
+    OV42.push([4860, /\[call cost\], \[cast cost\] and \[equip cost\].*lost/i, () => spell([{ op: "r42FreeCostTurn" }])]);
+    // #2433 pay as much life as you like (less than your remaining life), put that many cards from the top of the deck into the gauge
+    OPS.r42LifeToGauge = {
+      async run(s, ctx) {
+        const f = ctx.f, max = Math.max(0, f.life - 1);
+        const n = await askNum(ctx, ctx.card.name + " \u2014 how much life do you pay?", Math.min(max, f.deck.length));
+        if (!n) return false;
+        f.life -= n;
+        for (let k = 0; k < n && f.deck.length; k++) f.gauge.push(f.deck.shift());
+        fresh();
+        return true;
+      }
+    };
+    OV42.push([2433, /pay as much life as you like/i, () => spell([{ op: "r42LifeToGauge" }])]);
+    // #3446 this turn, you take no damage while you have a monster in your center
+    OPS.r42NoDmgCenter = { run(s, ctx) { ctx.f.r42NoDmgCenterTurn = B.turnCount; return true; } };
+    OV42.push([3446, /you will not take any damage/i, () => spell([{ op: "r42NoDmgCenter" }])]);
+    {
+      const prevAD6 = core.applyDamage;
+      core.applyDamage = function (side, n, src) {
+        const f = F(side);
+        if (f && f.r42NoDmgCenterTurn === B.turnCount && f.monsters.center && !(src && src.unreducible)) return 0;
+        return prevAD6.apply(this, arguments);
+      };
+    }
+    // #2473 Jackknife Linker: your life cannot drop below 1 during that attack phase
+    OV42.push([2473, /if your life would become 0, it becomes 1/i, () => spell([{ op: "lifeFloor" }])]);
+    // #1554 stand a Demon Lord
+    OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
+    // #988 / generic: discard up to two <X> from hand, draw that many
+    OPS.r42DiscardDrawX = {
+      async run(s, ctx) {
+        const f = ctx.f, re = new RegExp(s.re, "i");
+        const cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(x => x.card && ((x.card.attrs || []).some(a => re.test(String(a).replace(/\s+/g, ""))) || re.test(x.card.name || "")));
+        if (!cands.length) return false;
+        const ch = (await core.pick(cands, { qty: { n: 2, upTo: true }, raw: "up to two cards" }, ctx, { intent: "cost", title: ctx.card.name + " \u2014 discard up to two, then draw that many" })) || [];
+        let n = 0;
+        for (const r of ch) { const i = f.hand.indexOf(r.id); if (i >= 0) { f.drop.push(f.hand.splice(i, 1)[0]); n++; if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, core.cardOf(r.id)); } }
+        if (n) await OPS.draw.run({ op: "draw", n }, ctx);
+        fresh();
+        return n > 0;
+      }
+    };
+    OV42.push([988, /discard up to two star/i, () => ({ kind: "act", tags: ["act"], once: "turn", conds: [], steps: [{ op: "r42DiscardDrawX", re: "^star$" }] })]);
+    // #6012 Kronos Nehdy: up to one Time Dragon of different sizes per Reversal from the drop zone to your hand
+    OPS.r42KronosNehdy = {
+      async run(s, ctx) {
+        const f = ctx.f, n = (f.godclock && f.godclock.reversalCount) || 0;
+        let got = 0; const sizes = new Set();
+        for (let k = 0; k < n; k++) {
+          const cands = f.drop.map((id, idx) => ({ k: "zone", side: ctx.side, area: "drop", idx, id, card: core.cardOf(id) })).filter(x => x.card && x.card.type === "Monster" && hasTribe(x.card, "TimeDragon") && !sizes.has(Number(x.card.size) || 0));
+          if (!cands.length) break;
+          const ch = await core.pick(cands, { qty: { n: 1, upTo: true }, raw: "a Time Dragon monster" }, ctx, { intent: "help", title: ctx.card.name + " \u2014 take a Time Dragon monster (different size each)" });
+          const r = ch && ch[0]; if (!r) break;
+          const i = f.drop.indexOf(r.id); if (i < 0) break;
+          sizes.add(Number(r.card.size) || 0); f.hand.push(f.drop.splice(i, 1)[0]); got++;
+        }
+        fresh();
+        return got > 0;
+      }
+    };
+    OV42.push([6012, /put up to one .{0,3}time dragon.{0,3} monster of different sizes/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "r42KronosNehdy" }] })]);
+    // #1561 Scorpion Armor, Kenrosai: deals damage -> opp's item cannot [Stand] in their next stand phase
+    OPS.r42ItemNoStand = { run(s, ctx) { const es = F(otherSide(ctx.side)); [es.item, es.item2].forEach(u => { if (u) { u.abxNo = u.abxNo || {}; u.abxNo.stand = true; } }); fresh(); return !!(es.item || es.item2); } };
+    OV42.push([1561, /your opponent's item cannot \[stand\]/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42ItemNoStand" }] })]);
+    // #5209 Mitsuhiko: 3+ Junior Detective League -> all opposing characters and items cannot [Stand] this turn and the next
+    OPS.r42DetectiveLock = {
+      run(s, ctx) {
+        const n = core.fieldUnits(ctx.f, false).filter(x => x.unit && hasTribe(x.unit.card, "JuniorDetectiveLeague")).length;
+        if (n < 3) return false;
+        core.fieldUnits(F(otherSide(ctx.side)), true).forEach(r => { if (r.unit) { r.unit.abxNo = r.unit.abxNo || {}; r.unit.abxNo.stand = true; } });
+        fresh(); return true;
+      }
+    };
+    OV42.push([5209, /three or more .{0,3}junior detective league/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42DetectiveLock" }] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);
