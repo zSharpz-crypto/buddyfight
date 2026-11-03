@@ -2969,4 +2969,21 @@
       };
     }
   })();
+
+  /* ---- [r42] batch A: cards that only ran on the generic fallback ---- */
+  // #6558 Demon Lord, Gagnar "Re:B": "return all cards from each player's gauge into their owner's decks, and shuffle them. Then, if two or more of your opponent's gauge
+  // were returned, put the top three cards of your deck into your gauge." (the parse shuffled and milled 3 first, in the wrong order, and never returned the gauge)
+  OPS.r42GagnarVortex = {
+    async run(s, ctx) {
+      const f = ctx.f, e = ctx.e, side = ctx.side;
+      const back = (x) => { const n = x.gauge.length; x.deck.push(...x.gauge.splice(0)); return n; };
+      back(f); const oppN = back(e);
+      if (B.shuffleFighterDeck) { B.shuffleFighterDeck(side); B.shuffleFighterDeck(otherSide(side)); }
+      if (oppN >= 2) f.gauge.push(...f.deck.splice(0, 3));
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([6558, /return all cards from each player'?s gauge into their owner'?s decks/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42GagnarVortex" }] })]);
+  // #725 Actor Knights High Priest: "When you call a «Tarot» monster other than 'Actor Knights High Priest', you gain 1 life. (once per turn)" - was read as an enter trigger of itself
+  OV42.push([725, /when you call a .tarot. monster other than/i, () => ({ kind: "triggered", trigger: { event: "otherEnter", np: np({ tribes: ["Tarot"], types: ["monster"], notNames: ["actor knights high priest"] }, "field") }, conds: [], once: "turn", steps: [{ op: "life", who: "you", n: 1 }] })]);
 })(typeof window !== "undefined" ? window : globalThis);

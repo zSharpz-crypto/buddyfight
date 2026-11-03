@@ -1532,7 +1532,7 @@ function getReleaseConditionStatus(card, fighter) {
 
 // "turn" / "game" when a spell says "You may only cast "<this card>" once per turn / game / fight", else null.
 function getSpellCastLimit(card) {
-  const m = String(card && card.skill || "").match(/you may only cast "(.*?)" once per (turn|game|fight)\b/i);
+  const m = String(card && card.skill || "").match(/you may (?:only )?cast "(.*?)" once per (turn|game|fight)\b/i);
   if (!m) return null;
   return m[2].toLowerCase() === "turn" ? "turn" : "game";
 }
