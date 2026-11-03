@@ -3325,4 +3325,27 @@
   /* deck-building "total of up to N A and B combined" rule: enforced in game.js deckComboGroup (deck editor + auto-fill) */
   [2929, 2936, 3500, 3501, 3502, 3503, 3504].forEach(id =>
     OV42.push([id, /you can only put a total of up to/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
+
+  /* draw/hand family: #774 opp discards, #2638 / #6357 [Set] draw, #2638 leave -> opp discards */
+  {
+    const OPP_DISCARD = "Your opponent chooses a card from their hand and discards it.";
+    const stepsOf = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    OV42.push([774, /your opponent discards one card/i, () => { const st = stepsOf(OPP_DISCARD); return st && { kind: "spell", steps: st }; }]);
+    OV42.push([2638, /when this card is \[set\] and if you have/i, () => { const st = stepsOf("Draw a card."); return st && { kind: "triggered", trigger: { event: "enter", self: true }, conds: [has({ tribes: ["Black Dragon"] }, "drop zone")], steps: st }; }]);
+    OV42.push([2638, /put into the drop zone from the field, your opponent/i, () => { const st = stepsOf(OPP_DISCARD); return st && { kind: "triggered", trigger: { event: "leave", self: true }, conds: [], steps: st }; }]);
+    OV42.push([6357, /another .{0,3}dark burial.{0,3} is on your field, draw/i, () => { const st = stepsOf("Draw a card."); return st && { kind: "triggered", trigger: { event: "enter", self: true }, conds: [Object.assign(has({ tribes: ["Dark Burial"] }, "field"), { n: 2 })], steps: st }; }]);
+  }
+
+  /* #2953 Obstruct: this turn and the next, neither player can draw cards due to their own card effects */
+  OPS.r42NoDraw = { run() { const Bt = typeof battle !== "undefined" ? battle : window.battle; Bt.r42NoDrawUntil = (Bt.turnCount || 0) + 1; return true; } };
+  OV42.push([2953, /neither player can draw/i, () => ({ kind: "spell", steps: [{ op: "r42NoDraw" }] })]);
+  if (OPS.draw && OPS.draw.run && !OPS.draw.r42Wrapped) {
+    const drawRun = OPS.draw.run;
+    OPS.draw.run = function (s, ctx) {
+      const Bt = typeof battle !== "undefined" ? battle : window.battle;
+      if (Bt && Bt.r42NoDrawUntil != null && (Bt.turnCount || 0) <= Bt.r42NoDrawUntil) return false;
+      return drawRun.apply(this, arguments);
+    };
+    OPS.draw.r42Wrapped = true;
+  }
 })(typeof window !== "undefined" ? window : globalThis);

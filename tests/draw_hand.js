@@ -1,0 +1,32 @@
+// node tests/draw_hand.js - draw/hand family: #774 opp discard, #2638 [Set] draw + leave discard, #6357 [Set] draw
+const { createEnv } = require("./headless.js");
+let pass = 0, fail = 0;
+const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : JSON.stringify(extra ?? "")); };
+const env = createEnv(); const run = (c) => env.run('{' + c + '\n}'); const val = (c) => env.run('(function(){' + c + '\n})()');
+const settle = async () => { for (let i = 0; i < 60; i++) { env.flush(); await new Promise(r => setTimeout(r, 2)); } };
+env.run(`ABX.fast=true; ABX.autoPlay=true; globalThis.card=id=>window.BUDDYFIGHT_CARDS.find(c=>c.id===id);
+globalThis.fresh=function(){ battle.start('hotseat', generateFlagDeck(447,'T',571,true), generateFlagDeck(447,'O',571,true)); battle.renderBattle=function(){}; ['plr','opp'].forEach(sd=>{const f=battle.getFighter(sd); f.hand=[1]; f.drop=[]; f.setSpells=[];}); };
+globalThis.byAttr=(re)=>window.BUDDYFIGHT_CARDS.find(c=>(c.attrs||[]).some(a=>re.test(a)));
+globalThis.runAb=(id,idx)=>{const c=card(id);const ab=ABX.get(c).abilities.filter(a=>!['keyword','cost','reminder','rule'].includes(a.kind))[idx];return ABX.runAbility('plr',c,ab,null,{});};
+globalThis.setIt=(id)=>{ const c=card(id); battle.plr.setSpells.push(c); ABX.fireEnter('plr',c,{card:c,rested:false,soul:[],tempPower:0,tempDef:0,tempCrit:0}); };`);
+(async () => {
+  run(`fresh(); battle.opp.hand=[1,2,3]; runAb(774,0)`); await settle();
+  ck("774: opp hand 3 -> 2", val(`return battle.opp.hand.length===2`), val(`return battle.opp.hand.length`));
+  run(`fresh(); battle.plr.drop=[byAttr(/^blackdragon$/i).id]; globalThis.h0=battle.plr.hand.length; setIt(2638)`); await settle();
+  ck("2638 set with Black Dragon in drop: draw 1", val(`return battle.plr.hand.length===h0+1`), val(`return [h0,battle.plr.hand.length]`));
+  run(`fresh(); globalThis.h0=battle.plr.hand.length; setIt(2638)`); await settle();
+  ck("2638 set without Black Dragon in drop: no draw", val(`return battle.plr.hand.length===h0`));
+  run(`fresh(); battle.opp.hand=[1,2]; ABX.fireLeave('plr',card(2638),false,true)`); await settle();
+  ck("2638 leaves to drop: opp discards 1", val(`return battle.opp.hand.length===1`), val(`return battle.opp.hand.length`));
+  run(`fresh(); globalThis.h0=battle.plr.hand.length; setIt(6357)`); await settle();
+  ck("6357 set alone: no draw", val(`return battle.plr.hand.length===h0`));
+  run(`fresh(); battle.plr.setSpells.push(card(6356)); globalThis.h0=battle.plr.hand.length; setIt(6357)`); await settle();
+  ck("6357 set with another Dark Burial on field: draw 1", val(`return battle.plr.hand.length===h0+1`), val(`return [h0,battle.plr.hand.length]`));
+  run(`fresh(); battle.plr.deck=[1,2,3,4]; runAb(2953,0)`); await settle();
+  ck("2953 sets no-draw window", val(`return battle.r42NoDrawUntil===battle.turnCount+1`), val(`return [battle.r42NoDrawUntil,battle.turnCount]`));
+  run(`globalThis.h1=battle.plr.hand.length; ABX.runSteps ? 0 : 0; globalThis.ds=ABX.parseSentenceSteps('Draw a card.',{}).steps; ABX.runAbility('plr',card(2638),{kind:'spell',steps:ds},null,{});`); await settle();
+  ck("2953 blocks effect draw", val(`return battle.plr.hand.length===h1`), val(`return [h1,battle.plr.hand.length]`));
+  run(`battle.turnCount+=2; ABX.runAbility('plr',card(2638),{kind:'spell',steps:ds},null,{});`); await settle();
+  ck("2953 window expires", val(`return battle.plr.hand.length===h1+1`), val(`return [h1,battle.plr.hand.length]`));
+  console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
+})();
