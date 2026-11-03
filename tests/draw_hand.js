@@ -6,6 +6,9 @@ const env = createEnv(); const run = (c) => env.run('{' + c + '\n}'); const val 
 const settle = async () => { for (let i = 0; i < 60; i++) { env.flush(); await new Promise(r => setTimeout(r, 2)); } };
 env.run(`ABX.fast=true; ABX.autoPlay=true; globalThis.card=id=>window.BUDDYFIGHT_CARDS.find(c=>c.id===id);
 globalThis.fresh=function(){ battle.start('hotseat', generateFlagDeck(447,'T',571,true), generateFlagDeck(447,'O',571,true)); battle.renderBattle=function(){}; ['plr','opp'].forEach(sd=>{const f=battle.getFighter(sd); f.hand=[1]; f.drop=[]; f.setSpells=[];}); };
+globalThis.mk2=(id)=>({card:card(id),rested:false,soul:[],tempPower:0,tempDef:0,tempCrit:0,attacksLeft:1});
+ABX.OPS.tmove={run(s,ctx){ globalThis.__mv(ctx); return true; }};
+globalThis.go=(fn)=>{ globalThis.__mv=fn; return ABX.core.runAbility('plr', card(5159), {kind:'spell',steps:[{op:'tmove'}]}, null, {}); };
 globalThis.byAttr=(re)=>window.BUDDYFIGHT_CARDS.find(c=>(c.attrs||[]).some(a=>re.test(a)));
 globalThis.runAb=(id,idx)=>{const c=card(id);const ab=ABX.get(c).abilities.filter(a=>!['keyword','cost','reminder','rule'].includes(a.kind))[idx];return ABX.runAbility('plr',c,ab,null,{});};
 globalThis.setIt=(id)=>{ const c=card(id); battle.plr.setSpells.push(c); ABX.fireEnter('plr',c,{card:c,rested:false,soul:[],tempPower:0,tempDef:0,tempCrit:0}); };`);
@@ -28,5 +31,9 @@ globalThis.setIt=(id)=>{ const c=card(id); battle.plr.setSpells.push(c); ABX.fir
   ck("2953 blocks effect draw", val(`return battle.plr.hand.length===h1`), val(`return [h1,battle.plr.hand.length]`));
   run(`battle.turnCount+=2; ABX.runAbility('plr',card(2638),{kind:'spell',steps:ds},null,{});`); await settle();
   ck("2953 window expires", val(`return battle.plr.hand.length===h1+1`), val(`return [h1,battle.plr.hand.length]`));
+  run(`fresh(); battle.plr.monsters.center=mk2(3942); battle.opp.monsters.left=mk2(ALL_CARDS.find(x=>x.type==='Monster'&&x.size===1&&!x.skill).id); battle.plr.hand=[7,8]; go(()=>{ battle.plr.drop.push(battle.plr.hand.shift()); })`); await settle();
+  ck("3942 discard bounces opp card", val(`return !battle.opp.monsters.left`), val(`return [battle.plr.hand.length,!!battle.opp.monsters.left]`));
+  run(`fresh(); battle.plr.drop=[2]; battle.opp.drop=[3]; battle.plr.deck=[9]; battle.opp.deck=[9]; globalThis.u=mk2(2772); battle.plr.monsters.center=u; ABX.fireEnter('plr',card(2772),u)`); await settle();
+  ck("2772 enter moved one drop card to a deck bottom", val(`return battle.plr.drop.length+battle.opp.drop.length===1`), val(`return [battle.plr.drop,battle.opp.drop,battle.plr.deck.slice(-1),battle.opp.deck.slice(-1)]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

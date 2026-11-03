@@ -3348,4 +3348,24 @@
     };
     OPS.draw.r42Wrapped = true;
   }
+
+  /* #3942 discard -> bounce up to two opposing cards (once per turn); #2772 enter -> up to one card from either drop zone to the deck bottom */
+  {
+    const st = (txt) => { const p2 = ABX.parseSentenceSteps(txt, {}); return p2 && !(p2.unparsed && p2.unparsed.length) ? p2.steps : null; };
+    TG(3942, "when a card is discarded from your hand", { event: "handDiscard", owner: "you" }, "Return up to two cards on your opponent's field to their owner's hand.", { once: "turn" });
+    OPS.r42DropToDeckBottom = {
+      async run(s, ctx) {
+        const base = ABX.parseSentenceSteps("Put up to one card in your drop zone on the bottom of your deck.", {}).steps[0].np;
+        const mk = (o) => Object.assign(clone(base), { zone: Object.assign({}, base.zone, { owner: o }) });
+        const cands = core.refsFor(mk("you"), ctx).concat(core.refsFor(mk("opp"), ctx));
+        if (!cands.length) return false;
+        const one = Object.assign(clone(base), { parts: null });
+        const refs = await core.pick(cands, one, ctx, { intent: "help", title: ctx.card.name + " \u2014 choose", subtitle: "Put up to one card from a drop zone on the bottom of its owner's deck" });
+        let did = false;
+        (refs || []).slice(0, 1).forEach(r => { const f = F(r.side); const i = f.drop.indexOf(r.id); if (i >= 0) { f.deck.push(f.drop.splice(i, 1)[0]); did = true; } });
+        return did;
+      }
+    };
+    OV42.push([2772, /when this card enters the field, put up to one card/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42DropToDeckBottom" }] })]);
+  }
 })(typeof window !== "undefined" ? window : globalThis);
