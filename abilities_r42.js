@@ -3368,4 +3368,6 @@
     };
     OV42.push([2772, /when this card enters the field, put up to one card/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42DropToDeckBottom" }] })]);
   }
+
+  TG(2536, "when this card is put into your drop zone from your field or hand", LEAVE_SELF, "Put the top two cards of your deck into your drop zone and put the top card of your deck into your gauge.", { also: [{ event: "discardedFromHand", self: true }] });
 })(typeof window !== "undefined" ? window : globalThis);

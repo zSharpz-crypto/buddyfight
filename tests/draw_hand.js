@@ -35,5 +35,9 @@ globalThis.setIt=(id)=>{ const c=card(id); battle.plr.setSpells.push(c); ABX.fir
   ck("3942 discard bounces opp card", val(`return !battle.opp.monsters.left`), val(`return [battle.plr.hand.length,!!battle.opp.monsters.left]`));
   run(`fresh(); battle.plr.drop=[2]; battle.opp.drop=[3]; battle.plr.deck=[9]; battle.opp.deck=[9]; globalThis.u=mk2(2772); battle.plr.monsters.center=u; ABX.fireEnter('plr',card(2772),u)`); await settle();
   ck("2772 enter moved one drop card to a deck bottom", val(`return battle.plr.drop.length+battle.opp.drop.length===1`), val(`return [battle.plr.drop,battle.opp.drop,battle.plr.deck.slice(-1),battle.opp.deck.slice(-1)]`));
+  run(`fresh(); battle.plr.deck=[11,12,13,14,15]; globalThis.d0=battle.plr.drop.length; globalThis.g0=battle.plr.gauge.length; ABX.fireLeave('plr',card(2536),false,true)`); await settle();
+  ck("2536 leaves field: mill 2 to drop, 1 to gauge", val(`return battle.plr.drop.length===d0+2&&battle.plr.gauge.length===g0+1&&battle.plr.deck.length===2`), val(`return [battle.plr.drop.length-d0,battle.plr.gauge.length-g0,battle.plr.deck.length]`));
+  run(`fresh(); battle.plr.deck=[11,12,13,14,15]; battle.plr.hand=[2536,8]; battle.plr.hand.splice(0,1); battle.plr.drop.push(2536); ABX.fireDiscarded('plr',card(2536))`); await settle();
+  ck("2536 discarded from hand: also mills", val(`return battle.plr.deck.length===2`), val(`return battle.plr.deck.length`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
