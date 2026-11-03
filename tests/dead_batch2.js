@@ -19,7 +19,8 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.runAbility('plr',card(id),ab(id,k,ev),uni
   ck("1595: discarded self, paid gauge, fetched Duel Sieger", val(`return battle.plr.hand.length===1&&battle.plr.hand[0]===ds&&battle.plr.drop.includes(1595)&&battle.plr.gauge.length===g0-1`), val(`return [battle.plr.hand,battle.plr.gauge.length,g0]`));
   // 5285
   run(`fresh(); battle.plr.hand=[7]; battle.plr.deck=[21,22,23]; go(5285,'spell')`); await settle();
-  ck("5285: drop a hand card, draw 2", val(`return battle.plr.hand.length===2&&battle.plr.drop.length===1`), val(`return [battle.plr.hand,battle.plr.drop]`));
+  ck("5285: effect draws 2", val(`return battle.plr.hand.length===3`));
+  ck("5285: Drop-a-hand-card cost is a real extra cost (needs another hand card)", val(`const c=card(5285); battle.plr.hand=[5285]; const a=ABX.canPayExtras('plr',c,0); battle.plr.hand=[5285,7]; return ABX.hasExtras(c)&&!a&&ABX.canPayExtras('plr',c,0)`));
   // 5998
   run(`fresh(); globalThis.e=mk(mon(c=>c.crit>=2).id); battle.opp.monsters.center=e; globalThis.c0=e.tempCrit; battle.plr.godclock=battle.plr.godclock||{}; battle.plr.godclock.reversalCount=2; go(5998,'triggered','enter',mk(5998))`); await settle();
   ck("5998: crit -1 per Reversal (2 -> -2)", val(`return e.tempCrit===c0-2`), val(`return e.tempCrit`));
@@ -68,5 +69,10 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.runAbility('plr',card(id),ab(id,k,ev),uni
   ck("3103: no Cosmo Dragoon -> nothing", val(`return battle.plr.hand.length===0`));
   run(`fresh(); globalThis.u=mk(3104); battle.plr.monsters.center=u; globalThis.am=mon(c=>c.size===1); globalThis.a=mk(am.id); battle.opp.monsters.center=a; go(3104,'triggered','attacked',u,{event:{name:'attack',attUnits:[a],defUnit:u}})`); await settle();
   ck("3104: Aettir and attacker both returned to owners' hands", val(`return !battle.plr.monsters.center&&!battle.opp.monsters.center&&battle.plr.hand.includes(3104)&&battle.opp.hand.includes(am.id)`), val(`return [!!battle.plr.monsters.center,!!battle.opp.monsters.center,battle.plr.hand,battle.opp.hand]`));
+  run(`fresh(); globalThis.as1=mon(c=>(c.attrs||[]).includes('Astrodragon')); battle.plr.monsters.left=mk(as1.id); battle.plr.monsters.center=mk(mon(c=>c.size===1&&!(c.attrs||[]).includes('Astrodragon')).id); const a5=ABX.get(card(5368)).abilities.filter(x=>x.kind==='triggered').pop(); globalThis.pre=battle.plr.monsters.left; ABX.runAbility('plr',card(5368),a5,null,{})`); await settle();
+  ck("5368 attack-phase line: parses to the move op, auto-play leaves monsters in place", val(`return ABX.get(card(5368)).abilities.some(x=>x.kind==='triggered'&&x.steps[0].op==='r42AstroSeparate')&&battle.plr.monsters.left===pre`));
+  run(`ABX.autoPlay=false; ABX.ui=ABX.ui||{}; globalThis.__ui=ABX.ui.pickOption; ABX.ui.pickOption=async()=>1; ABX.runAbility('plr',card(5368),ABX.get(card(5368)).abilities.filter(x=>x.kind==='triggered').pop(),null,{})`); await settle();
+  ck("5368 attack-phase line: human picks 'center' -> Astrodragon swaps into the center", val(`return battle.plr.monsters.center===pre&&!!battle.plr.monsters.left`), val(`return [battle.plr.monsters.center===pre]`));
+  run(`ABX.ui.pickOption=__ui; ABX.autoPlay=true`);
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

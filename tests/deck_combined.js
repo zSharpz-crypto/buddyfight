@@ -12,4 +12,9 @@ for (const [id, partner] of Object.entries(pairs)) {
   ck(`#${id}+${partner}: 3 not full, 4 full, partner sees same group`, o.a === false && o.b === true && o.c2 === true && o.max === 4, o);
 }
 ck("unrelated card has no group", val(`return deckComboGroup(46)===null`));
+// the bot / auto deck builders respect the combined limit
+{
+  const worst = val(`let bad=0; for(let i=0;i<40;i++){ const d=generateFlagDeck(447,'T',571,true); const cards=(d.cards||d); Object.keys(%PAIRS%).forEach(id=>{ const g=deckComboGroup(+id); if(!g) return; const n=cards.filter(x=>g.ids.has(x)).length; if(n>g.max) bad++; }); } return bad;`.replace('%PAIRS%', JSON.stringify(pairs)));
+  ck("generated decks never exceed a combined limit", worst === 0, worst);
+}
 console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);

@@ -800,7 +800,8 @@
   ABX.stats = ABX.stats || { runs: 0 };
   async function runAbility(side, card, ab, unit, opts) {   // keeps a stack of the cards whose abilities are running ("entered by another X effect")
     (ABX.srcStack = ABX.srcStack || []).push(card);
-    try { return await runAbility0(side, card, ab, unit, opts); } finally { ABX.srcStack.pop(); }
+    (ABX.abStack = ABX.abStack || []).push(ab);
+    try { return await runAbility0(side, card, ab, unit, opts); } finally { ABX.srcStack.pop(); ABX.abStack.pop(); }
   }
   async function runAbility0(side, card, ab, unit, opts) {
     opts = opts || {};

@@ -2216,6 +2216,7 @@ function generateFlagDeck(flagId, customTitle, preferredBuddyId, includeLostWorl
     for (let i = 0; i < qty; i++) {
       if (cards.length >= DECK_SIZE) return;
       if ((counts[card.id] || 0) >= Math.min(maxLim, legalMax(card))) return;
+      if (deckComboFull(cards, card.id)) return;   // "up to N of A and B combined"
       cards.push(card.id);
       counts[card.id] = (counts[card.id] || 0) + 1;
     }
@@ -2365,6 +2366,7 @@ function generateSmartDeck(flagId, customTitle, preferredBuddyId, includeLostWor
     for (let i = 0; i < qty; i++) {
       if (cards.length >= DECK_SIZE) return;
       if ((counts[card.id] || 0) >= maxLim) return;
+      if (deckComboFull(cards, card.id)) return;   // "up to N of A and B combined"
       cards.push(card.id);
       counts[card.id] = (counts[card.id] || 0) + 1;
     }

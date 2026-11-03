@@ -62,5 +62,8 @@ globalThis.small=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.power<=30
   ck("6445: Double Attack card -> counter destroys it", val(`return !battle.opp.monsters.center`), val(`return !!battle.opp.monsters.center`));
   run(`fresh(); battle.plr.item=mk(6445); globalThis.a=mk(small.id); globalThis.b=mk(small.id); b.card=Object.assign({},b.card,{defense:20000}); battle.opp.monsters.center=a; battle.opp.monsters.left=b; ABX.fireAttack('opp',[{zone:'center',unit:a},{zone:'left',unit:b}],'plr','fighter')`); await settle();
   ck("6445: only units weaker than 15000 are destroyed", val(`return !battle.opp.monsters.center&&!!battle.opp.monsters.left`), val(`return [!!battle.opp.monsters.center,!!battle.opp.monsters.left]`));
+  ck("1351 cast rule: blocked when not on a Ride", val(`battle.plr.item=null; battle.plr.item2=null; return !!ABX.core.castBlock(battle.plr,card(1351))`));
+  run(`globalThis.rd=window.BUDDYFIGHT_CARDS.find(c=>c.ride); battle.plr.item=mk(rd.id)`);
+  ck("1351 cast rule: allowed when Ride on a card", val(`return !ABX.core.castBlock(battle.plr,card(1351))`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

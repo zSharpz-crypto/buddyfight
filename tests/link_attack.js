@@ -14,6 +14,8 @@ globalThis.go=(id,ev,unit)=>ABX.runAbility('plr',card(id),trig(id,ev),unit||null
   ck("2637: opp deck top 2 -> opp drop", val(`return battle.opp.drop.length-d0===2&&battle.opp.deck.length===2`), val(`return [battle.opp.drop.length-d0,battle.opp.deck.length]`));
   run(`fresh(); globalThis.u=mk(870); battle.plr.monsters.center=u; battle.plr.item=mk(46); battle.opp.item=mk(46); go(870,'attack',u)`); await settle();
   ck("870: crit + sum of both items' crit", val(`return u.tempCrit===card(46).crit*2`), val(`return [u.tempCrit,card(46).crit]`));
+  run(`ABX.fireBattleEnd('plr',[{unit:u}])`); await settle();
+  ck("870: crit boost removed at the end of the battle", val(`return u.tempCrit===0`), val(`return u.tempCrit`));
   run(`fresh(); globalThis.u=mk(1154); battle.plr.monsters.center=u; globalThis.e=mk(1); battle.opp.monsters.center=e; go(1154,'attacked',u)`); await settle();
   ck("1154: opp cards' Penetrate nullified this turn", val(`return ABX.kwNullified(e,'penetrate')`));
   run(`fresh(); globalThis.u=mk(2783); battle.plr.monsters.center=u; battle.plr.deck=[1,2]; battle.opp.deck=[1,2]; go(2783,'attackDestroys',u)`); await settle();

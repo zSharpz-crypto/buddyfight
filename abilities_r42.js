@@ -926,6 +926,8 @@
           if (!o) continue;
           ab.kind = o.kind; ab.steps = o.steps; ab.unparsed = []; ab.parsed = true; ab.r42 = true;
           if (o.options) ab.options = o.options;
+          if (o.costKind) ab.costKind = o.costKind;
+          if (o.parts) ab.parts = o.parts;
           if (o.action) ab.action = o.action;
           if (o.once) ab.once = o.once;
           if (o.tags) ab.tags = o.tags;
@@ -1675,7 +1677,7 @@
       const dropGain = msDiff(a.drop, b.drop), d2d = inter(msDiff(b.deck, a.deck), dropGain);
       if (d2d.length) evs.push(["deckToDrop", { owner, actor, cards: d2d.map(core.cardOf) }]);
       // #5552 Promise of Rainbow: put into the drop zone from your deck by your opponent's card effects -> may put it into your hand
-      if (actor && actor !== owner && d2d.includes(5552)) { const of = F(owner), di = of.drop.lastIndexOf(5552); if (di >= 0) { of.hand.push(of.drop.splice(di, 1)[0]); fresh(); } }
+      if (actor && actor !== owner && d2d.includes(5552)) evs.push(["r42Rainbow", { owner }]);   // #5552 Promise of Rainbow (handled below)
       const disc = inter(msDiff(b.hand, a.hand), msDiff(dropGain, d2d));
       if (disc.length) evs.push(["handDiscard", { owner, actor, cards: disc.map(core.cardOf) }]);
       const back = inter(msDiff(b.field, a.field), msDiff(a.hand, b.hand));
@@ -1687,7 +1689,19 @@
       const fromDrop = inter(msDiff(a.field, b.field), msDiff(b.drop, a.drop));
       if (fromDrop.length) evs.push(["enterFromDrop", { owner, actor, cards: fromDrop.map(core.cardOf) }]);
     });
-    for (const [ev, data] of evs) { await fire42(ev, data); if (B.matchOver) return; }
+    for (const [ev, data] of evs) {
+      if (ev === "r42Rainbow") {   // #5552: put into the drop zone from your deck by your opponent's card effects -> you may put it into your hand
+        const of = F(data.owner);
+        if (of.drop.lastIndexOf(5552) >= 0) {
+          let yes = true;   // a human is asked; bots / auto-play always take it
+          if (!of.isBot && !ABX.autoPlay && ABX.ui && ABX.ui.pickOption) { try { yes = (await ABX.ui.pickOption({ title: "Promise of Rainbow \u2014 put it from the drop zone into your hand?", options: [{ label: "Yes, put it into my hand" }, { label: "No" }] })) !== 1; } catch (e) { yes = true; } }
+          const di = of.drop.lastIndexOf(5552);
+          if (yes && di >= 0) { of.hand.push(of.drop.splice(di, 1)[0]); fresh(); }
+        }
+        continue;
+      }
+      await fire42(ev, data); if (B.matchOver) return;
+    }
   }
   let zdepth = 0;
   const prevRA2 = core.runAbility;
@@ -3380,7 +3394,7 @@
       run(s, ctx) {
         const items = [F("plr").item, F("plr").item2, F("opp").item, F("opp").item2].filter(Boolean);
         const n = items.reduce((a, u) => a + (Number(u.card && u.card.crit) || 0), 0);
-        if (ctx.unit && n) ctx.unit.tempCrit = (ctx.unit.tempCrit || 0) + n;
+        if (ctx.unit && n) { ctx.unit.tempCrit = (ctx.unit.tempCrit || 0) + n; ctx.unit.r42BattleCrit = (ctx.unit.r42BattleCrit || 0) + n; }   // lasts for this battle only (removed at its end)
         fresh();
         return n > 0;
       }
@@ -3477,7 +3491,7 @@
     OV42.push([1595, /you may discard this card from your hand and pay 1 gauge/i, () => ({ kind: "act", tags: ["act"], conds: [], from: "hand", steps: [{ op: "r42DiscardSelfSearch" }] })]);
     // #5285 Ai Haibara's Day: drop a hand card as cost, draw two, once per turn
     OPS.r42DropHandCost = { async run(s, ctx) { const f = ctx.f; if (!f.hand.length) return false; const np = ABX.parseSentenceSteps("Put a card in your hand into your drop zone.", {}).steps[0].np; const refs = await core.pick(core.refsFor(np, ctx), np, ctx, { intent: "help", title: ctx.card.name + " \u2014 drop a hand card (cost)" }); const r = refs && refs[0]; if (!r) return false; const i = f.hand.indexOf(r.id); if (i < 0) return false; f.drop.push(f.hand.splice(i, 1)[0]); if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, core.cardOf(r.id)); return true; } };
-    OV42.push([5285, /draw two cards/i, () => ({ kind: "spell", once: "turn", conds: [], steps: [{ op: "r42DropHandCost" }].concat(stOf("Draw two cards.")) })]);
+    OV42.push([5285, /draw two cards/i, () => ({ kind: "spell", once: "turn", conds: [], steps: stOf("Draw two cards.") })]);
     // #5998 crit reduced per Reversal
     OV42.push([5998, /critical of a card on your opponent's field is reduced/i, (ab) => { const st = stOf("For this turn, a card on your opponent's field gets critical-1."); if (!st) return null; st[0].each = { perReversal: true }; return trig2(ab, { steps: st }); }]);
     // #3899 Asmodai: when a 72 Pillars / Thunder Empire monster enters your field, choose an opp card, may discard a hand card; if you do destroy it
@@ -3502,7 +3516,7 @@
     };
     OV42.push([3899, /when .{0,3}72 pillars.{0,3} or .{0,3}thunder empire/i, () => ({ kind: "triggered", trigger: { event: "otherEnter", np: ABX.parseNP("«Pillars» or «Thunder Empire» monster") }, conds: [], steps: [{ op: "r42AsmodaiKill" }] })]);
     OV42.push([1595, /also regarded as/i, () => ({ kind: "rule", steps: [] })]);
-    OV42.push([5285, /\[cast cost\]/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+    OV42.push([5285, /\[cast cost\]/i, () => ({ kind: "cost", costKind: "cast", parts: [{ ok: true, text: "Drop a hand card", discard: { n: 1, np: { raw: "hand card", qty: { n: 1, upTo: false, all: false, any: false, each: false }, ref: null, self: false, filter: { types: [] }, zone: { owner: "you", area: "hand" }, excludeSelf: false, topN: null, soulOf: null } } }], steps: [], conds: [], unparsed: [], parsed: true })]);
     // #209: cast timing line is covered by the free-counter window
     OV42.push([209, /you may cast this during an attack/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
   }
@@ -3780,7 +3794,8 @@
       try {
         const top = (ABX.srcStack || [])[(ABX.srcStack || []).length - 1];
         const card = (src && src.sourceCard) || top;
-        if (dealt > 0 && card && /"spectral strike"/i.test(String(card.skill || ""))) {
+        const topAb = (ABX.abStack || [])[(ABX.abStack || []).length - 1];
+        if (dealt > 0 && card && topAb && /^spectral strike$/i.test(String(topAb.name || ""))) {   // only damage dealt by the "Spectral Strike" ability itself
           const owner = otherSide(side), of = F(owner);
           if ((of.setSpells || []).some(c => c && c.id === 3566) && of.r42PhantomTurn !== B.turnCount) {
             const df = F(side);
@@ -3820,4 +3835,45 @@
     }
   };
   OV42.push([6445, /counterattack.{0,3} all attacking monsters/i, () => ({ kind: "triggered", trigger: { event: "oppAttack" }, conds: [], steps: [{ op: "r42KanesadaCounter" }] })]);
+
+  /* "for this battle" crit boosts (#870): removed when the battle ends */
+  {
+    const prevFBE = ABX.fireBattleEnd;
+    ABX.fireBattleEnd = function (attSide, units) {
+      const r = prevFBE.apply(this, arguments);
+      const strip = () => (units || []).forEach(x => { const u = x && (x.unit || x); if (u && u.r42BattleCrit) { u.tempCrit = (u.tempCrit || 0) - u.r42BattleCrit; u.r42BattleCrit = 0; } });
+      return r && r.then ? r.then(strip, strip) : (strip(), r);
+    };
+  }
+
+  /* #1351 Long-range Cannon: "You may only cast this card if you are [Ride] on a card" */
+  {
+    const prevCB1351 = core.castBlock;
+    core.castBlock = function (fighter, card) {
+      const r = prevCB1351 ? prevCB1351.apply(this, arguments) : null;
+      if (r) return r;
+      if (card && card.id === 1351 && fighter && ![fighter.item, fighter.item2].some(u => u && u.card && u.card.ride)) return 'You may only cast "Long-range Cannon" if you are [Ride] on a card.';
+      return null;
+    };
+  }
+
+  /* #5368 Formation Clear, 2nd line: at the start of each player's attack phase, you move each of your «Astrodragon» monsters to a separate area of your choice
+     (swapping with whatever stands there). A human is asked per monster; bots / auto-play leave them as they are. */
+  OPS.r42AstroSeparate = {
+    async run(s, ctx) {
+      const f = ctx.f, POS = ["left", "center", "right"];
+      const astro = POS.filter(p => f.monsters[p] && hasTribe(f.monsters[p].card, "Astrodragon")).map(p => f.monsters[p]);
+      if (!astro.length || ctx.auto || f.isBot || ABX.autoPlay || !(ABX.ui && ABX.ui.pickOption)) return false;
+      let moved = false;
+      for (const u of astro) {
+        const cur = POS.find(p => f.monsters[p] === u); if (!cur) continue;
+        const i = await ABX.ui.pickOption({ title: ctx.card.name + " \u2014 move \u00ab" + u.card.name + "\u00bb to which area?", options: POS.map(p => ({ label: (p === cur ? "Stay " : "Move ") + p })) });
+        const dest = POS[i]; if (!dest || dest === cur) continue;
+        const other = f.monsters[dest]; f.monsters[dest] = u; f.monsters[cur] = other || null; moved = true;
+      }
+      if (moved) fresh();
+      return moved;
+    }
+  };
+  OV42.push([5368, /at the start of each player's attack phase/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42AstroSeparate" }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
