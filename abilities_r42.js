@@ -3987,6 +3987,23 @@
       if (toGauge) f.gauge.push(id); else (u.soul = u.soul || []).push(id);
       fresh(); return true; }, check: () => true };
     OV42.push([3289, /put up to one card from your drop zone into this card.s soul or your gauge/i, () => ({ kind: "triggered", trigger: { event: "phaseStart", phase: "attack", who: "you" }, conds: [], steps: [{ op: "r42DropSoulOrGauge" }] })]);
+    // #80 Sitri "Take a Chance": reveal the top card; a spell may be cast free, otherwise it goes to the deck bottom
+    OPS.r42TakeAChance = { async run(s, ctx) {
+      const f = ctx.f; if (!f.deck.length) return false;
+      const id = f.deck.shift(), c = core.cardOf(id);
+      if (root.battle && battle.log) try { battle.log(ctx.card.name + " reveals " + (c ? c.name : "a card")); } catch (e) {}
+      let cast = !!c && c.type === "Spell";
+      if (cast && !ABX.autoPlay && !f.isBot && ABX.ui && ABX.ui.pickOption) cast = (await ABX.ui.pickOption({ title: ctx.card.name + " \u2014 cast " + c.name + " without paying its cost?", options: ["Cast it", "Put it on the bottom of the deck"] })) === 0;
+      if (!cast) { f.deck.push(id); fresh(); return true; }
+      f.drop.push(id);
+      for (const a of ABX.get(c).abilities.filter(x => x.kind === "spell")) await core.runAbility(ctx.side, c, a, null, { event: { name: "cast" } });
+      if (ABX.fireSpell) await ABX.fireSpell(ctx.side, c);
+      fresh(); return true; }, check: () => true };
+    OV42.push([80, /reveal the top card of your deck/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42TakeAChance" }] })]);
+    // #5533 Kiamya: enters on the center -> search a Legend Dragon item
+    TG(5533, "when this card enters the field on the center", { event: "enter", self: true }, "put up to one \u00abLegend Dragon\u00bb item from your deck into your hand, and shuffle your deck", { conds: [{ t: "selfPos", pos: "center" }] });
+    // #1974 Perger: when your opponent uses a spell, 1 damage to them (once per turn)
+    TG(1974, "when your opponent uses a spell", { event: "oppCast" }, "deal 1 damage to your opponent", { once: "turn" });
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

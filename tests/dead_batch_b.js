@@ -47,5 +47,13 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   run(`ABX.ui.pickOption=__po; ABX.autoPlay=true`);
   run(`fresh(); globalThis.u3=mk(3289); battle.plr.monsters.center=u3; battle.plr.drop=[21,22]; go(3289,'triggered','phaseStart',u3)`); await settle();
   ck("3289: drop card goes into soul (auto)", val(`return u3.soul.length===1&&battle.plr.drop.length===1`), val(`return [u3.soul,battle.plr.drop]`));
+  run(`fresh(); globalThis.sp=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Spell'&&ABX.get(c).abilities.some(a=>a.kind==='spell'&&JSON.stringify(a.steps).includes('"draw"')&&!JSON.stringify(a.steps).includes('r40'))); battle.plr.deck=[sp.id,21,22]; battle.plr.hand=[]; go(80,'triggered','enter')`); await settle();
+  ck("80: revealed spell is cast free (goes to drop)", val(`return battle.plr.drop.includes(sp.id)&&battle.plr.hand.length>0`), val(`return [sp&&sp.id,battle.plr.drop,battle.plr.deck.length]`));
+  run(`fresh(); globalThis.mn=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster').id; battle.plr.deck=[mn,21]; go(80,'triggered','enter')`); await settle();
+  ck("80: non-spell goes to bottom", val(`return battle.plr.deck[battle.plr.deck.length-1]===mn`));
+  run(`fresh(); globalThis.ld=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Item'&&(c.attrs||[]).includes('LegendDragon')); battle.plr.deck=[21,ld.id,22]; battle.plr.hand=[]; globalThis.k=mk(5533); battle.plr.monsters.center=k; go(5533,'triggered','enter',k)`); await settle();
+  ck("5533: Legend Dragon item to hand", val(`return battle.plr.hand.includes(ld.id)`), val(`return [ld&&ld.id,battle.plr.hand]`));
+  run(`fresh(); globalThis.k2=mk(1974); battle.plr.monsters.left=k2; go(1974,'triggered','oppCast',k2)`); await settle();
+  ck("1974: 1 damage to opponent", val(`return battle.opp.life===9`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

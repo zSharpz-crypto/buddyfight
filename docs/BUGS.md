@@ -316,3 +316,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Dead-family batch A (#4324 #1613 #4236 #6148 #4860 #2433 #3446 #2473 #1554 #988 #6012 #1561 #5209): abilities_r42.js, game.js (free-cost turn, item stand lock), tests/dead_batch_a.js. 'May only cast when...' timing rules on these cards are not enforced.
 - Batch B (dead families): #4154 #3639 #5914 call-cost reductions (parseCardCost; #3639/#5914 apply to any call, not only from hand), #2342 #2451 #3525 shield counters (lifeFloor now takes a target), #3644 #3648 #3662 #5433. Tests: tests/dead_batch_b.js. Not built: #1687 soul-based cost cut, #2368 #3289 #356 #2029 #5701 #1151.
 - Batch B2: #2368 (pay up to 5 life -> crit; human prompt, bots/auto pay 0) #3289 (attack-phase drop -> soul/gauge; auto = soul). Test: dead_batch_b.
+- Batch B3: #80 (reveal top, free-cast spell; human prompt) #5533 #1974 (oppCast 1 dmg once/turn). #765 already parsed (audit overcount). Test: dead_batch_b.
