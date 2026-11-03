@@ -3321,4 +3321,8 @@
   [[276, /monsters on the left and right cannot be attacked by both players/i], [1530, /you and your opponent cannot call monsters to the center/i],
    [5856, /all cards on your opponent's field cannot attack characters on your left and right/i], [6237, /during the battle that this card is attacking, your opponent cannot call characters/i]]
     .forEach(([id, re]) => OV42.push([id, re, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
+
+  /* deck-building "total of up to N A and B combined" rule: enforced in game.js deckComboGroup (deck editor + auto-fill) */
+  [2929, 2936, 3500, 3501, 3502, 3503, 3504].forEach(id =>
+    OV42.push([id, /you can only put a total of up to/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]));
 })(typeof window !== "undefined" ? window : globalThis);

@@ -970,6 +970,31 @@ function checkCardLegalityForFlag(card, flagCard, editingLostDeck = false, buddy
   return { allowed: false, maxCopies: 0 };
 }
 
+/* Deck rule: 'You can only put a total of up to N "A" and "B" combined in your deck' */
+let _deckComboMap = null;
+function deckComboGroup(cardId) {
+  if (!_deckComboMap) {
+    _deckComboMap = new Map();
+    const byName = new Map();
+    ALL_CARDS.forEach(c => { const k = String(c.name || "").toLowerCase(); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(c.id); });
+    ALL_CARDS.forEach(c => {
+      const m = /you can only put a total of up to (\d+) (.+?) in your deck/i.exec(c.skill || "");
+      if (!m) return;
+      const rest = m[2].replace('"' + c.name + '"', "").replace(c.name, "").replace(/\bcombined\b/i, "").replace(/^[\s"]*and\s+/i, "").trim();
+      const pm = /^"(.+?)"?$/.exec(rest);
+      if (!pm) return;
+      const ids = new Set([...(byName.get(String(c.name).toLowerCase()) || []), ...(byName.get(pm[1].toLowerCase()) || [])]);
+      const g = { max: +m[1], ids };
+      ids.forEach(id => { if (!_deckComboMap.has(id)) _deckComboMap.set(id, g); });
+    });
+  }
+  return _deckComboMap.get(cardId) || null;
+}
+function deckComboFull(list, cardId) {
+  const g = deckComboGroup(cardId);
+  return !!g && list.filter(id => g.ids.has(id)).length >= g.max;
+}
+
 /* ==================== UNIVERSAL CARD CONDITION & DYNAMIC BUFF ENGINE ==================== */
 function getFighterReversalCount(fighter) {
   if (!fighter || !fighter.godclock) return 0;
@@ -3824,6 +3849,10 @@ const app = {
     }
 
     const copies = targetList.filter(id => id === cardId).length;
+    if (!isLostTab && deckComboFull(targetList, cardId)) {
+      alert(`Deck rule: "${c.name}" and its partner card may total at most ${deckComboGroup(cardId).max} copies combined.`);
+      return;
+    }
     if (copies >= leg.maxCopies) {
       if (leg.isOffWorldOmni) {
         alert(`[Omni Lord] Rule: Because "${c.name}" is from outside your Flag's World, you may only include 1 copy in your deck!`);
@@ -3901,6 +3930,7 @@ const app = {
       if (!c) continue;
       const leg = checkCardLegalityForFlag(c, flagCard, false);
       if (!leg.allowed || (counts[cid] || 0) >= (leg.maxCopies || 4)) continue;
+      if (deckComboFull(deck.cards, cid)) continue;
       deck.cards.push(cid);
       counts[cid] = (counts[cid] || 0) + 1;
     }
