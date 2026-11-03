@@ -1063,7 +1063,7 @@
       f.hand.forEach((id, i) => { const c = core.cardOf(id); if (isG(c)) cands.push({ k: "zone", side, area: "hand", idx: i, id, card: c }); });
       f.deck.forEach((id, i) => { const c = core.cardOf(id); if (isG(c)) cands.push({ k: "zone", side, area: "deck", idx: i, id, card: c }); });
       let picked = cands.slice(0, 2);
-      if (cands.length > 2 && !ABX.autoPlay) picked = (await core.pick(cands, { qty: { n: 2, upTo: true }, raw: "up to two items with Aqulta Gwaneff in their card names", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - equip up to two Aqulta Gwaneff items` }) || []).slice(0, 2);
+      if (cands.length > 0 && !ABX.autoPlay) picked = (await core.pick(cands, { qty: { n: 2, upTo: true }, raw: "up to two items with Aqulta Gwaneff in their card names", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - equip up to two Aqulta Gwaneff items` }) || []).slice(0, 2);
       if (picked.length === 2 && picked[0].id === picked[1].id && picked[0].area === picked[1].area && picked[0].idx === picked[1].idx) picked = picked.slice(0, 1);
       const fromDeck = picked.some(x => x.area === "deck");
       f.abxItemCap = 2;
@@ -2807,4 +2807,88 @@
       return prevFA.apply(this, arguments);
     };
   })();
+
+  /* ---- [r42] [Counter] spells that "return this card to hand" ended in the drop zone ----
+   * #4963 Linkdragon Spirit: the generic parse returned the card to hand unconditionally (even when the dropped card has no [D-Share]).
+   * #351 Berserk Gard: its text has an unbalanced quote ("Symbel Gard in your drop zone) so the whole return clause was lost. */
+  OPS.r42ReturnIfDropped = {
+    async run(s, ctx) {
+      const hit = (ctx.bind.chosen || []).some(r => r && r.card && new RegExp(s.re, "i").test(r.card.skill || ""));
+      if (!hit) return false;
+      return !!(await OPS.moveSelf.run({ op: "moveSelf", to: { area: "hand", owner: "you", end: "top" } }, ctx));
+    }, check: () => true
+  };
+  OV42.push([4963, /if the card dropped has \[d-share\], return this card to hand/i, () => ({ kind: "spell", steps: [
+    { op: "nullifyAttack" },
+    { op: "mill", who: "you", n: 1, to: "drop zone" },
+    { op: "r42ReturnIfDropped", re: "\\[d-share\\]" }
+  ] })]);
+  OV42.push([351, /symbel gard in your drop zone/i, (ab) => {
+    const hasSymbel = { t: "has", owner: "any", np: { raw: "\"Symbel Gard\" in your drop zone", qty: { n: 1, upTo: false, all: false, any: false, each: false }, ref: null, self: false, filter: { namesExact: ["symbel gard"] }, zone: { owner: "you", area: "drop zone" }, excludeSelf: false, topN: null, soulOf: null }, n: 1, other: false };
+    return { kind: "spell", steps: [
+      clone(ab.steps[0]), clone(ab.steps[1]),
+      { op: "discard", n: 1, cost: true, src: "discard a card from your hand", optional: true, cond: hasSymbel },
+      { op: "pay", gauge: 2, cost: true, src: "pay 2 gauge", cond: hasSymbel },
+      { op: "moveSelf", to: { area: "hand", owner: "you", end: "top" }, src: "return this card into your hand", gate: "ifYouDo" }
+    ] };
+  }]);
+  // #1387 Be Glad That You Can be of Use to Me: the "[Cast Cost] put the top card of your deck into your drop zone" part was never paid and the parse returned the card
+  // to hand every time. Now: drop the top card; «Darkhero» -> destroy an item on the opponent's field + gain 2 life; otherwise return this card to your hand.
+  OPS.r42BeGlad = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      if (!f.deck.length) return false;
+      const id = f.deck.shift(); f.drop.push(id);
+      const c = core.cardOf(id);
+      if (c && (c.attrs || []).some(a => /^darkhero$/i.test(a))) {
+        if (s.destroy && OPS.destroy && OPS.destroy.run) await OPS.destroy.run(s.destroy, ctx);
+        await OPS.life.run({ op: "life", who: "you", n: 2 }, ctx);
+        fresh(); return true;
+      }
+      const ok = await OPS.moveSelf.run({ op: "moveSelf", to: { area: "hand", owner: "you", end: "top" } }, ctx);
+      fresh(); return !!ok;
+    }, check: () => true
+  };
+  OV42.push([1387, /if it is not a .darkhero., return this card to your hand/i, (ab) => {
+    const d = clone(ab.steps[0]); delete d.cond;
+    return { kind: "spell", steps: [{ op: "r42BeGlad", destroy: d }] };
+  }]);
+
+  /* ---- [r42] [Stand] buddy zone mechanics ----
+   * The buddy zone is game.js `fighter.buddyZone` = [{id, rested, isFaceDown}] ([Rest] after a buddy call). "[Stand] all «Legend Dragon» in your buddy zone" (#5422 #5424 #5526 #6136)
+   * used to set an unused `buddyZoneRested` flag, so the buddy zone cards stayed rested; it also stood every buddy zone card whatever the filter.
+   * "put the top card of your deck face down into your buddy zone" (#5340) now adds a face-down card (fighter.buddyZoneFaceDown). */
+  ABX.buddyZoneRested = (f) => { try { return getFighterBuddyZoneEntries(f).some(e => !e.isFaceDown && e.rested); } catch (e) { return false; } };
+  OPS.standBuddyZone = {
+    stand(f, filter, ctx) {
+      const has = filter && Object.keys(filter).length;
+      const n = standFighterBuddyZone(f, has ? (c) => core.matchFilter(c, filter, null, ctx) : null);
+      return n;
+    },
+    async run(s, ctx) {
+      const f = ctx.f;
+      if (!f) return false;
+      if (s.refill) {
+        if (!f.deck.length) return false;
+        (f.buddyZoneFaceDown = f.buddyZoneFaceDown || []).push(f.deck.shift());
+        fresh(); return true;
+      }
+      let filter = null;
+      if (s.what) { const np = ABX.parseNP("all " + s.what + " on your field"); filter = np && !np.junk ? np.filter : null; }
+      getFighterBuddyZoneEntries(f);
+      OPS.standBuddyZone.stand(f, filter, ctx);
+      fresh(); return true;
+    },
+    check: () => true
+  };
+  // #1138 "You may only cast this card if the card in your buddy zone is [Rest]." (enforced in core.castBlock)
+  (function () {
+    const prevCB = core.castBlock;
+    core.castBlock = function (fighter, card) {
+      const r = prevCB ? prevCB.apply(this, arguments) : null;
+      if (r) return r;
+      return card && card.id === 1138 && !ABX.buddyZoneRested(fighter) ? "The card in your buddy zone must be in [Rest] to cast this card." : null;
+    };
+  })();
+  OV42.push([1138, /you may only cast this card if the card in your buddy zone is \[rest\]/i, () => ({ kind: "rule", steps: [] })]);
 })(typeof window !== "undefined" ? window : globalThis);

@@ -275,3 +275,6 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - [x] Round 2: field-to-soul costs (#1121 #3175 #1197), "return N «X» from drop zone to deck" (#2466), "drop all your hand" (#4762), "Pay a total of any 2 gauge" (#4962). #1448, #2675, #3728, #4759 were already built and tested (false positives of the coverage scan).
 - [x] Round 3: optional "you may put this card on top of ..." call cost (#1691, #1676): plain call or on top of a matching monster; #5127 cost reduced per «Astrodragon» attack this turn.
 - Nothing left in the unbuilt-class list except #523 (shout only, no effect).
+- [x] Azi Dahaka size 4 (#867 #2019 #6526 + #4174): the player now chooses which "Aqulta Gwaneff" to equip (hand or deck; #2020 counts as #942) instead of the engine taking the first match. tests/azi_sys.js
+- [x] [Counter]/spells that "return this card to hand" ended in the drop zone: #351 (broken quote lost the clause), #4963 (returned even without [D-Share]), #1387 (cost never paid, always returned). #352 #5290 #5421 checked OK. tests/counter_return.js
+- [x] [Stand] buddy zone: effects now stand the real buddy zone entries, filtered by tribe (#5422 #5424 #5526 #6136); #5340 puts the top card face down into the buddy zone; #1138 / #4237 read the real [Rest] state. tests/buddy_stand.js

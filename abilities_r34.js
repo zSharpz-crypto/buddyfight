@@ -173,7 +173,7 @@
       const r = gues.apply(this, arguments);
       try {
         if (!r || !unit || !unit.card || !fighter) return r;
-        if (active(unit) && hasTag(unit.card, "buddyRest4237") && fighter.buddyZoneRested) { r.pen = true; r.power += 99999999; }
+        if (active(unit) && hasTag(unit.card, "buddyRest4237") && ABX.buddyZoneRested(fighter)) { r.pen = true; r.power += 99999999; }
         if (fighter.buddyId === 6468 && !fieldUnits(fighter, true).some(x => x.unit.card.id === 6468) && B.phase === "attack" && B.activeSide === (fighter === B.plr ? "plr" : "opp") &&
           (unit.isBuddyGift || unit.card.id === fighter.buddyId)) r.crit = (r.crit || 0) + 2;
       } catch (e) { /* ignore */ }

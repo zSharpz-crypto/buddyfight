@@ -210,26 +210,20 @@
 
   OPS.r40AziDahakaDestroy867 = {
     async run(s, ctx) {
-      const f = ctx.f;
-      const isGwaneff = (id) => { const c = cardOf(id); return !!c && c.name === "Demonic Demise Sword, Aqulta Gwaneff"; };   // text: a "Demonic Demise Sword, Aqulta Gwaneff" (exact name)
-      let area = "hand", idx = f.hand.findIndex(isGwaneff);
-      if (idx < 0) {
-        area = "deck";
-        idx = f.deck.findIndex(isGwaneff);
-      }
-      if (idx >= 0) {
-        const cid = f[area].splice(idx, 1)[0];
-        const eqCard = cardOf(cid);
-        if (area === "deck" && B.shuffleFighterDeck) B.shuffleFighterDeck(ctx.side);
-        if (eqCard) {
-          if (f.item && !f.item.isEndrulerFlag) {
-            if (Array.isArray(f.item.soul)) f.drop.push(...f.item.soul.map(getCid));
-            f.drop.push(f.item.card.id);
-          }
-          f.item = { card: eqCard, rested: false, attacksLeft: eqCard.atk_max || 1, soul: [], itemMode: "equip" };
-          if (ABX.fireEquipped) ABX.fireEquipped(ctx.side, eqCard, f.item);
-        }
-      }
+      const f = ctx.f, side = ctx.side;
+      // text: a "Demonic Demise Sword, Aqulta Gwaneff"; #2020 "Wicked Lord Dragon Sword, Aqulta Gwaneff" is also regarded as it, so both count.
+      const isGwaneff = (c) => !!c && c.type === "Item" && (c.name === "Demonic Demise Sword, Aqulta Gwaneff" || c.id === 2020);
+      // the player picks which one (and from the hand or the deck); identical copies in one zone are offered once
+      const cands = [], seen = new Set();
+      ["hand", "deck"].forEach(area => f[area].forEach((id, idx) => {
+        const c = cardOf(id), k = area + ":" + id;
+        if (isGwaneff(c) && !seen.has(k)) { seen.add(k); cands.push({ k: "zone", side, area, idx, id, card: c }); }
+      }));
+      if (!cands.length) { if (B.shuffleFighterDeck && f.deck.length) { /* looked in the deck, nothing found */ B.shuffleFighterDeck(side); } fresh(); return true; }
+      const ch = (await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 1, title: `${ctx.card.name} - choose an Aqulta Gwaneff to equip (hand or deck)` })) || [];
+      const x = ch[0] || (ABX.autoPlay ? cands[0] : null);
+      if (x && ABX.equipFrom) ABX.equipFrom(side, x.area, x.id, false);
+      if (B.shuffleFighterDeck) B.shuffleFighterDeck(side);
       fresh();
       return true;
     },

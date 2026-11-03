@@ -166,8 +166,8 @@
     const np = NP("all " + m[1] + " on your field");
     return np ? { op: "stand", np, alsoBuddyZone: true } : null;
   });
-  ar(/^\[?stand\]? all (.+?) in your buddy zone$/i, () => ({ op: "standBuddyZone" }));
-  ar(/^refill your buddy zone$/i, () => ({ op: "standBuddyZone" }));
+  ar(/^\[?stand\]? all (.+?) in your buddy zone$/i, (m) => ({ op: "standBuddyZone", what: m[1] }));
+  ar(/^refill your buddy zone$/i, () => ({ op: "standBuddyZone", refill: true }));
 
   // Impact & Impact Monster cost reduction (#4170 Future Force, "DX")
   ar(/^(?:the )?gauge cost written in the \[cast cost\] of your impacts and the \[call cost\] of your impact monsters is reduced by (\d+)(?: gauge)?$/i,
@@ -637,7 +637,7 @@
   if (OPS.stand && OPS.stand.run) {
     const origStand = OPS.stand.run;
     OPS.stand.run = function (s, ctx) {
-      if (s && s.alsoBuddyZone && ctx && ctx.f) ctx.f.buddyZoneRested = false;
+      if (s && s.alsoBuddyZone && ctx && ctx.f && OPS.standBuddyZone) OPS.standBuddyZone.stand(ctx.f, s.np && s.np.filter, ctx);
       return origStand.apply(this, arguments);
     };
   }

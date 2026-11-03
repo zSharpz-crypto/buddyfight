@@ -46,12 +46,18 @@ const ck = (n, ok, extra) => { ok ? pass++ : fail++; console.log(ok ? "PASS" : "
   }
   run(`setup(2019); battle.plr.hand=[942]; if(battle.bounceMonster) battle.bounceMonster('plr','center'); else if(battle.returnMonsterToHand) battle.returnMonsterToHand('plr','center');`); await settle();
   ck("2019 only 'destroyed' text: bounced card must not equip", !items().includes("942") || !val(`return !!(battle.bounceMonster||battle.returnMonsterToHand)`), items());
-  // exact name: #867 / #2019 / #6526 search a "Demonic Demise Sword, Aqulta Gwaneff" (#942) only - not #2020 / #4175
+  // #2020 is "also regarded as" #942, so it is a valid search target; #4175 is not. The player chooses which one (UI pick, not the first match).
   for (const id of [867, 2019]) {
-    run(`setup(${id}); battle.plr.hand=[2020,4175]; battle.plr.deck=battle.plr.deck.filter(x=>x!==942); battle.destroyMonster('plr','center');`); await settle();
-    ck(id + " does not equip other Aqulta Gwaneff swords", items() === "", items());
-    run(`setup(${id}); battle.plr.hand=[2020,942]; battle.destroyMonster('plr','center');`); await settle();
-    ck(id + " equips #942 even with #2020 in hand", items() === "942", items());
+    run(`setup(${id}); battle.plr.hand=[4175]; battle.plr.deck=battle.plr.deck.filter(x=>x!==942&&x!==2020); battle.destroyMonster('plr','center');`); await settle();
+    ck(id + " does not equip unrelated Aqulta Gwaneff items (#4175)", items() === "", items());
+    run(`setup(${id}); battle.plr.hand=[2020,4175]; battle.plr.deck=battle.plr.deck.filter(x=>x!==942&&x!==2020); battle.destroyMonster('plr','center');`); await settle();
+    ck(id + " equips #2020 (regarded as #942)", items() === "2020", items());
+    // human player: a pick prompt offering both swords; choose the 2nd
+    run(`ABX.autoPlay=false; battle.plr.isBot=false; globalThis.__offer=null; ABX.ui.pickCards=async function(o){ globalThis.__offer=o.cards.map(c=>c.card.id); return [o.cards.length-1]; };
+      setup(${id}); battle.plr.hand=[942]; battle.plr.deck=battle.plr.deck.filter(x=>x!==942&&x!==2020).concat([2020]); battle.destroyMonster('plr','center');`); await settle();
+    ck(id + " asks the player to choose (offers #942 and #2020)", val(`return JSON.stringify(globalThis.__offer)`) === "[942,2020]", val(`return JSON.stringify(globalThis.__offer)`));
+    ck(id + " equips the chosen sword (#2020 from the deck)", items() === "2020", items());
+    run(`ABX.autoPlay=true;`);
   }
   console.log("pass", pass, "fail", fail);
 })();
