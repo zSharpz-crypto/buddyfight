@@ -2891,4 +2891,82 @@
     };
   })();
   OV42.push([1138, /you may only cast this card if the card in your buddy zone is \[rest\]/i, () => ({ kind: "rule", steps: [] })]);
+
+  /* ---- [r42] "[Call Cost] [Pay N opponent's gauge]" (#4381 #4383 #4387 #4389 #4412 ...) ----
+   * The cost line was never read: these cards were called / equipped for free and the opponent's gauge stayed untouched. The N gauge cards go from the OPPONENT's
+   * gauge to the OPPONENT's drop zone, and the card cannot be called / equipped / cast when the opponent has fewer than N gauge. */
+  (function () {
+    const NUMW = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
+    const oppGaugeCost = (card) => {
+      const m = /\[(?:call|cast|equip) cost\]([^\n]*)/i.exec((card && card.skill) || "");
+      const g = m && /\bpay (\d+|an?|one|two|three|four|five) opponent'?s gauge\b/i.exec(m[1]);
+      return g ? (parseInt(g[1], 10) || NUMW[g[1].toLowerCase()] || 1) : 0;
+    };
+    ABX.oppGaugeCost = oppGaugeCost;
+    const heP = ABX.hasExtras, cpeP = ABX.canPayExtras, peP = ABX.payExtras;
+    ABX.hasExtras = function (card) { return oppGaugeCost(card) > 0 || heP.apply(this, arguments); };
+    ABX.canPayExtras = function (side, card) {
+      const n = oppGaugeCost(card);
+      if (n > 0 && F(otherSide(side)).gauge.length < n) return false;
+      return heP.call(this, card) ? cpeP.apply(this, arguments) : true;
+    };
+    ABX.payExtras = function (side, card, unit) {
+      const n = oppGaugeCost(card);
+      if (n > 0) { const e = F(otherSide(side)); for (let k = 0; k < n && e.gauge.length; k++) e.drop.push(e.gauge.pop()); }
+      return heP.call(this, card) ? peP.apply(this, arguments) : undefined;
+    };
+  })();
+
+  /* ---- [r42] #16 Gotcha!: "For this turn, the next time you would pay gauge for a monster's [Act] on your field, you may pay from both your gauge and your opponent's gauge." ----
+   * The spell only set up nothing. Now it arms f.abxGotcha for this turn; the next monster [Act] gauge payment takes what your own gauge lacks from the opponent's gauge
+   * (their cards go to THEIR drop zone), and the flag is used up. */
+  OPS.r42Gotcha = { run(s, ctx) { ctx.f.abxGotcha = B.turnCount; return true; }, check: () => true };
+  OV42.push([16, /the next time you would pay gauge for a monster's \[act\]/i, () => ({ kind: "spell", steps: [{ op: "r42Gotcha" }] })]);
+  (function () {
+    const armed = (f, unit, ab) => f.abxGotcha === B.turnCount && unit && unit.card && unit.card.type === "Monster" && (!ab || ab.kind === "act" || ab.kind === "modal");
+    const prevCUA = ABX.canUseAct;
+    ABX.canUseAct = function (side, card, ab, unit) {
+      const f = F(side), e = F(otherSide(side));
+      if (!armed(f, unit, ab) || !e.gauge.length) return prevCUA.apply(this, arguments);
+      const own = f.gauge, saved = own.slice();
+      f.gauge = own.concat(e.gauge);      // "both your gauge and your opponent's": only for the affordability check
+      try { return prevCUA.apply(this, arguments); } finally { f.gauge = saved; }
+    };
+    const prevPay = OPS.pay.run;
+    OPS.pay.run = function (s, ctx) {
+      const f = ctx.f, e = ctx.e || F(otherSide(ctx.side));
+      if (s && s.gauge && f.gauge.length < s.gauge && armed(f, ctx.unit, ctx.ab) && f.gauge.length + e.gauge.length >= s.gauge) {
+        let need = s.gauge - f.gauge.length;
+        while (f.gauge.length) f.drop.push(f.gauge.pop());
+        while (need-- > 0) e.drop.push(e.gauge.pop());
+        f.abxGotcha = null;
+        const rest = Object.assign({}, s, { gauge: 0 });
+        return (rest.life || rest.restSelf) ? prevPay.call(this, rest, ctx) : true;
+      }
+      if (s && s.gauge && armed(f, ctx.unit, ctx.ab) && f.gauge.length >= s.gauge) f.abxGotcha = null;   // paid from your own gauge: the "next time" is used up
+      return prevPay.apply(this, arguments);
+    };
+  })();
+
+  /* ---- [r42] cards that count the cards put under the opponent's flag ----
+   * #5069 Scar Bind: "You may only cast this card if your opponent has a card under their flag" was not enforced.
+   * #5060 Curse Decline: "You may cast this card without paying its [Cast Cost] if your opponent has eight or more cards under their flag" always cost 2 gauge + 1 life. */
+  (function () {
+    const underOf = (fighter) => (fighter && Array.isArray(fighter.flagUnderFaceUp)) ? fighter.flagUnderFaceUp.length : 0;
+    const foeOf = (fighter) => (B.plr === fighter ? B.opp : B.plr);
+    const prevCB = core.castBlock;
+    core.castBlock = function (fighter, card) {
+      const r = prevCB ? prevCB.apply(this, arguments) : null;
+      if (r) return r;
+      return card && card.id === 5069 && underOf(foeOf(fighter)) < 1 ? "Your opponent has no card under their flag." : null;
+    };
+    const prevPCC = root.parseCardCost;
+    if (typeof prevPCC === "function") {
+      root.parseCardCost = function (costStr, skillStr, fighter, cardObj) {
+        const c = prevPCC.apply(this, arguments);
+        try { if (cardObj && cardObj.id === 5060 && fighter && underOf(foeOf(fighter)) >= 8) return Object.assign({}, c, { gauge: 0, life: 0 }); } catch (e) { /* ignore */ }
+        return c;
+      };
+    }
+  })();
 })(typeof window !== "undefined" ? window : globalThis);
