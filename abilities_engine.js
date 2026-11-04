@@ -1376,6 +1376,9 @@
   function extraParts(card) {
     const out = [];
     abilitiesOf(card, a => a.kind === "cost").forEach(a => (a.parts || []).forEach(p => {
+      // [r42] #5736 two NAMED cards that themselves contain quotes: Put a "Projection Shell, "Sigurd"" and a "Heroical Armor, "Gram"" from your field into its soul (the name list was cut at the inner quotes: never payable)
+      const mNest = /^put an? "(.+)" and an? "(.+)" from your field into (?:its|this card's|this monster's) soul\.?$/i.exec(String(p.text || ""));
+      if (mNest) { [mNest[1], mNest[2]].forEach(nm => out.push({ soulFrom: { area: "field", n: 1, np: { raw: "a card", qty: { n: 1 }, filter: { names: [lc(nm)] } } }, text: p.text })); return; }
       if (p.soulFrom || p.discard || p.destroy) {
         // parser reads "Put up to two «X» from your drop zone into its soul" as n=1: fix the count here (e.g. #6010)
         const um = p.soulFrom && /^put up to (one|two|three|four|\d+)\b/i.exec(p.text || "");
@@ -1445,6 +1448,12 @@
     }));
     return out;
   }
+  // names (lower case) of cards an [Equip Cost] / [Call Cost] puts from your field into its soul (#5736 Messiah Arms wants your equipped "Gram")
+  ABX.fieldSoulCostNames = function (card) {
+    const out = [];
+    extraParts(card).forEach(p => { if (p.soulFrom && p.soulFrom.area === "field" && p.soulFrom.np && p.soulFrom.np.filter && p.soulFrom.np.filter.names) out.push(...p.soulFrom.np.filter.names); });
+    return out;
+  };
   const AREA = { "drop zone": "drop", hand: "hand", gauge: "gauge", field: "field", deck: "deck" };
   function partCands(part, side, card, exclHandIdx) {
     const f = F(side), ctx = { side, f, e: F(otherSide(side)), card, unit: null, bind: {} };
