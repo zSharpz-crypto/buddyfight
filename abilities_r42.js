@@ -4151,6 +4151,7 @@
           }
           if (card && card.id === 1428 && !(ABX.battleCtx && ABX.battleCtx.active)) return `"${card.name}" can only be cast while you are being attacked`;
           if (card && card.id === 2661) { const nm = new Set(fighter.drop.map(id => core.cardOf(id)).filter(c => c && /caardian/i.test(c.name || "")).map(c => c.name)); if (nm.size < 3) return `"${card.name}" needs three or more different Caardian cards in your drop zone`; }
+          if (card && card.id === 6221 && !core.fieldUnits(fighter, false).some(x => x.unit && x.unit.card && hasTribe(x.unit.card, "SuperRobot") && (x.unit.soul || []).length)) return `"${card.name}" needs a «Super Robot» with a soul on your field`;
           if (card && card.id === 765 && B.phase === "final") return `"${card.name}" cannot be cast during a final phase`;
           if (card && card.id === 3904 && Object.values(fighter.monsters || {}).some(Boolean)) return `"${card.name}" can only be cast with no monsters on your field`;
           if (card && card.id === 1141 && core.fieldUnits(fighter, false).filter(x => x.unit && x.unit.card && x.unit.card.type === "Monster" && (x.unit.card.attrs || []).some(a => /^blackdragon$/i.test(a))).length < 2) return `"${card.name}" needs two or more Black Dragon on your field`;
@@ -4473,6 +4474,74 @@
       ABX.r42ApplyFate = applyFate;
     }
     OV42.push([1004, /if there are star on your left and right/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+    // #6221 I won't... Let you!: the cast cost drops 1+ souls from a Super Robot; that number sizes both modal options
+    OV42.push([6221, /drop one or more souls from a .super robot. on your field/i, () => ({ kind: "cost", costKind: "cast", parts: [], steps: [], unparsed: [] })]);
+    OPS.r42SoulDropN = { async run(s, ctx) {
+      const f = ctx.f;
+      const hosts = core.fieldUnits(f, false).filter(x => x.unit && x.unit.card && hasTribe(x.unit.card, "SuperRobot") && (x.unit.soul || []).length).map(x => ({ k: "unit", side: ctx.side, unit: x.unit, card: x.unit.card, id: x.unit.card.id }));
+      if (!hosts.length) return false;
+      const ch = (await core.pick(hosts, { qty: { n: 1, upTo: false }, raw: "a \u00abSuper Robot\u00bb on your field" }, ctx, { intent: "cost", title: ctx.card.name + " \u2014 drop souls from which monster?" })) || [];
+      const u = ch[0] && ch[0].unit; if (!u) return false;
+      let n = u.soul.length;
+      if (!ABX.autoPlay && !f.isBot && ABX.ui && ABX.ui.pickOption && u.soul.length > 1) {
+        const opts = []; for (let i = 1; i <= u.soul.length; i++) opts.push({ label: "Drop " + i });
+        n = 1 + Math.max(0, Math.min(u.soul.length - 1, +(await ABX.ui.pickOption({ title: ctx.card.name + " \u2014 how many souls?", options: opts })) || 0));
+      }
+      for (let i = 0; i < n; i++) f.drop.push(u.soul.pop());
+      ctx.r42N = n; fresh(); return true; }, check: () => true };
+    OPS.r42ModalN = { async run(s, ctx) {
+      const n = ctx.r42N || 1;
+      if (s.mode === "stand") return await OPS.stand.run({ op: "stand", np: ABX.parseNP("up to " + n + " cards on your field") }, ctx);
+      return await OPS.boost.run({ op: "boost", np: ABX.parseNP("up to " + n + " cards on your opponent's field"), mods: { power: -10000, defense: 0, critical: -3, kws: [] } }, ctx); }, check: () => true };
+    OV42.push([6221, /choose and use one of the following two/i, () => {
+      const o = (t, mode) => ({ kind: "spell", tags: [], conds: [], steps: [{ op: "r42ModalN", mode }], raw: t, cleaned: t, parsed: true });
+      return { kind: "modal", steps: [{ op: "r42SoulDropN" }], options: [o("Choose up to one card on your field for each soul dropped, and [Stand] the chosen card.", "stand"), o("Choose up to one card on your opponent's field for each soul dropped, and for this turn, the chosen card gets power-10000 and critical-3.", "debuff")] };
+    }]);
+    // #5653 Nagi: when "Friendly Twin Idol, Hayate Hisakawa" (#5652) on your field stands (by a card effect), stand this card
+    {
+      const prevStand = OPS.stand.run;
+      OPS.stand.run = async function (s, ctx) {
+        const before = [];
+        ["plr", "opp"].forEach(side => core.fieldUnits(F(side), true).forEach(x => { if (x.unit && x.unit.card && x.unit.card.id === 5652 && x.unit.rested) before.push({ side, unit: x.unit }); }));
+        const res = await prevStand.apply(this, arguments);
+        try {
+          before.forEach(b => {
+            if (b.unit.rested) return;
+            core.fieldUnits(F(b.side), true).forEach(x => { if (x.unit && x.unit.card && x.unit.card.id === 5653 && x.unit.rested && x.unit.abxNullified !== B.turnCount) x.unit.rested = false; });
+          });
+        } catch (e) { /* ignore */ }
+        return res;
+      };
+    }
+    OV42.push([5653, /when .hayate hisakawa. on your field stands/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+    // #2269 Helper Sei: when a soul is put from a size 3 «Dragon Chief Emperor» on your field into the drop zone, you may put this card from your field into that monster's soul
+    {
+      const dceSnap = () => { const out = []; ["plr", "opp"].forEach(side => core.fieldUnits(F(side), true).forEach(x => { if (x.unit && x.unit.card && x.unit.card.type === "Monster" && hasTribe(x.unit.card, "DragonChiefEmperor") && (x.unit.card.size || 0) === 3) out.push({ side, unit: x.unit, n: (x.unit.soul || []).length, drop: F(side).drop.length }); })); return out; };
+      const prevRAs = core.runAbility;
+      core.runAbility = async function () {
+        const before = dceSnap();
+        let res;
+        try { res = await prevRAs.apply(this, arguments); }
+        finally {
+          try {
+            for (const b of before) {
+              const f = F(b.side);
+              if ((b.unit.soul || []).length < b.n && f.drop.length > b.drop && core.posOfUnit(f, b.unit)) {
+                const sei = core.fieldUnits(f, false).find(x => x.unit && x.unit.card && x.unit.card.id === 2269 && x.unit !== b.unit && x.unit.abxNullified !== B.turnCount);
+                if (!sei) continue;
+                let yes = true;
+                if (!f.isBot && !ABX.autoPlay && ABX.ui && ABX.ui.pickOption) yes = (await ABX.ui.pickOption({ title: "Apprentice Underling, Helper Sei \u2014 put it into " + b.unit.card.name + "'s soul?", options: ["Yes", "No"] })) === 0;
+                if (!yes) continue;
+                const p = core.posOfUnit(f, sei.unit);
+                if (p && p !== "item") { f.monsters[p] = null; (b.unit.soul = b.unit.soul || []).push(2269, ...(sei.unit.soul || [])); fresh(); }
+              }
+            }
+          } catch (e) { /* ignore */ }
+        }
+        return res;
+      };
+    }
+    OV42.push([2269, /when a soul is put from a size 3 .dragon chief emperor. on your field into your drop zone/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

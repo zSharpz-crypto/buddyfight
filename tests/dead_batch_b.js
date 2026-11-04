@@ -157,5 +157,14 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("4770: pays 1 gauge, two Dragod tokens", val(`return [battle.plr.monsters.left,battle.plr.monsters.right].filter(Boolean).length===2&&battle.plr.gauge.length===2`), val(`return battle.plr.gauge.length`));
   run(`fresh(); globalThis.st=window.BUDDYFIGHT_CARDS.filter(c=>c.type==='Monster'&&(c.attrs||[]).includes('Star')).slice(0,2); battle.plr.setSpells=[card(1004)]; battle.plr.monsters.left=mk(st[0].id); battle.opp.monsters.center=mk(mm[0]); ABX.r42ApplyFate(); globalThis.n1=battle.opp.monsters.center.abxNullified; battle.plr.monsters.right=mk(st[1].id); ABX.r42ApplyFate(); globalThis.n2=battle.opp.monsters.center.abxNullified`);
   ck("1004: nullifies only with Star on left and right", val(`return !n1&&n2===battle.turnCount`), val(`return [n1,n2]`));
+  run(`fresh(); globalThis.sr=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('SuperRobot')); globalThis.srU=mk(sr.id); srU.soul=[31,32]; srU.rested=true; battle.plr.monsters.left=srU; globalThis.cb11=ABX.core.castBlock(battle.plr,card(6221)); ABX.core.runAbility('plr',card(6221),ABX.get(card(6221)).abilities.find(a=>a.kind==='modal'),null,{})`); await settle();
+  ck("6221: castable with a Super Robot soul; drops souls then stands", val(`return !cb11&&srU.soul.length===0&&srU.rested===false`), val(`return [cb11,srU.soul,srU.rested]`));
+  run(`fresh(); globalThis.cb12=ABX.core.castBlock(battle.plr,card(6221))`);
+  ck("6221: blocked without a Super Robot soul", val(`return !!cb12`));
+  run(`fresh(); globalThis.hy=mk(5652); hy.rested=true; globalThis.ng=mk(5653); ng.rested=true; battle.plr.monsters.left=hy; battle.plr.monsters.right=ng; ABX.core.runAbility('plr',card(21),{kind:'spell',steps:[{op:'stand',np:ABX.parseNP('up to one monster on your field')}]},null,{})`); await settle();
+  ck("5653: Nagi stands when Hayate stands by an effect", val(`return hy.rested===false&&ng.rested===false`), val(`return [hy.rested,ng.rested]`));
+  run(`ABX.OPS.testDropSoul={run(s,ctx){ dU.soul.pop(); ctx.f.drop.push(31); return true; },check:()=>true}`);
+  run(`fresh(); globalThis.dce=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.size===3&&(c.attrs||[]).includes('DragonChiefEmperor')); globalThis.dU=mk(dce.id); dU.soul=[31,32]; battle.plr.monsters.center=dU; battle.plr.monsters.left=mk(2269); ABX.core.runAbility('plr',card(21),{kind:'spell',steps:[{op:'testDropSoul'}]},null,{})`); await settle();
+  ck("2269: Sei goes into the Dragon Chief Emperor's soul after a soul is dropped", val(`return !battle.plr.monsters.left&&dU.soul.includes(2269)`), val(`return [!!battle.plr.monsters.left,dU.soul,battle.plr.drop]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
