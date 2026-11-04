@@ -4057,6 +4057,7 @@
             if (fighter.r42TrollTurn === B.turnCount) return `"${card.name}" can only be cast once per turn`;
           }
           if (card && card.id === 1428 && !(ABX.battleCtx && ABX.battleCtx.active)) return `"${card.name}" can only be cast while you are being attacked`;
+          if (card && card.id === 2661) { const nm = new Set(fighter.drop.map(id => core.cardOf(id)).filter(c => c && /caardian/i.test(c.name || "")).map(c => c.name)); if (nm.size < 3) return `"${card.name}" needs three or more different Caardian cards in your drop zone`; }
           if (card && card.id === 765 && B.phase === "final") return `"${card.name}" cannot be cast during a final phase`;
           if (card && card.id === 3904 && Object.values(fighter.monsters || {}).some(Boolean)) return `"${card.name}" can only be cast with no monsters on your field`;
           if (card && card.id === 1141 && core.fieldUnits(fighter, false).filter(x => x.unit && x.unit.card && x.unit.card.type === "Monster" && (x.unit.card.attrs || []).some(a => /^blackdragon$/i.test(a))).length < 2) return `"${card.name}" needs two or more Black Dragon on your field`;
@@ -4283,6 +4284,22 @@
         return false;
       };
     }
+    OV42.push([2661, /cannot \[transform\] other than by the \[act\] of/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+    // #3299 Miserea: entering by the effect of "Masked Swordsman, Kiri" -> nullify the abilities of all cards on the opponent's field this turn
+    OPS.r42KiriNullify = { run(s, ctx) {
+      if (!(ABX.srcStack || []).some(c => c && c !== ctx.card && /masked swordsman, kiri/i.test(c.name || ""))) return false;
+      core.fieldUnits(F(otherSide(ctx.side)), true).forEach(x => { if (x.unit) x.unit.abxNullified = B.turnCount; });
+      fresh(); return true; }, check: () => true };
+    OV42.push([3299, /enters the field by the effect of .masked swordsman, kiri/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42KiriNullify" }] })]);
+    // #6518 Gratos: [Counter] [Act] drop a soul -> destroy all opposing monsters; all Black Knight get +10000/+10000/crit+1 and [Triple Attack] this turn (once per turn)
+    OPS.r42GratosAct = { async run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u || !(u.soul || []).length) return false;
+      f.drop.push(u.soul.pop());
+      const eside = otherSide(ctx.side), ef = F(eside);
+      ["left", "center", "center2", "right"].forEach(p => { if (ef.monsters[p]) B.destroyMonster(eside, p); });
+      core.fieldUnits(f, false).forEach(x => { if (x.unit && x.unit.card && hasTribe(x.unit.card, "BlackKnight")) { x.unit.tempPower = (x.unit.tempPower || 0) + 10000; x.unit.tempDef = (x.unit.tempDef || 0) + 10000; x.unit.tempCrit = (x.unit.tempCrit || 0) + 1; x.unit.tempTA = true; ABX.grantAttacks(x.unit, 3); } });
+      fresh(); return true; }, check: () => true };
+    OV42.push([6518, /you may drop a soul from this card/i, () => ({ kind: "act", tags: ["act", "counter"], once: "turn", conds: [], steps: [{ op: "r42GratosAct" }] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

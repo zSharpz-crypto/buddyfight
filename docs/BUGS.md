@@ -328,3 +328,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch J: #3440 (item act: rest -> call 0-power Death from drop, paying cost) #5867 (turnEnd from drop after A destroyed this turn; call B from hand/deck, size limit bypassed; random deck order instead of true shuffle-only-if-looked). Test: dead_batch_b.
 - Batch K: #4884 (maxSize accessor 6 with MAX Dragon) #719 (spell -> buddy soul; +5000 static, Soulguard kw unverified). #3640 'separate areas' rule unclear - open.
 - Batch L: #362 (modal; bullets were 3 separate spells) #1428 (divert to center; castBlock requires battleCtx) #6036 (final-phase retrieve via fireDiscarded flag + Dragon-item protection via isProtected, automatic). Test: dead_batch_b.
+- Batch M: #2661 (call needs 3 different Caardian in drop; transform restriction not enforced) #3299 (Kiri nullify via srcStack) #6518 (Act; buddy-zone placement and size -1 aura not built). Test: dead_batch_b.

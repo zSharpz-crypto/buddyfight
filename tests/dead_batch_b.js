@@ -129,5 +129,11 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("6036: Dragon item protected by returning Zeff to deck bottom + 1 life", val(`return zp1===true&&battle.plr.life===4&&battle.plr.deck[battle.plr.deck.length-1]===6036&&!battle.plr.drop.includes(6036)`), val(`return [zp1,battle.plr.life]`));
   run(`fresh(); battle.plr.item={card:dri,rested:false,soul:[],tempCrit:0}; battle.plr.drop=[6036]; battle.plr.hand=[]; ABX.fireDiscarded('plr',card(6036)); ABX.core.runAbility('plr',card(6036),ab(6036,'triggered','phaseStart'),null,{event:{name:'phaseStart'},hostArea:'drop'}); globalThis.gz=battle.plr.gauge.length`); await settle();
   ck("6036: final-phase retrieval into hand (+life)", val(`return battle.plr.hand.includes(6036)&&battle.plr.life===11`), val(`return [battle.plr.hand,battle.plr.life]`));
+  run(`fresh(); globalThis.cd=window.BUDDYFIGHT_CARDS.filter(c=>/caardian/i.test(c.name)&&c.id!==2661); battle.plr.drop=cd.slice(0,2).map(c=>c.id); globalThis.cc1=ABX.core.castBlock(battle.plr,card(2661)); battle.plr.drop=cd.slice(0,3).map(c=>c.id); globalThis.cc2=ABX.core.castBlock(battle.plr,card(2661))`);
+  ck("2661: needs 3 different Caardian in drop", val(`return !!cc1&&!cc2`), val(`return [cc1,cc2,cd.length]`));
+  run(`fresh(); globalThis.gr=mk(6518); gr.soul=[31,32]; battle.plr.monsters.left=gr; battle.opp.monsters.left=mk(mm[0]); battle.opp.monsters.right=mk(mm[1]); go(6518,'act',null,gr)`); await settle();
+  ck("6518: drops a soul, destroys all opposing monsters, Black Knights boosted", val(`return gr.soul.length===1&&!battle.opp.monsters.left&&!battle.opp.monsters.right&&gr.tempPower===10000&&gr.tempTA===true`), val(`return [gr.soul.length,!!battle.opp.monsters.left,gr.tempPower,gr.tempTA]`));
+  run(`fresh(); battle.opp.monsters.left=mk(mm[0]); ABX.srcStack=ABX.srcStack||[]; ABX.srcStack.push({name:'Masked Swordsman, Kiri',id:99999}); go(3299,'triggered','enter',mk(3299)); `); await settle(); run(`ABX.srcStack.pop()`);
+  ck("3299: entering via Kiri nullifies opponent field abilities", val(`return battle.opp.monsters.left.abxNullified===battle.turnCount`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
