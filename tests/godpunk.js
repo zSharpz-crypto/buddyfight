@@ -81,6 +81,29 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   await spell(6378);
   ok(J(`["left","center","right"].filter(p=>battle.plr.monsters[p]).length`) <= 1, "#6378 two same-size Godpunk are not both called");
 
+  // ---- 4410 Bonesplitter: return ALL opp gauge to their deck, shuffle, top 2 -> gauge; gain 2 only if any gauge was returned ----
+  run(`clear(); battle.opp.gauge=[1,2,3,4,5,6,7,8]; battle.opp.deck=Array(20).fill(47); battle.plr.life=10`); place("center", 4410); await enter(4410, "center");
+  ok(J(`[battle.opp.gauge.length, battle.opp.deck.length, battle.plr.life]`).join() === "2,26,12", `#4410 opp had 8 gauge -> 2 gauge / deck 26 / you gain 2 (${J(`[battle.opp.gauge.length, battle.opp.deck.length, battle.plr.life]`)})`);
+  run(`clear(); battle.opp.gauge=[]; battle.opp.deck=Array(20).fill(47); battle.plr.life=10`); place("center", 4410); await enter(4410, "center");
+  ok(J(`[battle.opp.gauge.length, battle.plr.life]`).join() === "2,10", `#4410 opp had 0 gauge -> 2 gauge, NO life gain (${J(`[battle.opp.gauge.length, battle.plr.life]`)})`);
+
+  // ---- 4414: 2 damage; if the opponent has no gauge, 5 damage INSTEAD ----
+  const impact = async () => { run(`{const c=CARD_MAP.get(4414); const ab=ABX.get(c).abilities.find(a=>a.kind==='spell'); ABX.runAbility('plr',c,ab,null,{preApproved:true,auto:true,event:{name:'cast'}});}`); await settle(); };
+  run(`clear(); battle.opp.life=5; battle.opp.gauge=[9,9,9]`); await impact();
+  ok(J(`battle.opp.life`) === 3, `#4414 opp has gauge -> exactly 2 damage (life ${J(`battle.opp.life`)})`);
+  run(`clear(); battle.opp.life=9; battle.opp.gauge=[]`); await impact();
+  ok(J(`battle.opp.life`) === 4, `#4414 opp has no gauge -> exactly 5 damage, not 7 (life ${J(`battle.opp.life`)})`);
+
+  // ---- 4387 / 6379 equip: Godpunk from drop into soul, opp pays 1 gauge, NO extra deck card in the soul ----
+  for (const id of [4387, 6379]) {
+    run(`clear(); battle.plr.hand=[${id}]; battle.plr.drop=[4385,4389]; globalThis.__og=battle.opp.gauge.length; globalThis.__dk=battle.plr.deck.length`);
+    run(`battle.equipCardFromHand('plr',0,'Equip')`); await settle();
+    const r = J(`({item:battle.plr.item&&battle.plr.item.card.id, soul:battle.plr.item&&battle.plr.item.soul.map(x=>typeof x==='object'?x.id:x), og:battle.opp.gauge.length-__og, dk:battle.plr.deck.length-__dk})`);
+    ok(r.item === id && r.soul.length === 1 && r.soul[0] === 4385, `#${id} equip: soul is only the Godpunk from the drop zone (${JSON.stringify(r.soul)})`);
+    ok(r.og === -1, `#${id} equip: opponent pays 1 gauge (${r.og})`);
+    ok(r.dk === 0, `#${id} equip: no card taken from your deck (${r.dk})`);
+  }
+
   console.log(fail ? `\n${fail} FAILED` : "\nALL PASSED");
   process.exit(fail ? 1 : 0);
 })();

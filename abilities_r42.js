@@ -2919,7 +2919,7 @@
     const NUMW = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
     const oppGaugeCost = (card) => {
       const m = /\[(?:call|cast|equip) cost\]([^\n]*)/i.exec((card && card.skill) || "");
-      const g = m && /\bpay (\d+|an?|one|two|three|four|five) opponent'?s gauge\b/i.exec(m[1]);
+      const g = m && /\bpay (\d+|an?|one|two|three|four|five) (?:of )?(?:your )?opponent'?s gauge\b/i.exec(m[1]);
       return g ? (parseInt(g[1], 10) || NUMW[g[1].toLowerCase()] || 1) : 0;
     };
     ABX.oppGaugeCost = oppGaugeCost;
@@ -3004,6 +3004,22 @@
     }, check: () => true
   };
   OV42.push([6558, /return all cards from each player'?s gauge into their owner'?s decks/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42GagnarVortex" }] })]);
+  // #4410 Bonesplitter, Shearzelus: "When this card enters the field, return all of your opponent's gauge to their deck, shuffle it, and put the top two cards of your opponent's deck into their gauge.
+  // If any of their gauge were returned, you gain 2 life!" (the parse milled 2 and gained 2 life with no condition, then ran the whole text again: gauge stayed, +4 life)
+  OPS.r42Bonesplitter = {
+    async run(s, ctx) {
+      const e = ctx.e, n = e.gauge.length;
+      e.deck.push(...e.gauge.splice(0));
+      if (B.shuffleFighterDeck) B.shuffleFighterDeck(otherSide(ctx.side));
+      e.gauge.push(...e.deck.splice(0, 2));
+      if (n > 0 && OPS.life && OPS.life.run) await OPS.life.run({ op: "life", who: "you", n: 2 }, ctx);
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([4410, /return all of your opponent'?s gauge to their deck/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42Bonesplitter" }] })]);
+  // #4414 Topfist Punishment! Keravnos Burst Fist!: "Deal 2 damage to your opponent! If your opponent has no gauge, deal 5 damage to your opponent instead!!" (it dealt 2 and then 5 more)
+  OPS.r42KeravnosFist = { async run(s, ctx) { return OPS.damage.run({ op: "damage", who: "opp", n: F(otherSide(ctx.side)).gauge.length ? 2 : 5 }, ctx); }, check: () => true };
+  OV42.push([4414, /deal 2 damage to your opponent.{0,3} if your opponent has no gauge/i, () => ({ kind: "spell", conds: [], steps: [{ op: "r42KeravnosFist" }] })]);
   // #725 Actor Knights High Priest: "When you call a «Tarot» monster other than 'Actor Knights High Priest', you gain 1 life. (once per turn)" - was read as an enter trigger of itself
   OV42.push([725, /when you call a .tarot. monster other than/i, () => ({ kind: "triggered", trigger: { event: "otherEnter", np: np({ tribes: ["Tarot"], types: ["monster"], notNames: ["actor knights high priest"] }, "field") }, conds: [], once: "turn", steps: [{ op: "life", who: "you", n: 1 }] })]);
 
