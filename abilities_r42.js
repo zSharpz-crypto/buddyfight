@@ -4446,6 +4446,33 @@
       mv.cost = true;
       return { kind: "act", tags: ["act", "kw:overthrow"], once: "game", conds: [{ t: "phase", phase: "attack" }], steps: [mv, { op: "pay", gauge: 1, cost: true, src: "pay 1 gauge" }, bo] };
     }]);
+    // #4682 Replicate / #4770 Jiraiya: put the top card(s) of your deck face down on the field as "«Dragod»/size 0/6000/6000/2 crit" monsters
+    OPS.r42DragodTokens = { async run(s, ctx) {
+      const f = ctx.f; let n = s.n || 1;
+      if (s.pay) { if (f.gauge.length < s.pay) return false; for (let i = 0; i < s.pay; i++) f.drop.push(f.gauge.pop()); }
+      if (s.evoExtra && (ctx.unit && (ctx.unit.soul || []).some(id => /\[g\.evo\]/i.test((core.cardOf(id) || {}).skill || "")))) n += 1;
+      let got = 0;
+      for (let i = 0; i < n; i++) if (await OPS.r40CallTopDeckToken.run({ name: "Dragod", size: 0, power: 6000, defense: 6000, crit: 2, attrs: ["Dragod"] }, ctx)) got++;
+      return got > 0; }, check: () => true };
+    OV42.push([4682, /put the top card of your deck face down on the field as a/i, () => ({ kind: "act", tags: ["counter", "act"], counter: true, once: "turn", conds: [], steps: [{ op: "r42DragodTokens", n: 1, evoExtra: true }] })]);
+    OV42.push([4770, /when this card enters the field, you may pay 1 gauge/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42DragodTokens", n: 2, pay: 1 }] })]);
+    // #1004 Great Fate, Frozen Stars: with a Star on your left and right, nullify all abilities of the opponent's field (re-checked after every ability and attack; once nullified it lasts the turn)
+    {
+      const applyFate = () => {
+        ["plr", "opp"].forEach(side => {
+          const f = F(side);
+          if (!(f.setSpells || []).some(c => c && c.id === 1004)) return;
+          const star = (u) => u && u.card && (u.card.attrs || []).some(a => /^star$/i.test(a));
+          if (star(f.monsters.left) && star(f.monsters.right)) core.fieldUnits(F(otherSide(side)), true).forEach(x => { if (x.unit) x.unit.abxNullified = B.turnCount; });
+        });
+      };
+      const prevRAf = core.runAbility;
+      core.runAbility = async function () { try { return await prevRAf.apply(this, arguments); } finally { try { applyFate(); } catch (e) { /* ignore */ } } };
+      const prevFAf = ABX.fireAttack;
+      ABX.fireAttack = function () { try { applyFate(); } catch (e) { /* ignore */ } return prevFAf.apply(this, arguments); };
+      ABX.r42ApplyFate = applyFate;
+    }
+    OV42.push([1004, /if there are star on your left and right/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
