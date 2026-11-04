@@ -4388,3 +4388,52 @@
     OV42.push([5209, /three or more .{0,3}junior detective league/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42DetectiveLock" }] })]);
   }
 })(typeof window !== "undefined" ? window : globalThis);
+/* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
+ * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
+ * read by the old text pattern "if (you have) a «X»", which skips "A, and B" lists and ignores "«X» monster" (a «Godpunk» item
+ * satisfied #4977 / #5769). The parsed rule conditions were only checked for [Counter] casts. Now the "you have a «tribe»
+ * (monster) on your field" parts of every cast rule are also checked when you cast from the main phase.
+ */
+(function (root) {
+  "use strict";
+  const ABX = root.ABX;
+  if (!ABX || !ABX.core || typeof root.evaluateCardConditions !== "function") return;
+  const core = ABX.core;
+  const getB = () => (typeof battle !== "undefined" ? battle : root.battle);
+  const flat = (cs, out) => { (cs || []).forEach(c => { if (c && c.t === "and") flat(c.list, out); else out.push(c); }); return out; };
+  const ruleHasConds = (card) => {
+    if (!card || (card.type !== "Spell" && card.type !== "Impact")) return [];
+    const out = [];
+    ((ABX.get(card) || {}).abilities || []).forEach(a => {
+      if (a.kind !== "rule" || !/only cast/i.test(a.raw || "") || /\bwith "[^"]+"/i.test(a.raw || "")) return;
+      flat(a.conds, []).forEach(c => { if (c.t === "has" && c.owner === "you" && c.np && c.np.zone && c.np.zone.area === "field" && c.np.filter && (c.np.filter.tribes || []).length && c.np.filter.tribes.every(t => /^[A-Za-z0-9 ]+$/.test(t)) && !c.np.zone.pos) out.push({ c, ab: a }); });
+    });
+    return out;
+  };
+  ABX.r42RuleHasReasons = function (card, fighter, enemy) {
+    const bt = getB(), reasons = [];
+    const side = fighter === bt.plr ? "plr" : fighter === bt.opp ? "opp" : null;
+    if (!side) return reasons;
+    ruleHasConds(card).forEach(({ c, ab }) => {
+      const probe = { side, f: fighter, e: enemy, card, unit: null, ab, bind: { chosen: [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [], event: { name: "cast" } };
+      let met = true; try { met = core.evalCond(c, probe); } catch (e) { met = true; }
+      if (!met) reasons.push(`Requires a «${c.np.filter.tribes[0]}»${(c.np.filter.types || []).includes("monster") ? " monster" : ""} on your field`);
+    });
+    return reasons;
+  };
+  const prev = root.evaluateCardConditions;
+  const wrapped = function (card, fighter, enemy) {
+    const r = prev.apply(this, arguments);
+    try {
+      const extra = ABX.r42RuleHasReasons(card, fighter, enemy);
+      if (extra.length) {
+        const have = r.reasons || [];
+        const reasons = have.concat(extra.filter(x => !have.some(h => /on your field/i.test(h) && h.includes(x.match(/«[^»]+»/)[0]))));
+        if (reasons.length > have.length) return Object.assign({}, r, { met: false, reasons, summary: `⚠️ ${reasons[0]}` });
+      }
+    } catch (e) { if (ABX.debug) console.error(e); }
+    return r;
+  };
+  root.evaluateCardConditions = wrapped;
+  try { if (typeof globalThis !== "undefined") globalThis.evaluateCardConditions = wrapped; } catch (e) { /* ignore */ }
+})(typeof window !== "undefined" ? window : globalThis);
