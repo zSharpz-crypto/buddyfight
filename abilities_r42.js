@@ -2153,7 +2153,7 @@
   TG(6354, "when a monster enters your opponent's field by your card effects", { event: "unitEnters", owner: "opp", by: "yourEffect" }, "put the top two cards of your deck into your gauge, and deal 1 damage to your opponent");
   TG(5657, "when you draw cards from your effects", { event: "draw", owner: "you", by: "yourEffect" }, "draw a card", { once: "turn" });
   TG(5656, "when your opponent draws cards from their card effects", { event: "draw", owner: "opp", by: "oppEffect", minDifferent: { get filter() { return ABX.parseNP("an Idol card").filter; }, n: 3 } }, "your opponent chooses and drops a hand card");
-  TG(5771, "when the number of cards in your opponent's hand increases", { event: "handUp", owner: "opp" }, "your opponent chooses and drops a hand card");
+  TG(5771, "when the number of cards in your opponent's hand increases", { event: "handUp", owner: "opp" }, "your opponent chooses and drops a hand card", { once: "turn", conds: [{ t: "not", c: { t: "phase", phase: "start", who: "opp" } }] });   // "Other than during your opponent's start phase ... only once per turn"
   OV42.push([6499, /when a card is put into your opponent's gauge/i, () => ({ kind: "triggered", trigger: { event: "gaugeUp", owner: "opp" }, steps: [{ op: "r42GaugeTo2" }] })]);
 
   /* ---- Dragonarms / Neodragon audit (tests/dragonarms_audit.js) ---- */
@@ -2937,6 +2937,52 @@
     };
   })();
 
+  /* ---- [r42] more call costs that were never paid: "Put a card from your opponent's field into the drop zone" + "Pay 1 opponent's life" (#4381),
+   * "Put two cards in total from your field and your opponent's field to drop zone" (#6380). They were parsed but not among the cost shapes the engine pays, so the cards were called
+   * for (almost) free. The card cannot be called when it cannot be paid; paying opponent life is refused when it would take them to 0 (assumption: a cost may not end the game). ---- */
+  (function () {
+    const NW = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
+    const num = (x) => parseInt(x, 10) || NW[String(x).toLowerCase()] || 1;
+    const spec = (card) => {
+      const m = /\[(?:call|cast|equip) cost\]([^\n]*)/i.exec((card && card.skill) || ""); if (!m) return null;
+      const t = m[1], out = {};
+      if (/put a card from your opponent'?s field (?:in)?to (?:the )?drop zone/i.test(t)) out.oppField = 1;
+      const b = /put (two|three|\d+) cards? in total from your field and your opponent'?s field (?:in)?to (?:the )?drop zone/i.exec(t); if (b) out.bothField = num(b[1]);
+      const l = /\bpay (\d+|an?|one|two|three) opponent'?s life\b/i.exec(t); if (l) out.oppLife = num(l[1]);
+      return Object.keys(out).length ? out : null;
+    };
+    ABX.dropCostSpec = spec;
+    const refs = (S) => core.fieldUnits(F(S), true).map(x => ({ k: /^item/.test(x.pos) ? "item" : "unit", side: S, unit: x.unit, card: x.unit.card, id: x.unit.card.id }));
+    const heP2 = ABX.hasExtras, cpeP2 = ABX.canPayExtras, peP2 = ABX.payExtras;
+    ABX.hasExtras = function (card) { return !!spec(card) || heP2.apply(this, arguments); };
+    ABX.canPayExtras = function (side, card) {
+      const sp = spec(card);
+      if (sp) {
+        const me = F(side), en = F(otherSide(side));
+        if (sp.oppField && refs(otherSide(side)).length < sp.oppField) return false;
+        if (sp.bothField && refs(side).length + refs(otherSide(side)).length < sp.bothField) return false;
+        if (sp.oppLife && en.life <= sp.oppLife) return false;
+      }
+      return heP2.call(this, card) ? cpeP2.apply(this, arguments) : true;
+    };
+    ABX.payExtras = async function (side, card, unit) {
+      const sp = spec(card);
+      if (sp) {
+        const me = F(side), en = F(otherSide(side));
+        const ctx = { side, f: me, e: en, card, unit, bind: {}, auto: true };
+        const take = async (cands, n, raw) => {
+          const chosen = await core.pick(cands, { qty: { n }, raw }, ctx, { intent: "cost", title: `${card.name} \u2014 pay the Cost`, subtitle: raw, min: Math.min(n, cands.length), max: n });
+          for (const r of chosen) { const id = core.detach(r); if (id != null) F(r.side).drop.push(id); }
+        };
+        if (sp.oppField) await take(refs(otherSide(side)), sp.oppField, "a card from your opponent's field");
+        if (sp.bothField) await take(refs(side).filter(r => r.unit !== unit).concat(refs(otherSide(side))), sp.bothField, `${sp.bothField} cards in total from your field and your opponent's field`);
+        if (sp.oppLife) en.life = Math.max(1, en.life - sp.oppLife);
+        fresh();
+      }
+      return heP2.call(this, card) ? peP2.apply(this, arguments) : undefined;
+    };
+  })();
+
   /* ---- [r42] #16 Gotcha!: "For this turn, the next time you would pay gauge for a monster's [Act] on your field, you may pay from both your gauge and your opponent's gauge." ----
    * The spell only set up nothing. Now it arms f.abxGotcha for this turn; the next monster [Act] gauge payment takes what your own gauge lacks from the opponent's gauge
    * (their cards go to THEIR drop zone), and the flag is used up. */
@@ -3033,6 +3079,24 @@
     c.steps = c.steps.filter(x => x.op !== "r40StructuredExec");
     return c;
   }]);
+  // #4413 Roaring Hydra: "... drop 1 of your opponent's gauge. If not, your opponent chooses and drops a hand card." ("If not" had nothing to negate, so the hand drop never happened)
+  OV42.push([4413, /drop 1 of your opponent'?s gauge\. if not/i, (ab) => {
+    const c = clone(ab), st = c.steps.find(x => x.cond && x.cond.t === "xElse");
+    if (st) st.cond = { t: "not", c: { t: "xLastCount", n: 1 } };
+    return c;
+  }]);
+  // #6380 Skycrushing Deity Strike, Brawlzeus "Plunder": "your opponent chooses and put a hand card into their gauge. If put, you draw a card." (the parse moved YOUR hand card into their gauge and ran the sentence a second time)
+  OPS.r42Plunder6380 = {
+    async run(s, ctx) {
+      const e = ctx.e; if (!e.hand.length) return false;
+      const cands = e.hand.map((id, i) => ({ k: "zone", side: otherSide(ctx.side), area: "hand", idx: i, id, card: core.cardOf(id) }));
+      const ch = await core.pick(cands, { qty: { n: 1 } }, ctx, { chooserSide: otherSide(ctx.side), intent: "cost", title: "Choose a hand card to put into your gauge" });
+      let did = 0; ch.forEach(r => { const id = core.detach(r); if (id != null) { e.gauge.push(id); did++; } });
+      if (did && OPS.draw && OPS.draw.run) await OPS.draw.run({ op: "draw", who: "you", n: 1 }, ctx);
+      fresh(); return did > 0;
+    }, check: () => true
+  };
+  OV42.push([6380, /your opponent chooses and put a hand card into their gauge/i, (ab) => ({ kind: "triggered", trigger: clone(ab.trigger), conds: [], steps: [{ op: "r42Plunder6380" }] })]);
   // #725 Actor Knights High Priest: "When you call a «Tarot» monster other than 'Actor Knights High Priest', you gain 1 life. (once per turn)" - was read as an enter trigger of itself
   OV42.push([725, /when you call a .tarot. monster other than/i, () => ({ kind: "triggered", trigger: { event: "otherEnter", np: np({ tribes: ["Tarot"], types: ["monster"], notNames: ["actor knights high priest"] }, "field") }, conds: [], once: "turn", steps: [{ op: "life", who: "you", n: 1 }] })]);
 
