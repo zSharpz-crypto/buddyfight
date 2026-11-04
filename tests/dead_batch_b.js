@@ -135,5 +135,14 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("6518: drops a soul, destroys all opposing monsters, Black Knights boosted", val(`return gr.soul.length===1&&!battle.opp.monsters.left&&!battle.opp.monsters.right&&gr.tempPower===10000&&gr.tempTA===true`), val(`return [gr.soul.length,!!battle.opp.monsters.left,gr.tempPower,gr.tempTA]`));
   run(`fresh(); battle.opp.monsters.left=mk(mm[0]); ABX.srcStack=ABX.srcStack||[]; ABX.srcStack.push({name:'Masked Swordsman, Kiri',id:99999}); go(3299,'triggered','enter',mk(3299)); `); await settle(); run(`ABX.srcStack.pop()`);
   ck("3299: entering via Kiri nullifies opponent field abilities", val(`return battle.opp.monsters.left.abxNullified===battle.turnCount`));
+  run(`fresh(); globalThis.ca=mk(2762); battle.plr.monsters.center=ca; battle.opp.monsters.left=mk(mm[0]); battle.plr.deck=[mm[1],22,23]; battle.plr.hand=[]; go(2762,'act',null,ca)`); await settle();
+  ck("2762: correct guess -> card to hand, opposing monster destroyed, Double Attack", val(`return battle.plr.hand.includes(mm[1])&&!battle.opp.monsters.left&&ca.tempDA===true`), val(`return [battle.plr.hand,!!battle.opp.monsters.left,ca.tempDA]`));
+  run(`fresh(); ca=mk(2762); battle.plr.monsters.center=ca; battle.opp.monsters.left=mk(mm[0]); battle.plr.deck=[22,23]; battle.plr.hand=[]; globalThis.sp2=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Spell').id; battle.plr.deck=[sp2,23]; go(2762,'act',null,ca)`); await settle();
+  ck("2762: wrong guess -> card stays in drop, nothing destroyed", val(`return battle.plr.drop.includes(sp2)&&!!battle.opp.monsters.left&&!ca.tempDA`));
+  run(`fresh(); globalThis.mg=mk(1582); mg.soul=[31,32,33]; battle.plr.monsters.center=mg; globalThis.ws1=ABX.wouldLeaveSave('plr','center',mg,false)`);
+  ck("1582: would leave -> two souls to deck bottom, stays", val(`return ws1===true&&mg.soul.length===1&&battle.plr.deck.slice(-2).join()==='33,32'`), val(`return [ws1,mg.soul,battle.plr.deck.slice(-2)]`));
+  run(`fresh(); mg=mk(1582); mg.soul=[31]; battle.plr.monsters.center=mg; globalThis.ws2=ABX.wouldLeaveSave('plr','center',mg,false)`);
+  ck("1582: needs two souls", val(`return !ws2`));
+  ck("1582: attacked counter act parsed", val(`const a=ABX.get(card(1582)).abilities.find(a=>a.kind==='act'&&(a.tags||[]).includes('counter')); return !!a&&ABX.isExecutable(a)`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

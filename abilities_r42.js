@@ -4300,6 +4300,41 @@
       core.fieldUnits(f, false).forEach(x => { if (x.unit && x.unit.card && hasTribe(x.unit.card, "BlackKnight")) { x.unit.tempPower = (x.unit.tempPower || 0) + 10000; x.unit.tempDef = (x.unit.tempDef || 0) + 10000; x.unit.tempCrit = (x.unit.tempCrit || 0) + 1; x.unit.tempTA = true; ABX.grantAttacks(x.unit, 3); } });
       fresh(); return true; }, check: () => true };
     OV42.push([6518, /you may drop a soul from this card/i, () => ({ kind: "act", tags: ["act", "counter"], once: "turn", conds: [], steps: [{ op: "r42GratosAct" }] })]);
+    // #2762 Captain Answer: [Counter] [Act] on your turn, declare monster or spell; top card of the deck to the drop zone; if it is that type -> hand, destroy an opposing monster, +[Double Attack] (once per turn)
+    OPS.r42DeclareGuess = { async run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u || B.activeSide !== ctx.side || !f.deck.length) return false;
+      let want = "Monster";
+      if (!ABX.autoPlay && !f.isBot && ABX.ui && ABX.ui.pickOption) want = (await ABX.ui.pickOption({ title: ctx.card.name + " \u2014 declare a card type", options: ["Monster", "Spell"] })) === 1 ? "Spell" : "Monster";
+      const id = f.deck.shift(), c = core.cardOf(id); f.drop.push(id);
+      if (!c || c.type !== want) { fresh(); return true; }
+      f.drop.pop(); f.hand.push(id);
+      const eside = otherSide(ctx.side), ef = F(eside);
+      const cands = ["left", "center", "center2", "right"].filter(p => ef.monsters[p]).map(p => ({ k: "unit", side: eside, unit: ef.monsters[p], card: ef.monsters[p].card, id: ef.monsters[p].card.id }));
+      if (cands.length) { const ch = (await core.pick(cands, { qty: { n: 1, upTo: false }, raw: "a monster on your opponent's field" }, ctx, { intent: "harm", title: ctx.card.name + " \u2014 destroy a monster" })) || []; const p = ch[0] && core.posOfUnit(ef, ch[0].unit); if (p && p !== "item") B.destroyMonster(eside, p); }
+      u.tempDA = true; ABX.grantAttacks(u, 2);
+      fresh(); return true; }, check: () => true };
+    OV42.push([2762, /declare either monster or spell/i, () => ({ kind: "act", tags: ["act", "counter"], once: "turn", conds: [], steps: [{ op: "r42DeclareGuess" }] })]);
+    // #1582 Megiddo: when this card is attacked, or would leave the field, put two cards from its soul on the bottom of the deck -> nullify the attack / it stays
+    XCx.xTargetSelf = (c, ctx) => { const b = ABX.battleCtx; return !!(b && b.active && ctx.unit && b.defUnit === ctx.unit); };
+    ABX.COND_OK.add("xTargetSelf");
+    OPS.r42SoulsToBottom = { run(s, ctx) {
+      const u = ctx.unit; if (!u || (u.soul || []).length < 2) return false;
+      for (let i = 0; i < 2; i++) ctx.f.deck.push(u.soul.pop());
+      fresh(); return true; }, check: () => true };
+    OV42.push([1582, /when this card is attacked or when this card would leave the field/i, () => ({ kind: "act", tags: ["counter", "act"], counter: true, conds: [{ t: "xTargetSelf" }], steps: [{ op: "r42SoulsToBottom", cost: true }, { op: "nullifyAttack", src: "nullify the attack", gate: "ifYouDo" }] })]);
+    {
+      const wls1582 = ABX.wouldLeaveSave;
+      ABX.wouldLeaveSave = function (side, pos, unit, byAttack) {
+        if (wls1582 && wls1582.apply(this, arguments)) return true;
+        try {
+          if (unit && unit.card && unit.card.id === 1582 && unit.abxNullified !== B.turnCount && (unit.soul || []).length >= 2) {
+            for (let i = 0; i < 2; i++) F(side).deck.push(unit.soul.pop());
+            fresh(); return true;
+          }
+        } catch (e) { /* ignore */ }
+        return false;
+      };
+    }
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
