@@ -483,6 +483,7 @@
         if (!under) { const cp = await chooseCallPlacement(ctx, r.card, (s.pos && s.pos !== "open area") ? pos : null); if (cp) pos = cp; }
         const cost = s.pay ? parseCardCost(r.card.cost, r.card.skill, f, r.card) : { gauge: 0, life: 0 };
         if (s.pay && (f.gauge.length < cost.gauge || f.life <= cost.life)) continue;
+        if (s.pay && ABX.hasExtras(r.card) && !ABX.canPayExtras(ctx.side, r.card, -1)) continue;   // the first call may have used up what the next one's [Call Cost] needs (opponent's gauge ...)
         if (r.k === "soul") { const id = detach(r); if (id == null) continue; f.hand.push(id); }   // from a soul
         else if (r.pending) { r.pending = false; f.hand.push(r.id); }  // a looked-at / revealed card is already out of the deck
         else if (r.area !== "hand") { const arr = f[r.area]; const i = arr.indexOf(r.id); if (i < 0) continue; arr.splice(i, 1); f.hand.push(r.id); }

@@ -102,8 +102,50 @@ const onField = () => J(`battle.plr.monsters.center&&battle.plr.monsters.center.
   ok(r && r.nullified === true && J(`battle.plr.life`) === 10, `#5101 without a Weapon: nullify, no life (you ${J(`battle.plr.life`)})`);
 
   // #4409 may only be cast during an attack on the opponent's turn: not castable in your own main phase
-  run(`clear(); battle.plr.monsters.center=mku(4385)`);
-  ok(J(`ABX.counterAvailable ? true : true`), "(placeholder)");
+  const opt = (id, info) => J(`ABX.counterSpellOption('plr', CARD_MAP.get(${id}), ${JSON.stringify(info)})`);
+  const atk = { attSide: "opp", attackerZones: ["center"], targetPos: "fighter" };
+  run(`clear(); battle.opp.monsters.center=mku(45); battle.plr.monsters.center=mku(4385)`);
+  ok(opt(4409, atk) && opt(4409, atk).nullifies === true, "#4409 offered while defending with a Godpunk on your field");
+  ok(J(`ABX.freeCounterOption('plr', CARD_MAP.get(4409))`) === false, "#4409 NOT offered outside an attack (spell-response window, opponent's turn)");
+  run(`clear(); battle.opp.monsters.center=mku(45); battle.plr.monsters.center=mku(45)`);
+  ok(opt(4409, atk) === null, "#4409 NOT offered during an attack without a Godpunk on your field");
+  run(`clear(); battle.opp.monsters.center=mku(45)`);
+  ok(opt(4409, atk) === null, "#4409 NOT offered with an empty field");
+
+  // option-2 helper: keep only the wanted option so the (auto) modal runs it
+  const modalOpt = async (id, n, side) => {
+    run(`{ const c=CARD_MAP.get(${id}); const ab=ABX.get(c).abilities.find(a=>a.kind==='modal'); globalThis.__all=ab.options; ab.options=[ab.options[${n}]]; globalThis.__ab=ab; }`);
+    try { run(`ABX.runAbility('plr',CARD_MAP.get(${id}),__ab,null,{preApproved:true,auto:true,event:{name:'cast'}})`); await settle(); }
+    finally { run(`__ab.options=__all`); }
+  };
+  // #4384 option 2: drop all souls from ONE monster on the opponent's field
+  run(`clear(); battle.opp.monsters.left=mku(45); battle.opp.monsters.left.soul=[46,47,48]; battle.opp.monsters.right=mku(45); battle.opp.monsters.right.soul=[46,47]; globalThis.__od=battle.opp.drop.length`);
+  await modalOpt(4384, 1);
+  const souls = J(`[battle.opp.monsters.left.soul.length, battle.opp.monsters.right.soul.length]`);
+  ok(souls.reduce((a, b) => a + b, 0) === 2 || souls.reduce((a, b) => a + b, 0) === 3, `#4384 option 2: all souls dropped from exactly one monster (souls left ${souls})`);
+  ok(J(`battle.opp.drop.length - __od`) === (5 - souls.reduce((a, b) => a + b, 0)), `#4384 option 2: dropped souls go to the opponent's drop zone (+${J(`battle.opp.drop.length - __od`)})`);
+  ok(J(`!!battle.opp.monsters.left && !!battle.opp.monsters.right`), "#4384 option 2: no monster is destroyed");
+
+  // #4382 option 2: drop 1 opponent gauge, put the top two cards of your deck into your gauge
+  run(`clear(); globalThis.__og=battle.opp.gauge.length; globalThis.__pg=battle.plr.gauge.length; globalThis.__pd=battle.plr.deck.length; globalThis.__od=battle.opp.drop.length`);
+  await modalOpt(4382, 1);
+  ok(J(`battle.opp.gauge.length - __og`) === -1 && J(`battle.opp.drop.length - __od`) === 1, "#4382 option 2: opponent loses exactly 1 gauge, it goes to their drop zone");
+  ok(J(`battle.plr.gauge.length - __pg`) === 2 && J(`battle.plr.deck.length - __pd`) === -2 && J(`battle.plr.gauge.slice(-2).join()`) === "3000,3001" , `#4382 option 2: top two deck cards into your gauge (gauge +${J(`battle.plr.gauge.length - __pg`)}, deck ${J(`battle.plr.deck.length - __pd`)}, new ${J(`battle.plr.gauge.slice(-2)`)})`);
+  run(`clear(); battle.opp.gauge=[]; globalThis.__pg=battle.plr.gauge.length`);
+  await modalOpt(4382, 1);
+  ok(J(`battle.plr.gauge.length - __pg`) === 2, "#4382 option 2: opponent has no gauge -> you still put 2 cards into your gauge");
+
+  // #4382 "only set one"
+  run(`clear(); battle.plr.setSpells=[CARD_MAP.get(4382)]`);
+  ok(J(`evaluateCardConditions(CARD_MAP.get(4382), battle.plr, battle.opp).met`) === false, "#4382 cannot set a second copy while one is already set");
+  run(`clear()`);
+  ok(J(`evaluateCardConditions(CARD_MAP.get(4382), battle.plr, battle.opp).met`) === true, "#4382 can be set when none is set");
+
+  // #4384 [Cast Cost]: destroy a Godpunk on your field + pay 1 gauge
+  run(`clear(); battle.plr.monsters.left=mku(45)`);
+  ok(J(`evaluateCardConditions(CARD_MAP.get(4384), battle.plr, battle.opp).met`) === false || J(`ABX.canPayExtras ? ABX.canPayExtras('plr', CARD_MAP.get(4384)) : false`) === false, "#4384 cannot be cast with no Godpunk to destroy");
+  run(`clear(); battle.plr.monsters.left=mku(4385); battle.plr.gauge=[1,2,3]`);
+  ok(J(`evaluateCardConditions(CARD_MAP.get(4384), battle.plr, battle.opp).met`) === true, "#4384 castable with a Godpunk and gauge");
 
   // #4384 Junk Wheels [Counter] modal, option 1: destroy up to two opponent monsters, draw if any destroyed
   run(`clear(); battle.opp.monsters.left=mku(45); battle.opp.monsters.right=mku(45); battle.opp.monsters.center=mku(45); globalThis.__h=battle.plr.hand.length`);
@@ -115,6 +157,21 @@ const onField = () => J(`battle.plr.monsters.center&&battle.plr.monsters.center.
   run(`clear(); battle.plr.setSpells=[CARD_MAP.get(4382)]; battle.opp.hand=[46,46]; globalThis.__h=battle.plr.hand.length; battle.plr.deck=Array.from({length:30},(_,i)=>3000+i)`);
   run(`ABX.fireTurnEvent('phaseStart','main','opp')`); await settle();
   ok(J(`battle.opp.hand.length`) === 1 && J(`battle.plr.hand.length - __h`) === 1, `#4382 option 1: opponent drops a hand card and you draw 1 (opp hand ${J(`battle.opp.hand.length`)}, you +${J(`battle.plr.hand.length - __h`)})`);
+
+  // ---- #6378 Topfist: each called Godpunk pays its own [Call Cost] ----
+  const spell6378 = async () => { run(`{ const c=CARD_MAP.get(6378); const ab=ABX.get(c).abilities.find(a=>a.kind==='spell'); ABX.runAbility('plr',c,ab,null,{preApproved:true,auto:true,event:{name:'cast'}}); }`); await settle(); };
+  const calledIds = () => J(`["left","center","right"].map(p=>battle.plr.monsters[p]&&battle.plr.monsters[p].card.id).filter(Boolean).sort()`);
+  run(`clear(); battle.plr.drop=[4389,4383,45]; globalThis.__og=battle.opp.gauge.length; globalThis.__dk=battle.plr.deck.length`);
+  await spell6378();
+  ok(calledIds().join() === "4383,4389", `#6378 calls size 1 + size 3 Godpunk (${calledIds()})`);
+  ok(J(`battle.opp.gauge.length - __og`) === -2, `#6378 both [Call Cost]s paid: opponent pays 1 + 1 gauge (${J(`battle.opp.gauge.length - __og`)})`);
+  ok(J(`battle.plr.monsters.${J(`["left","center","right"].find(p=>battle.plr.monsters[p]&&battle.plr.monsters[p].card.id===4383)`)}.soul.length`) === 1 && J(`battle.plr.deck.length - __dk`) === -1, "#6378 Zapuranos puts the top card of your deck into its soul");
+  run(`clear(); battle.plr.drop=[4389,4383]; battle.opp.gauge=[1]`);
+  await spell6378();
+  ok(calledIds().length <= 1 && J(`battle.opp.gauge.length`) >= 0, `#6378 opponent has only 1 gauge: cannot pay both call costs (called ${calledIds()}, opp gauge ${J(`battle.opp.gauge.length`)})`);
+  run(`clear(); battle.plr.drop=[4389,4381]; battle.opp.monsters.left=mku(45); globalThis.__og=battle.opp.gauge.length; globalThis.__ol=battle.opp.life`);
+  await spell6378();
+  ok(calledIds().join() === "4381,4389" && J(`!battle.opp.monsters.left`) && J(`battle.opp.life - __ol`) === -1 && J(`battle.opp.gauge.length - __og`) === -2, `#6378 Brawlzeus + Gothiris: opp field card dropped, opp pays 1 life and 2 gauge in total (called ${calledIds()}, life ${J(`battle.opp.life - __ol`)}, gauge ${J(`battle.opp.gauge.length - __og`)})`);
 
   console.log(fail ? `\n${fail} FAILED` : "\nALL PASSED");
   process.exit(fail ? 1 : 0);

@@ -652,7 +652,7 @@
     root.evaluateCardConditions = function (card, fighter, enemy, isAbilityCall) {
       const r = ecc2.apply(this, arguments);
       try {
-        if (r && card && card.type === "Spell" && card.set && fighter && (ABX.get(card).abilities || []).some(a => (a.steps || []).some(x => x.op === "static" && x.kind === "onlyOneSet")) &&
+        if (r && card && card.type === "Spell" && card.set && fighter && (ABX.get(card).abilities || []).some(a => a.onlyOneSet || (a.steps || []).some(x => x.op === "static" && x.kind === "onlyOneSet")) &&
             (fighter.setSpells || []).some(c => c.id === card.id || c.name === card.name)) {
           const reasons = (r.reasons || []).concat([`You may only [Set] one "${card.name}" on your field`]);
           return Object.assign({}, r, { met: false, reasons, summary: `⚠️ ${reasons[0]}` });
