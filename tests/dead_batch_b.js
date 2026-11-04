@@ -166,5 +166,7 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   run(`ABX.OPS.testDropSoul={run(s,ctx){ dU.soul.pop(); ctx.f.drop.push(31); return true; },check:()=>true}`);
   run(`fresh(); globalThis.dce=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&c.size===3&&(c.attrs||[]).includes('DragonChiefEmperor')); globalThis.dU=mk(dce.id); dU.soul=[31,32]; battle.plr.monsters.center=dU; battle.plr.monsters.left=mk(2269); ABX.core.runAbility('plr',card(21),{kind:'spell',steps:[{op:'testDropSoul'}]},null,{})`); await settle();
   ck("2269: Sei goes into the Dragon Chief Emperor's soul after a soul is dropped", val(`return !battle.plr.monsters.left&&dU.soul.includes(2269)`), val(`return [!!battle.plr.monsters.left,dU.soul,battle.plr.drop]`));
+  run(`fresh(); globalThis.dh=window.BUDDYFIGHT_CARDS.filter(c=>c.type==='Monster'&&(c.attrs||[]).includes('Darkhero')).slice(0,5).map(c=>c.id); globalThis.rt=Object.assign({},card(1420),{soul:dh.slice(0,4)}); battle.plr.setSpells=[rt]; battle.plr.deck=[dh[4],22]; battle.matchOver=false; globalThis.won=null; battle.finishMatch=function(w){ globalThis.won=w; }; ABX.core.runAbility('plr',rt,ab(1420,'triggered','cardDestroyed'),null,{})`); await settle();
+  ck("1420: fifth Darkhero soul wins the game", val(`return rt.soul.length===5&&won===true`), val(`return [rt.soul.length,battle.matchOver]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

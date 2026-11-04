@@ -1789,7 +1789,7 @@
   TG(215, "when your adventurer is destroyed by an attack", { event: "cardDestroyed", owner: "you", by: "attack", np: NPT("an Adventurer") }, "put up to two Adventurer from your drop zone into your hand. Then, put this card into the drop zone");
   TG(756, "when a monster with", { event: "cardDestroyed", owner: "you", by: "effect", np: NPT('a monster with "Purgatory Knights" in its card name') }, "put the top card of your deck into your gauge");
   TG(1305, "during your turn, when your opponent's monster is destroyed", { event: "cardDestroyed", owner: "opp", turn: "you" }, "deal 1 damage to your opponent", { once: "turn" });
-  TG(1420, "when your card destroys your opponent's monster", { event: "cardDestroyed", owner: "opp", by: "you" }, "put the top card of your deck into this card's soul");
+  OV42.push([1420, /when your card destroys your opponent.s monster/i, () => ({ kind: "triggered", trigger: { event: "cardDestroyed", owner: "opp", by: "you" }, conds: [], steps: [{ op: "r42RulerSoul" }] })]);   // #1420 (op + win check below)
   TG(2605, "when a «superhero» on your field destroys a card on your opponent's field", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT("a «Superhero»") }, "deal 1 damage to your opponent", { once: "turn" });
   TG(2951, "during your opponent's turn, when a", { event: "cardDestroyed", owner: "you", turn: "opp", np: NPT("a «Prism Dragon»") }, "you gain 1 life");
   TG(3246, "when a monster on your opponent's field is destroyed by an attack of your black dragon or demon lord", { event: "cardDestroyed", owner: "opp", by: "attack", attacker: NPT("a «Black Dragon» or «Demon Lord»") }, "put a card from your opponent's gauge into the drop zone and deal 1 damage to your opponent", { once: "turn" });
@@ -4542,6 +4542,16 @@
       };
     }
     OV42.push([2269, /when a soul is put from a size 3 .dragon chief emperor. on your field into your drop zone/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+    // #1420 Ruler of Terror: souls come only from its own ability; five «Darkhero» / «Hundred Demons» monsters in its soul = you win
+    OPS.r42RulerSoul = { run(s, ctx) {
+      const h = ctx.soulHost || ctx.card, f = ctx.f; if (!f.deck.length) return false;
+      h.soul = h.soul || []; h.soul.push(f.deck.shift());
+      const n = h.soul.map(id => core.cardOf(id)).filter(c => c && c.type === "Monster" && (hasTribe(c, "Darkhero") || hasTribe(c, "HundredDemons"))).length;
+      fresh();
+      if (n >= 5 && !B.matchOver) OPS.winGame.run({}, { side: ctx.side, card: ctx.card });
+      return true; }, check: () => true };
+    OV42.push([1420, /when the total number of monsters with .darkhero. or .hundred demons. in this card.s soul/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    OV42.push([1420, /you cannot put cards into this card.s soul other than/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
