@@ -320,10 +320,14 @@
   if (OPS.noop) {
     OPS.noop.check = () => true;
     const origNoopRun = OPS.noop.run;
-    OPS.noop.run = function (s, ctx) {
+    OPS.noop.run = async function (s, ctx) {
       if (s && s.note === "look" && ctx && ctx.e && Array.isArray(ctx.e.hand)) {
         const names = ctx.e.hand.map(id => (cardOf(id) || {}).name).filter(Boolean);
         say(`👁️ Opponent's hand (${names.length}): ${names.join(", ") || "empty"}`);
+        // a human player is actually shown the cards (view only), e.g. #335 Kashinkoji "Clairvoyance"; the bot does not need a popup
+        if (names.length && !ABX.fast && !ctx.auto && ABX.ui && ABX.ui.pickCards && !(F(ctx.side) || {}).isBot) {
+          try { await ABX.ui.pickCards({ cards: ctx.e.hand.map(id => ({ card: cardOf(id) })), min: 0, max: 0, title: `👁️ ${ctx.card ? ctx.card.name : "Look"} — your opponent's hand`, subtitle: `Your opponent has ${names.length} card(s) in hand. Only you can see them now.` }); } catch (e) { /* ignore */ }
+        }
       }
       return origNoopRun ? origNoopRun.apply(this, arguments) : true;
     };
