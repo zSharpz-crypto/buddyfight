@@ -39,6 +39,15 @@ const onField = () => J(`battle.plr.monsters.center&&battle.plr.monsters.center.
   const others = J(`["left","right"].filter(p=>battle.plr.monsters[p]).length + ["left","center","right"].filter(p=>battle.opp.monsters[p]).length`);
   ok(onField() === 6380 && others === 1, `#6380 puts exactly two cards in total from the two fields into the drop zone (3 -> ${others} left)`);
 
+  // #6380 may take cards from EITHER field: 1 of yours + 1 of theirs is enough; 2 of yours is enough; 1 card in total is not
+  for (const [mine, theirs, canCall] of [[1, 1, true], [2, 0, true], [0, 2, true], [1, 0, false], [0, 1, false]]) {
+    run(`clear(); ["left","center"].slice(0,${mine}).forEach(p=>battle.plr.monsters[p]=mku(45)); ["left","center"].slice(0,${theirs}).forEach(p=>battle.opp.monsters[p]=mku(45)); battle.plr.hand=[6380]`);
+    run(`battle.completeMonsterCall('plr','right',0,false)`); await settle();
+    const called = J(`!!battle.plr.monsters.right && battle.plr.monsters.right.card.id===6380`);
+    const left = J(`["left","center"].filter(p=>battle.plr.monsters[p]).length + ["left","center"].filter(p=>battle.opp.monsters[p]).length`);
+    ok(called === canCall && (!canCall || left === mine + theirs - 2), `#6380 with ${mine} of your cards and ${theirs} of theirs -> ${canCall ? "called, two dropped" : "refused"} (called ${called}, field cards left ${left})`);
+  }
+
   // ---- "Plunder": When this card attacks and destroys monsters or deals damage ----
   const plr = (id) => run(`clear(); battle.plr.monsters.center=mku(${id}); battle.plr.hand=[]; battle.plr.deck=Array.from({length:30},(_,i)=>3000+i)`);
   plr(4408); await outcome(4408, { destroyedMonster: true });

@@ -1439,7 +1439,7 @@
         out.push({ soulFrom: { area: "deck", n: 1, faceDown: true, np: { raw: "card", qty: { n: 1 }, filter: {} } }, text: txt });
         return;
       }
-      if (p.step && p.step.op === "move" && p.step.to && p.step.to.area === "drop zone" && p.step.np && (!p.step.np.zone || p.step.np.zone.area === "field")) {
+      if (p.step && p.step.op === "move" && p.step.to && p.step.to.area === "drop zone" && p.step.np && (!p.step.np.zone || p.step.np.zone.area === "field") && !(ABX.dropCostSpec && ABX.dropCostSpec(card))) {   // #4381 #6380: paid by the r42 handler (it may take cards from both fields)
         out.push({ destroy: { n: (p.step.np.qty && p.step.np.qty.n) || 1, np: p.step.np }, text: txt });
       }
     }));
