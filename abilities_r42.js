@@ -4644,6 +4644,48 @@
       };
       if (ABX.resetCaches) ABX.resetCaches();
     })();
+    // #119 Demon Slay Barrier: cast from hand when one or more of your cards would be destroyed and you have no center monster -> one of them stays
+    {
+      const wls119 = ABX.wouldLeaveSave;
+      ABX.wouldLeaveSave = function (side, pos, unit, byAttack) {
+        if (wls119 && wls119.apply(this, arguments)) return true;
+        try {
+          const f = F(side), c = core.cardOf(119);
+          if (!unit || !c || B.matchOver || !f.hand.includes(119) || f.monsters.center || (f.monsters.center2 && f.monsters.center2.card)) return false;
+          const cost = typeof parseCardCost === "function" ? (parseCardCost(c.cost, c.skill, f, c) || {}) : {};
+          if ((cost.gauge || 0) > f.gauge.length) return false;
+          const auto = f.isBot || ABX.autoPlay === true;
+          if (!auto && !(B.mode !== "online_p2p" && typeof confirm === "function" && confirm(`Cast "${c.name}" so "${unit.card.name}" remains on the field?`))) return false;
+          for (let i = 0; i < (cost.gauge || 0); i++) f.drop.push(f.gauge.pop());
+          f.hand.splice(f.hand.indexOf(119), 1); f.drop.push(119);
+          fresh(); return true;
+        } catch (e) { return false; }
+      };
+    }
+    // #6342 Space Bridge [Counter][Act]: a Cosmo Dragoon from the drop zone on the top or bottom of the deck -> the chosen opp card gets -5000/-5000/crit-2 for the turn
+    OPS.r42SpaceBridge = { async run(s, ctx) {
+      const f = ctx.f, e = ctx.e || F(otherSide(ctx.side));
+      const drops = f.drop.map(id => core.cardOf(id)).filter(c => c && hasTribe(c, "CosmoDragoon"));
+      if (!drops.length) return false;
+      const tg = core.fieldUnits(e, true).map(x => x.unit).filter(Boolean);
+      let unit = null;
+      if (tg.length) {
+        const refs = tg.map(u => ({ k: "unit", side: otherSide(ctx.side), unit: u, card: u.card, id: u.card.id }));
+        const ch = await core.pick(refs, { qty: { n: 1, upTo: true }, raw: "up to one card on your opponent's field", filter: {} }, ctx, { intent: "harm", title: `${ctx.card.name} - choose a card on the opponent's field` });
+        unit = ch && ch[0] && ch[0].unit || null;
+      }
+      const cands = drops.map(c => ({ k: "zone", side: ctx.side, area: "drop zone", idx: f.drop.lastIndexOf(c.id), id: c.id, card: c }));
+      const pk = await core.pick(cands, { qty: { n: 1 }, raw: "a «Cosmo Dragoon» from your drop zone", filter: {} }, ctx, { intent: "help", title: `${ctx.card.name} - put a Cosmo Dragoon on your deck` });
+      const c = pk && pk[0]; if (!c) return false;
+      let top = true;
+      if (!ABX.autoPlay && !f.isBot && core.askChoice) { try { top = (await core.askChoice(ctx, ctx.card.name, ["Top of your deck", "Bottom of your deck"])) === 0; } catch (err) { top = true; } }
+      const i = f.drop.lastIndexOf(c.id); if (i < 0) return false;
+      f.drop.splice(i, 1); if (top) f.deck.unshift(c.id); else f.deck.push(c.id);
+      if (unit) { unit.tempPower = (unit.tempPower || 0) - 5000; unit.tempDef = (unit.tempDef || 0) - 5000; unit.tempCrit = (unit.tempCrit || 0) - 2; }
+      fresh(); return true; }, check: () => true };
+    OV42.push([6342, /choose up to one card on your opponent.s field, and put a/i, () => ({ kind: "act", tags: ["counter", "act"], conds: [], once: "turn", steps: [{ op: "r42SpaceBridge" }] })]);
+    // #3640 Thunder Bones: each area holds one monster, so "put to separate areas" is already always true
+    OV42.push([3640, /put all size 3 or less monsters from your opponent.s field to separate areas/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

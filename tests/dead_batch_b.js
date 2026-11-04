@@ -191,5 +191,12 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   run(`ABX.core.runAbility('opp',card(21),{kind:'spell',steps:[{op:'testNull'}],conds:[]},null,{})`); await settle();
   ck("6144: Linkdragon Order is not nullified by opp effects; others are", val(`return lk.abxNullified!==battle.turnCount&&nl.abxNullified===battle.turnCount`), val(`return [lk.abxNullified,nl.abxNullified,battle.turnCount]`));
   ck("6144: ABX.get on a D-Share card still works", val(`return ABX.get(card(4318)).abilities.length>0`));
+  run(`fresh(); battle.plr.monsters.center=null; battle.plr.monsters.left=mk(1817); battle.plr.hand=[119]; battle.plr.gauge=[1,2,3,4,5]`);
+  ck("119: Demon Slay Barrier keeps a monster from being destroyed", val(`return ABX.wouldLeaveSave('plr','left',battle.plr.monsters.left,false)===true&&battle.plr.hand.length===0&&battle.plr.drop.includes(119)`), val(`return [battle.plr.hand,battle.plr.drop]`));
+  run(`fresh(); battle.plr.monsters.center=mk(1818); battle.plr.monsters.left=mk(1817); battle.plr.hand=[119]; battle.plr.gauge=[1,2,3,4,5]`);
+  ck("119: not castable with a center monster", val(`return ABX.wouldLeaveSave('plr','left',battle.plr.monsters.left,false)!==true&&battle.plr.hand.includes(119)`));
+  run(`fresh(); globalThis.cd=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('CosmoDragoon')).id; battle.plr.drop=[cd]; battle.opp.monsters.center=mk(1817); globalThis.dk0=battle.plr.deck.length`);
+  run(`go(6342,'act')`); await settle();
+  ck("6342: Cosmo Dragoon to deck, chosen card -5000/-5000/crit-2", val(`const u=battle.opp.monsters.center; return battle.plr.deck.length===dk0+1&&battle.plr.drop.length===0&&u.tempPower===-5000&&u.tempDef===-5000&&u.tempCrit===-2`), val(`const u=battle.opp.monsters.center; return [battle.plr.deck.length,dk0,u.tempPower,u.tempCrit]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
