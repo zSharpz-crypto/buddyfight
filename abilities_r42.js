@@ -4367,6 +4367,21 @@
     // #5274 (April Fools flag): the joke lines have no game effect
     OV42.push([5274, /but most of all, try the new dangerous veggies/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
     OV42.push([5274, /^april fools/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    // #6105 Yui: [Counter] [Act] from the drop zone while being attacked: bottom of the deck + 1 gauge -> nullify the attack, gain 2 life
+    OV42.push([6105, /when you are being attacked, you may put this card from your drop zone/i, () => {
+      const mv = ABX.parseSentenceSteps("put this card from your drop zone on the bottom of your deck", {}).steps[0];
+      if (!mv) return null;
+      mv.cost = true;
+      return { kind: "act", tags: ["counter", "act"], conds: [], steps: [mv, { op: "pay", gauge: 1, cost: true, src: "pay 1 gauge" }, { op: "nullifyAttack", src: "nullify the attack", gate: "ifYouDo" }, { op: "life", who: "you", n: 2, gate: "ifYouDo", src: "you gain 2 life" }] };
+    }]);
+    // #5163 Abygale [Overthrow]: during each player's attack phase, a Black Dragon with [Set] from the drop zone to the deck bottom + 1 gauge -> opposing cards get -5000/-5000/crit-1
+    OV42.push([5163, /put a black dragon with \[set\] from your drop zone on the bottom of your deck/i, () => {
+      const mv = ABX.parseSentenceSteps("put a Black Dragon with [Set] from your drop zone on the bottom of your deck", {}).steps[0];
+      const bo = ABX.parseSentenceSteps("all cards on your opponent's field get power-5000, defense-5000, and critical-1", {}).steps[0];
+      if (!mv || !bo) return null;
+      mv.cost = true;
+      return { kind: "act", tags: ["act", "kw:overthrow"], once: "game", conds: [{ t: "phase", phase: "attack" }], steps: [mv, { op: "pay", gauge: 1, cost: true, src: "pay 1 gauge" }, bo] };
+    }]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

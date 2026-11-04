@@ -144,5 +144,10 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   run(`fresh(); mg=mk(1582); mg.soul=[31]; battle.plr.monsters.center=mg; globalThis.ws2=ABX.wouldLeaveSave('plr','center',mg,false)`);
   ck("1582: needs two souls", val(`return !ws2`));
   ck("1582: attacked counter act parsed", val(`const a=ABX.get(card(1582)).abilities.find(a=>a.kind==='act'&&(a.tags||[]).includes('counter')); return !!a&&ABX.isExecutable(a)`));
+  run(`fresh(); battle.plr.drop=[6105]; battle.plr.gauge=[21,22]; battle.plr.life=5; globalThis.fo=ABX.fieldCounterOptions('plr',{attUnits:[],targetPos:'fighter'}).filter(o=>o.card.id===6105)`);
+  ck("6105: offered as a drop-zone counter while attacked", val(`return fo.length===1&&fo[0].nullifies===true`), val(`return fo.length`));
+  run(`globalThis.res6105=null; ABX.useFieldCounter('plr',fo[0].key,{attUnits:[],targetPos:'fighter'}).then(r=>{globalThis.res6105=r})`); await settle();
+  ck("6105: nullifies, +2 life, back to deck bottom, 1 gauge paid", val(`return res6105&&res6105.nullified===true&&battle.plr.life===7&&battle.plr.deck[battle.plr.deck.length-1]===6105&&battle.plr.gauge.length===1`), val(`return [res6105,battle.plr.life,battle.plr.gauge.length]`));
+  ck("5163: Overthrow act executable", val(`const a=ABX.get(card(5163)).abilities.find(a=>(a.tags||[]).includes('kw:overthrow')); return !!a&&a.kind==='act'&&ABX.isExecutable(a)&&a.steps.length>=3`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
