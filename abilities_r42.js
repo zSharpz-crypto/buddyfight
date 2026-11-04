@@ -4335,6 +4335,9 @@
         return false;
       };
     }
+    // #5274 (April Fools flag): the joke lines have no game effect
+    OV42.push([5274, /but most of all, try the new dangerous veggies/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    OV42.push([5274, /^april fools/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

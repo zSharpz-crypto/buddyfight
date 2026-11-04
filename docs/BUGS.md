@@ -330,3 +330,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch L: #362 (modal; bullets were 3 separate spells) #1428 (divert to center; castBlock requires battleCtx) #6036 (final-phase retrieve via fireDiscarded flag + Dragon-item protection via isProtected, automatic). Test: dead_batch_b.
 - Batch M: #2661 (call needs 3 different Caardian in drop; transform restriction not enforced) #3299 (Kiri nullify via srcStack) #6518 (Act; buddy-zone placement and size -1 aura not built). Test: dead_batch_b.
 - Batch N: #2762 (declare/guess act) #1582 (souls to deck bottom: stay on leave; attacked-counter act with xTargetSelf, automatic on leave). #5022 text is truncated in cards_data (cannot build). Test: dead_batch_b.
+- #5274 joke flag lines marked as rules (no game effect).
