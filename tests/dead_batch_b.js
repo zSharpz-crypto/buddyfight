@@ -198,5 +198,7 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   run(`fresh(); globalThis.cd=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('CosmoDragoon')).id; battle.plr.drop=[cd]; battle.opp.monsters.center=mk(1817); globalThis.dk0=battle.plr.deck.length`);
   run(`go(6342,'act')`); await settle();
   ck("6342: Cosmo Dragoon to deck, chosen card -5000/-5000/crit-2", val(`const u=battle.opp.monsters.center; return battle.plr.deck.length===dk0+1&&battle.plr.drop.length===0&&u.tempPower===-5000&&u.tempDef===-5000&&u.tempCrit===-2`), val(`const u=battle.opp.monsters.center; return [battle.plr.deck.length,dk0,u.tempPower,u.tempCrit]`));
+  run(`fresh(); battle.plr.hand=[2661]`);
+  ck("2661: cannot Transform from hand by itself", val(`return battle.equipCardFromHand('plr',0,'Transform')===false&&battle.plr.hand.includes(2661)`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

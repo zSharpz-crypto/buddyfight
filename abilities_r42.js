@@ -4686,6 +4686,14 @@
     OV42.push([6342, /choose up to one card on your opponent.s field, and put a/i, () => ({ kind: "act", tags: ["counter", "act"], conds: [], once: "turn", steps: [{ op: "r42SpaceBridge" }] })]);
     // #3640 Thunder Bones: each area holds one monster, so "put to separate areas" is already always true
     OV42.push([3640, /put all size 3 or less monsters from your opponent.s field to separate areas/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    // #2661 Caardian "Mode Lethal": cannot [Transform] other than by a card effect ("Transform Belt, Card Winder")
+    {
+      const eq2661 = B.equipCardFromHand;
+      B.equipCardFromHand = function (side, handIdx, modeLabel) {
+        try { const id = F(side).hand[handIdx]; if (id === 2661 && !ABX._modeByEffect) { if (typeof B.say === "function") B.say('"Caardian Mode Lethal" can only [Transform] by "Transform Belt, Card Winder".'); return false; } } catch (e) { /* ignore */ }
+        return eq2661.apply(this, arguments);
+      };
+    }
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
