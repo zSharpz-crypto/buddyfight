@@ -4559,6 +4559,91 @@
       return true; }, check: () => true };
     OV42.push([1420, /when the total number of monsters with .darkhero. or .hundred demons. in this card.s soul/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
     OV42.push([1420, /you cannot put cards into this card.s soul other than/i, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]);
+    /* ---- soul-resident cards: #6134 Ian, #4078 Enigma Virus, #5966 Hugo, #1687 Devotion Wall ---- */
+    const sidOf = (e) => { try { return typeof globalThis.getSoulCardId === "function" ? globalThis.getSoulCardId(e) : (e && e.id != null ? e.id : e); } catch (_) { return e; } };
+    const soulHosts42 = (side, id, hostOK) => {
+      const f = F(side), list = [];
+      core.fieldUnits(f, true).forEach(x => { if (x.unit && !list.includes(x.unit)) list.push(x.unit); });
+      [f.item, f.item2].forEach(it => { if (it && !list.includes(it)) list.push(it); });
+      return list.filter(u => u.card && (u.soul || []).some(e => sidOf(e) === id) && hostOK(u.card));
+    };
+    const isMessiah = (c) => hasTribe(c, "MessiahArms"), isPlague = (c) => hasTribe(c, "Plague"), isShade = (c) => hasTribe(c, "ShadowShade");
+    const ownEffect42 = (side, src) => { const f = F(side);
+      return src.sourceSide ? src.sourceSide === side : (src.card ? [f.hand, f.drop, f.gauge].some(a => a.includes(src.card.id)) || core.fieldUnits(f, true).some(x => x.unit && (x.unit.card.id === src.card.id || (x.unit.soul || []).includes(src.card.id))) : B.activeSide === side); };
+    const prevAD5 = core.applyDamage;
+    core.applyDamage = function (side, n, src) {
+      let nn = n, srcHosts = null;
+      try {
+        if (src && src.kind === "effect" && n > 0 && !src.unreducible) {
+          // #6134 damage -2 comes from its parsed static shield
+          const os = otherSide(side);
+          if (src.card && isShade(src.card)) srcHosts = soulHosts42(os, 5966, isShade).filter(u => u.card.id === src.card.id);   // #5966
+        }
+      } catch (e) { /* ignore */ }
+      if (nn <= 0 && n > 0) return 0;
+      const dealt = prevAD5.call(this, side, nn, src);
+      try { if (dealt > 0 && srcHosts && srcHosts.length) { const g = F(side).gauge; if (g.length) F(side).drop.push(g.pop()); } } catch (e) { /* ignore */ }
+      return dealt;
+    };
+    const prevFL5 = ABX.fireLeave;
+    ABX.fireLeave = function (side, card, byAttack, notDestroyed) {
+      try {
+        if (card && !byAttack && (card.attrs || []).some(a => /dragon/i.test(a))) {
+          const os = otherSide(side);   // #6134: Dragon attribute card leaves the opponent's field by your card effects
+          soulHosts42(os, 6134, isMessiah).forEach(() => core.applyDamage(side, 1, { kind: "effect", sourceSide: os }));
+        }
+      } catch (e) { /* ignore */ }
+      return prevFL5.apply(this, arguments);
+    };
+    // #4078: a soul put from your Plague into the drop zone by the opponent's effects -> 1 damage per Enigma Virus still in a Plague's soul
+    const prevSTD5 = ABX.fireSoulToDrop;
+    ABX.fireSoulToDrop = function (side, card, hostUnit) {
+      try {
+        if (hostUnit && hostUnit.card && isPlague(hostUnit.card) && B.activeSide !== side && !(card && card.id === 4078 && !soulHosts42(side, 4078, isPlague).length))
+          soulHosts42(side, 4078, isPlague).forEach(() => core.applyDamage(otherSide(side), 1, { kind: "effect", sourceSide: side }));
+      } catch (e) { /* ignore */ }
+      return prevSTD5.apply(this, arguments);
+    };
+    OPS.r42DestroyOrBounce = { async run(s, ctx) {
+      let idx = 0;
+      if (!ABX.autoPlay && core.askChoice) { try { idx = await core.askChoice(ctx, ctx.card.name, ["Destroy up to one card on the opponent's field", "Return up to one card on the opponent's field to hand"]); } catch (e) { idx = 0; } }
+      const p2 = ABX.parseSentenceSteps(idx === 1 ? "return up to one card on your opponent's field to your opponent's hand" : "destroy up to one card on your opponent's field", {});
+      let ok = false;
+      for (const st of (p2 && p2.steps) || []) if (OPS[st.op] && OPS[st.op].run) ok = (await OPS[st.op].run(st, ctx)) || ok;
+      fresh(); return ok; }, check: () => true };
+    OV42.push([5966, /when this card is put from the soul of/i, () => ({ kind: "triggered", trigger: { event: "soulToDrop", self: true, hostNp: ABX.parseNP("a «Shadow Shade» monster") }, conds: [], steps: [{ op: "r42DestroyOrBounce" }] })]);
+    const prevPay5 = OPS.pay.run;   // #1687: cost reduced by 1 gauge in the soul of a "Jackknife" card
+    OPS.pay.run = function (s, ctx) {
+      if (s && s.gauge && ctx && ctx.card && ctx.card.id === 1687 && ctx.soulHost && ctx.soulHost.card && /jackknife/i.test(ctx.soulHost.card.name)) s = Object.assign({}, s, { gauge: Math.max(0, s.gauge - 1) });
+      return prevPay5.call(this, s, ctx);
+    };
+    /* ---- #6144 For-Share Bath Time: Linkdragon Order abilities can't be nullified by the opponent; D-Share cards share the [D] of D-Share cards in its soul ---- */
+    const bath = (side) => (F(side).setSpells || []).filter(c => c && c.id === 6144);
+    const prevRA6 = core.runAbility;
+    core.runAbility = async function (side) {
+      const os = otherSide(side), guarded = bath(os).length ? core.fieldUnits(F(os), true).map(x => x.unit).filter(u => u && u.card && hasTribe(u.card, "LinkdragonOrder")).map(u => [u, u.abxNullified, u.abxFrontNull]) : [];
+      try { return await prevRA6.apply(this, arguments); }
+      finally { guarded.forEach(([u, v, fn]) => { if (u.abxNullified !== v && u.abxNullified === B.turnCount) { u.abxNullified = v; u.abxFrontNull = fn; } }); }
+    };
+    (function () {
+      const hasDS = (c) => !!c && /\[d-share\]/i.test(c.skill || "");
+      const prevGet6 = ABX.get;
+      ABX.get = function (card) {
+        const r = prevGet6.apply(this, arguments);
+        try {
+          if (!r || !card || !hasDS(card) || typeof B === "undefined" || !B.plr || !B.opp) return r;
+          const extra = [], have = new Set((r.abilities || []).map(a => a.raw));
+          ["plr", "opp"].forEach(sd => {
+            const sets = bath(sd); if (!sets.length) return;
+            if (!core.fieldUnits(F(sd), true).some(x => x.unit && x.unit.card === card && x.unit.abxNullified !== B.turnCount)) return;
+            sets.forEach(sp => (sp.soul || []).forEach(e => { const sc = core.cardOf(sidOf(e)); if (!sc || sc === card || !hasDS(sc)) return;
+              ((prevGet6.call(ABX, sc) || {}).abilities || []).forEach(a => { if (/^\s*\[d\]/i.test(String(a.raw || "")) && !(a.unparsed && a.unparsed.length) && !have.has(a.raw)) { have.add(a.raw); extra.push(Object.assign({}, a, { sharedFrom: sc.id })); } }); }));
+          });
+          return extra.length ? Object.assign({}, r, { abilities: r.abilities.concat(extra) }) : r;
+        } catch (e) { return r; }
+      };
+      if (ABX.resetCaches) ABX.resetCaches();
+    })();
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

@@ -168,5 +168,28 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("2269: Sei goes into the Dragon Chief Emperor's soul after a soul is dropped", val(`return !battle.plr.monsters.left&&dU.soul.includes(2269)`), val(`return [!!battle.plr.monsters.left,dU.soul,battle.plr.drop]`));
   run(`fresh(); globalThis.dh=window.BUDDYFIGHT_CARDS.filter(c=>c.type==='Monster'&&(c.attrs||[]).includes('Darkhero')).slice(0,5).map(c=>c.id); globalThis.rt=Object.assign({},card(1420),{soul:dh.slice(0,4)}); battle.plr.setSpells=[rt]; battle.plr.deck=[dh[4],22]; battle.matchOver=false; globalThis.won=null; battle.finishMatch=function(w){ globalThis.won=w; }; ABX.core.runAbility('plr',rt,ab(1420,'triggered','cardDestroyed'),null,{})`); await settle();
   ck("1420: fifth Darkhero soul wins the game", val(`return rt.soul.length===5&&won===true`), val(`return [rt.soul.length,battle.matchOver]`));
+  // soul-resident: #6134 Ian, #4078 Enigma Virus, #5966 Hugo, #1687 Devotion Wall
+  run(`fresh(); globalThis.mu=mk(5734); mu.soul=[6134]; battle.plr.monsters.center=mu`);
+  ck("6134: effect damage reduced by 2", val(`battle.activeSide='opp'; return ABX.core.applyDamage('plr',3,{kind:'effect',sourceSide:'opp'})`) === 1);
+  ck("6134: attack-type / own damage not reduced", val(`return ABX.core.applyDamage('plr',3,{kind:'attack',sourceSide:'opp'})`) === 3);
+  run(`fresh(); globalThis.mu=mk(5734); mu.soul=[6134]; battle.plr.monsters.center=mu; globalThis.l0=battle.opp.life`);
+  run(`ABX.fireLeave('opp', card(142), false, true)`); await settle();
+  ck("6134: Dragon leaves opp field by effect -> 1 damage", val(`return battle.opp.life===l0-1`), val(`return [l0,battle.opp.life]`));
+  run(`fresh(); globalThis.pu=mk(3916); pu.soul=[4078]; battle.plr.monsters.center=pu; globalThis.l1=battle.opp.life; battle.activeSide='opp'`);
+  run(`ABX.fireSoulToDrop('plr', card(31), pu)`); await settle();
+  ck("4078: soul dropped by opp effect -> 1 damage", val(`return battle.opp.life===l1-1`), val(`return [l1,battle.opp.life]`));
+  run(`fresh(); globalThis.sh=mk(1817); sh.soul=[5966]; battle.plr.monsters.center=sh; globalThis.g2=battle.opp.gauge.length`);
+  run(`ABX.core.applyDamage('opp',1,{kind:'effect',sourceSide:'plr',card:card(1817)})`);
+  ck("5966: damage by Shadow Shade with Hugo -> opp gauge -1", val(`return battle.opp.gauge.length===g2-1`), val(`return [g2,battle.opp.gauge.length]`));
+  run(`fresh(); globalThis.sh=mk(1817); battle.plr.monsters.center=sh; battle.opp.monsters.center=mk(142)`);
+  run(`go(5966,'triggered','soulToDrop',sh)`); await settle();
+  ck("5966: soul-to-drop destroys an opp card", val(`return !battle.opp.monsters.center`), val(`return !!battle.opp.monsters.center`));
+  run(`fresh(); globalThis.jh=mk(1817); jh.soul=[1687]; battle.plr.monsters.center=jh; jh.card=Object.assign({},jh.card,{name:'Jackknife X'}); globalThis.g3=battle.plr.gauge.length`);
+  run(`ABX.OPS.pay.run({op:'pay',gauge:1},{f:battle.plr,card:card(1687),soulHost:jh})`);
+  ck("1687: Devotion Wall cost -1 gauge in a Jackknife soul", val(`return battle.plr.gauge.length===g3`), val(`return [g3,battle.plr.gauge.length]`));
+  run(`fresh(); globalThis.lk=mk(4317); battle.plr.monsters.center=lk; battle.plr.setSpells=[Object.assign({},card(6144),{soul:[]})]; globalThis.nl=mk(1817); battle.opp.monsters.center=nl; ABX.OPS.testNull={run(s,ctx){ lk.abxNullified=battle.turnCount; nl.abxNullified=battle.turnCount; return true; },check:()=>true}`);
+  run(`ABX.core.runAbility('opp',card(21),{kind:'spell',steps:[{op:'testNull'}],conds:[]},null,{})`); await settle();
+  ck("6144: Linkdragon Order is not nullified by opp effects; others are", val(`return lk.abxNullified!==battle.turnCount&&nl.abxNullified===battle.turnCount`), val(`return [lk.abxNullified,nl.abxNullified,battle.turnCount]`));
+  ck("6144: ABX.get on a D-Share card still works", val(`return ABX.get(card(4318)).abilities.length>0`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
