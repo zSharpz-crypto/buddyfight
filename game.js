@@ -7991,7 +7991,7 @@ const battle = {
     const toItemZone = side === "plr" ? "z-plr-item" : "z-opp-fighter";
 
     this.animateCardFlight(fromHandId, toItemZone, c.img, `🗡️ ${modeLabel.toUpperCase()}!`, 0, () => {
-      const soulCount = Math.max(cost.soul || 0, c.sg ? 1 : 0);
+      const soulCount = Math.max(cost.soul || 0, c.sg && !(window.ABX && ABX.hasSoulExtras && ABX.hasSoulExtras(c)) ? 1 : 0);   // an [Equip Cost] that pays its own soul (#4387 #6379) replaces the [Soulguard] default deck soul, like calls do
       const soulArr = [];
       for (let i = 0; i < soulCount; i++) {
         if (f.deck.length > 0) soulArr.push(f.deck.shift());
