@@ -453,7 +453,7 @@
         if (effSz > (f.maxSize || 3)) return false;
         if (!s.pay) return true;
         const cost = parseCardCost(r.card.cost, r.card.skill, f, r.card);
-        return f.gauge.length >= cost.gauge && f.life > cost.life && ABX.canPayExtras(ctx.side, r.card, -1);
+        return f.gauge.length >= cost.gauge && f.life > cost.life && ABX.canPayExtras(ctx.side, r.card, r.area === "hand" && r.k !== "soul" ? r.idx : -1);   // a monster called from your hand cannot be one of the cards its own [Call Cost] discards
       });
       const ch = ((s.np.ref && s.np.ref !== "looked") || s.np.self) ? cands : await pick(cands, s.np, ctx, { intent: "help", title: `${ctx.card.name} — call`, subtitle: ABX.clean(s.np.raw) });
       // "on top of this card / a «X» on your field": that monster's spot; it and its soul go into the new card's soul
@@ -483,7 +483,7 @@
         if (!under) { const cp = await chooseCallPlacement(ctx, r.card, (s.pos && s.pos !== "open area") ? pos : null); if (cp) pos = cp; }
         const cost = s.pay ? parseCardCost(r.card.cost, r.card.skill, f, r.card) : { gauge: 0, life: 0 };
         if (s.pay && (f.gauge.length < cost.gauge || f.life <= cost.life)) continue;
-        if (s.pay && ABX.hasExtras(r.card) && !ABX.canPayExtras(ctx.side, r.card, -1)) continue;   // the first call may have used up what the next one's [Call Cost] needs (opponent's gauge ...)
+        if (s.pay && ABX.hasExtras(r.card) && !ABX.canPayExtras(ctx.side, r.card, r.area === "hand" && r.k !== "soul" ? (f.hand[r.idx] === r.id ? r.idx : f.hand.indexOf(r.id)) : -1)) continue;   // the first call may have used up what the next one's [Call Cost] needs (opponent's gauge ...)
         if (r.k === "soul") { const id = detach(r); if (id == null) continue; f.hand.push(id); }   // from a soul
         else if (r.pending) { r.pending = false; f.hand.push(r.id); }  // a looked-at / revealed card is already out of the deck
         else if (r.area !== "hand") { const arr = f[r.area]; const i = arr.indexOf(r.id); if (i < 0) continue; arr.splice(i, 1); f.hand.push(r.id); }
