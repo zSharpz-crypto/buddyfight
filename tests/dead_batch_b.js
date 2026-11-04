@@ -113,5 +113,10 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   ck("3440: Death Pen calls a 0-power Death monster and rests", val(`return pen.rested===true&&Object.values(battle.plr.monsters).some(u=>u&&u.card.id===dm.id)`), val(`return [dm.id,dm.cost,pen.rested,Object.values(battle.plr.monsters).map(u=>u&&u.card.id)]`));
   run(`fresh(); battle.plr.hand=[5866]; battle.plr.gauge=[21,22,23,24,25,26,27,28]; battle.plr.monsters.left=null; battle.plr.monsters.center=null; battle.plr.monsters.right=null; battle.plr.drop=[5867]; battle.plr.r42AnonA=battle.turnCount; ABX.core.runAbility('plr',card(5867),ab(5867,'triggered','turnEnd'),null,{event:{name:'turnEnd'},hostArea:'drop',selfRef:{k:'zone',side:'plr',area:'drop',idx:0,id:5867,card:card(5867)}})`); await settle();
   ck("5867: Anonymous B called at end of turn after A destroyed", val(`return Object.values(battle.plr.monsters).some(u=>u&&u.card.id===5866)`), val(`return [battle.plr.hand,Object.values(battle.plr.monsters).map(u=>u&&u.card.id)]`));
+  run(`fresh(); battle.plr.setSpells=[card(4884)]; globalThis.m0=battle.plr.maxSize; battle.plr.monsters.left=mk(window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('MAXDragon')).id); globalThis.m1=battle.plr.maxSize`);
+  ck("4884: field size limit 6 with a MAX Dragon", val(`return m0===3&&m1===6`), val(`return [m0,m1]`));
+  run(`fresh(); globalThis.bm=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'); battle.plr.buddyId=bm.id; battle.plr.monsters.center=mk(bm.id); battle.plr.drop=[719]; go(719,'spell')`); await settle();
+  ck("719: spell placed in buddy's soul", val(`return battle.plr.monsters.center.soul.includes(719)&&!battle.plr.drop.includes(719)`), val(`return [battle.plr.monsters.center.soul,battle.plr.drop]`));
+  ck("719: soul static boosts buddy power +5000", val(`const st=ABX.get(card(719)).abilities.find(a=>a.kind==='static'); return !!st&&st.steps[0].mods.power===5000`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();

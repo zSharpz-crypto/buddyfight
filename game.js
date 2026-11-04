@@ -4507,7 +4507,12 @@ const battle = {
     let __baseMax = __fighter.maxSize;
     Object.defineProperty(__fighter, "maxSize", {
       enumerable: true, configurable: true,
-      get() { return (__fighter.setSpells || []).some(c => c && c.id === 941) ? Math.max(__baseMax, 4) : __baseMax; },
+      get() {
+        let m = (__fighter.setSpells || []).some(c => c && c.id === 941) ? Math.max(__baseMax, 4) : __baseMax;
+        // "Overcrest" (#4884): with a «MAX Dragon» monster on your field you may hold monsters up to a total size of 6
+        if ((__fighter.setSpells || []).some(c => c && c.id === 4884) && Object.values(__fighter.monsters || {}).some(u => u && u.card && (u.card.attrs || []).some(a => /^maxdragon$/i.test(a)))) m = Math.max(m, 6);
+        return m;
+      },
       set(v) { __baseMax = v; }
     });
     return __fighter;

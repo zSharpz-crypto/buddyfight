@@ -4218,6 +4218,20 @@
         return prevFODa.apply(this, arguments);
       };
     }
+    // #4884 Overcrest: the "total size 6" line is handled by the maxSize accessor in game.js
+    OV42.push([4884, /you may put monsters up to a total size of 6/i, () => ({ kind: "static", steps: [{ op: "static", kind: "r42CostHandled" }], conds: [] })]);
+    // #719 Ultimate Buddy!: the spell goes into your buddy monster's soul (instead of the drop zone); that buddy gets [Soulguard] and power+5000
+    OPS.r42IntoBuddySoul = { run(s, ctx) {
+      const f = ctx.f, bu = core.fieldUnits(f, false).map(x => x.unit).find(u => u && u.card && f.buddyId != null && u.card.id === f.buddyId);
+      if (!bu) return false;
+      const i = f.drop.lastIndexOf(719); if (i < 0) return false;
+      f.drop.splice(i, 1); (bu.soul = bu.soul || []).push(719); fresh(); return true; }, check: () => true };
+    OV42.push([719, /put this card into your buddy monster.s soul/i, () => ({ kind: "spell", steps: [{ op: "r42IntoBuddySoul" }] })]);
+    OV42.push([719, /if this card is on your buddy monster.s soul/i, () => {
+      const p2 = ABX.parseSentenceSteps("your buddy monster gets power+5000", {});
+      const st = p2.steps.map(x => Object.assign({}, x, { mods: Object.assign({}, x.mods, { kws: ["Soulguard"] }), cond: { t: "selfInSoulOf", np: x.np } }));
+      return { kind: "static", conds: [], steps: st };
+    }]);
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many
