@@ -4628,10 +4628,21 @@
     const bt = getB(), reasons = [];
     const side = fighter === bt.plr ? "plr" : fighter === bt.opp ? "opp" : null;
     if (!side) return reasons;
+    const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, "");
     ruleHasConds(card).forEach(({ c, ab }) => {
       const probe = { side, f: fighter, e: enemy, card, unit: null, ab, bind: { chosen: [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [], event: { name: "cast" } };
-      let met = true; try { met = core.evalCond(c, probe); } catch (e) { met = true; }
-      if (!met) reasons.push(`Requires a «${c.np.filter.tribes[0]}»${(c.np.filter.types || []).includes("monster") ? " monster" : ""} on your field`);
+      const tribes = c.np.filter.tribes, isSet = (c.np.filter.kws || []).includes("set");
+      // "a «A» and a «B»" needs both, "a «A» or «B»" either (#1745, #6344); "a «X» [Set]" is a Set spell, not a field unit (#3352)
+      const meets = (t) => {
+        if (isSet) return (fighter.setSpells || []).some(sc => sc && (sc.attrs || []).some(a => norm(a) === norm(t)));
+        const c2 = Object.assign({}, c, { np: Object.assign({}, c.np, { filter: Object.assign({}, c.np.filter, { tribes: [t] }) }) });
+        try { return core.evalCond(c2, probe); } catch (e) { return true; }
+      };
+      const either = /»\s*(?:or|\/)\s*(?:an?\s+)?«/i.test(ab.raw || "");
+      const res = tribes.map(meets);
+      if (either ? res.some(Boolean) : res.every(Boolean)) return;
+      const mon = (c.np.filter.types || []).includes("monster") ? " monster" : "", st = isSet ? " [Set]" : "";
+      reasons.push(either ? `Requires a ${tribes.map(t => "«" + t + "»").join(" or ")}${mon}${st} on your field` : `Requires a «${tribes[res.indexOf(false)]}»${mon}${st} on your field`);
     });
     return reasons;
   };

@@ -1751,7 +1751,7 @@ function evaluateCardConditions(card, fighter, enemy, isAbilityCall = false) {
   }
 
   const attrCastMatch = s.match(/only\s+(?:cast|call)\s+this\s+card\s+if\s+(?:you\s+have\s+)?(a|an|two\s+or\s+more|three\s+or\s+more|four\s+or\s+more|five\s+or\s+more)\s+«([^»]+)»([^.,]*)/i);
-  if (attrCastMatch) {
+  if (attrCastMatch && !(/^an?$/i.test(attrCastMatch[1]) && /«|\[set\]/i.test(attrCastMatch[3] || ""))) {   // "«A» and a «B»" / "«A» or «B»" lists are checked by abilities_r42.js (r42RuleHasReasons)
     const need = { two: 2, three: 3, four: 4, five: 5 }[String(attrCastMatch[1]).split(/\s+/)[0].toLowerCase()] || 1;
     const inDrop = /in your drop zone/i.test(attrCastMatch[3] || "");
     const sub = normalizeSearchToken(attrCastMatch[2]);
