@@ -24,6 +24,13 @@ const settle = async () => { for (let i = 0; i < 40; i++) { env.flush(); await n
   run(`clear(); battle.plr.gauge=[]; battle.plr.monsters.center=mku(2565); battle.plr.deck=[...BM.slice(0,5), ...Array(20).fill(46)]`);
   run(`{const c=CARD_MAP.get(2565); const ab=ABX.get(c).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',c,ab,battle.plr.monsters.center,{auto:true});}`); await settle();
   ok(J(`battle.opp.life`) === 20, `#2565 cannot pay the gauge -> no damage even with five «Brave Machine» on top (opp life ${J(`battle.opp.life`)})`);
+  // #2229 Arch Enemy: when this card attacks, 1 damage; 10+ cards in the opponent's drop zone -> 2 INSTEAD; 20+ -> 4 INSTEAD
+  for (const [drop, exp] of [[0, 1], [9, 1], [10, 2], [19, 2], [20, 4], [27, 4]]) {
+    run(`clear(); battle.opp.drop=Array(${drop}).fill(47); battle.plr.monsters.center=mku(2229)`);
+    run(`ABX.fireAttack('plr', [{unit: battle.plr.monsters.center}], 'opp', 'fighter')`); await settle();
+    const dmg = 20 - J(`battle.opp.life`);
+    ok(dmg === exp, `#2229 attack with ${drop} cards in the opponent's drop zone -> ${exp} damage (got ${dmg})`);
+  }
   console.log(fail ? `\n${fail} FAILED` : "\nALL PASSED");
   process.exit(fail ? 1 : 0);
 })();

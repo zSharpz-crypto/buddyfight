@@ -3079,6 +3079,13 @@
     c.steps = c.steps.filter(x => x.op !== "r40StructuredExec");
     return c;
   }]);
+  // #2229 Great Demonic Black Dragon, Arch Enemy: "1 damage! If 10 or more cards in the opponent's drop zone, 2 damage instead! If 20 or more, 4 damage!" (20+ dealt 2 + 4 = 6: the 10-or-more step had no upper bound)
+  OV42.push([2229, /if there are 10 or more cards in your opponent'?s drop zone, deal 2 damage instead/i, (ab) => {
+    const c = clone(ab), dm = c.steps.filter(x => x.op === "damage" && x.cond);
+    if (dm.length !== 3 || !dm[1].instead || !dm[2].cond || dm[2].cond.n !== 20) return ab;
+    dm[1].cond = { t: "and", list: [dm[1].cond, { t: "not", c: dm[2].cond }] };
+    return c;
+  }]);
   // #4413 Roaring Hydra: "... drop 1 of your opponent's gauge. If not, your opponent chooses and drops a hand card." ("If not" had nothing to negate, so the hand drop never happened)
   OV42.push([4413, /drop 1 of your opponent'?s gauge\. if not/i, (ab) => {
     const c = clone(ab), st = c.steps.find(x => x.cond && x.cond.t === "xElse");
