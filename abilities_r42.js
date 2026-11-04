@@ -4056,6 +4056,7 @@
             if (core.fieldUnits(fighter, false).filter(x => x.unit && x.unit.card && hasTribe(x.unit.card, "WydarSarkal")).length < 2) return `"${card.name}" needs two or more Wydar Sarkal on your field`;
             if (fighter.r42TrollTurn === B.turnCount) return `"${card.name}" can only be cast once per turn`;
           }
+          if (card && card.id === 1428 && !(ABX.battleCtx && ABX.battleCtx.active)) return `"${card.name}" can only be cast while you are being attacked`;
           if (card && card.id === 765 && B.phase === "final") return `"${card.name}" cannot be cast during a final phase`;
           if (card && card.id === 3904 && Object.values(fighter.monsters || {}).some(Boolean)) return `"${card.name}" can only be cast with no monsters on your field`;
           if (card && card.id === 1141 && core.fieldUnits(fighter, false).filter(x => x.unit && x.unit.card && x.unit.card.type === "Monster" && (x.unit.card.attrs || []).some(a => /^blackdragon$/i.test(a))).length < 2) return `"${card.name}" needs two or more Black Dragon on your field`;
@@ -4232,6 +4233,56 @@
       const st = p2.steps.map(x => Object.assign({}, x, { mods: Object.assign({}, x.mods, { kws: ["Soulguard"] }), cond: { t: "selfInSoulOf", np: x.np } }));
       return { kind: "static", conds: [], steps: st };
     }]);
+    // #362 Power of Mythology: one of three (the bullets were parsed as three separate spells)
+    OV42.push([362, /use one of the three following/i, () => {
+      const texts = ["For this turn, all monsters on your field get power+5000", "Choose a monster on your field, and for this turn, that monster gets [Penetrate]", "During an attack on your opponent's turn, nullify that attack"];
+      const opts = texts.map((t, i) => { const p2 = ABX.parseSentenceSteps(i === 2 ? "nullify that attack" : t, {}); return { kind: "spell", tags: [], conds: [], steps: p2.steps, raw: t, cleaned: t, parsed: true }; });
+      if (opts.some(o => !o.steps.length)) return null;
+      return { kind: "modal", steps: [], options: opts };
+    }]);
+    [/^-for this turn, all monsters on your field get power/i, /^-choose a monster on your field, and for this turn, that monster gets \[penetrate\]/i, /^-during an attack on your opponent.s turn, nullify that attack/i]
+      .forEach(re => OV42.push([362, re, () => ({ kind: "rule", trigger: null, conds: [], steps: [] })]));
+    // #1428 Yamimonoimi: move a Hundred Demons monster to the center and change the attack's target to it
+    OPS.r42DemonDivert = { async run(s, ctx) {
+      const f = ctx.f, bc = ABX.battleCtx; if (!bc || !bc.active) return false;
+      const cands = core.fieldUnits(f, false).filter(x => x.unit && x.unit.card && x.unit.card.type === "Monster" && hasTribe(x.unit.card, "HundredDemons")).map(x => ({ k: "unit", side: ctx.side, unit: x.unit, card: x.unit.card, id: x.unit.card.id }));
+      if (!cands.length) return false;
+      const ch = (await core.pick(cands, { qty: { n: 1, upTo: false }, raw: "a Hundred Demons monster on your field" }, ctx, { intent: "help", title: ctx.card.name + " \u2014 move to the center" })) || [];
+      const u = ch[0] && ch[0].unit; if (!u) return false;
+      const p = core.posOfUnit(f, u); if (!p) return false;
+      if (p !== "center") { const other = f.monsters.center; f.monsters.center = u; f.monsters[p] = other || null; }
+      bc.redirectTo = "center"; fresh(); return true; }, check: () => true };
+    OV42.push([1428, /move a hundred demons monster on your field to the center/i, () => ({ kind: "spell", steps: [{ op: "r42DemonDivert" }] })]);
+    // #6036 Zeff Hiter: (1) dropped from hand -> at the start of that turn's final phase, with a Dragon item equipped, get a Zeff Hiter back from the drop zone (+1 gauge, +1 life)
+    {
+      const prevFDz = ABX.fireDiscarded;
+      ABX.fireDiscarded = function (side, card) {
+        if (card && card.id === 6036) F(side).r42ZeffTurn = B.turnCount;
+        return prevFDz ? prevFDz.apply(this, arguments) : undefined;
+      };
+    }
+    const dragonItemEquipped = (f) => [f.item, f.item2].some(it => it && it.card && (it.card.attrs || []).some(a => /^dragon$/i.test(a)));
+    OPS.r42ZeffRetrieve = { run(s, ctx) {
+      const f = ctx.f; if (f.r42ZeffTurn !== B.turnCount || !dragonItemEquipped(f)) return false;
+      const i = f.drop.lastIndexOf(6036); if (i < 0) return false;
+      f.hand.push(f.drop.splice(i, 1)[0]);
+      OPS.gaugeUpTop.run({}, ctx); f.life += 1; fresh(); return true; }, check: () => true };
+    OV42.push([6036, /at the start of the final phase during the turn that this card is dropped from your hand/i, () => ({ kind: "triggered", fromDrop: true, trigger: { event: "phaseStart", phase: "final", who: "you" }, conds: [{ t: "selfIn", area: "drop" }], steps: [{ op: "r42ZeffRetrieve" }] })]);
+    // (2) a Dragon item on your field would leave by your opponent's effect -> put a Zeff Hiter from the drop zone on the bottom of the deck and pay 1 life: it stays
+    {
+      const prevIPz = core.isProtected;
+      core.isProtected = function (unit, side, kind, ctx) {
+        if (prevIPz.apply(this, arguments)) return true;
+        try {
+          const f = F(side);
+          if (unit && (unit === f.item || unit === f.item2) && (unit.card.attrs || []).some(a => /^dragon$/i.test(a)) && ctx && ctx.side && ctx.side !== side && f.life > 1 && ["destroyed", "returned to hand", "put into the drop zone", "put into soul", "put into deck", "put to other areas"].includes(kind)) {
+            const i = f.drop.lastIndexOf(6036);
+            if (i >= 0) { f.deck.push(f.drop.splice(i, 1)[0]); f.life -= 1; return true; }
+          }
+        } catch (e) { /* ignore */ }
+        return false;
+      };
+    }
     // #1554 stand a Demon Lord
     OV42.push([1554, /stand a demon lord on your field/i, () => ({ kind: "spell", once: "turn", steps: [{ op: "stand", np: ABX.parseNP("a \u00abDemon Lord\u00bb on your field") }] })]);
     // #988 / generic: discard up to two <X> from hand, draw that many

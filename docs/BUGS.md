@@ -327,3 +327,4 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Batch I: #1878 (fireOtherDestroyed wrapper using unit.abxDestroyedBy + !_destroyByAttack; pays call cost; prompts human). Test: dead_batch_b.
 - Batch J: #3440 (item act: rest -> call 0-power Death from drop, paying cost) #5867 (turnEnd from drop after A destroyed this turn; call B from hand/deck, size limit bypassed; random deck order instead of true shuffle-only-if-looked). Test: dead_batch_b.
 - Batch K: #4884 (maxSize accessor 6 with MAX Dragon) #719 (spell -> buddy soul; +5000 static, Soulguard kw unverified). #3640 'separate areas' rule unclear - open.
+- Batch L: #362 (modal; bullets were 3 separate spells) #1428 (divert to center; castBlock requires battleCtx) #6036 (final-phase retrieve via fireDiscarded flag + Dragon-item protection via isProtected, automatic). Test: dead_batch_b.

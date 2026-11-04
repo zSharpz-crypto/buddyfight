@@ -118,5 +118,16 @@ globalThis.go=(id,k,ev,unit,opts)=>ABX.core.runAbility('plr',card(id),ab(id,k,ev
   run(`fresh(); globalThis.bm=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'); battle.plr.buddyId=bm.id; battle.plr.monsters.center=mk(bm.id); battle.plr.drop=[719]; go(719,'spell')`); await settle();
   ck("719: spell placed in buddy's soul", val(`return battle.plr.monsters.center.soul.includes(719)&&!battle.plr.drop.includes(719)`), val(`return [battle.plr.monsters.center.soul,battle.plr.drop]`));
   ck("719: soul static boosts buddy power +5000", val(`const st=ABX.get(card(719)).abilities.find(a=>a.kind==='static'); return !!st&&st.steps[0].mods.power===5000`));
+  run(`fresh(); globalThis.mm=window.BUDDYFIGHT_CARDS.filter(c=>c.type==='Monster').slice(0,2).map(c=>c.id); battle.plr.monsters.left=mk(mm[0]); battle.plr.monsters.right=mk(mm[1]); globalThis.ab362=ABX.get(card(362)).abilities.find(a=>a.kind==='modal'); ABX.core.runAbility('plr',card(362),ab362,null,{})`); await settle();
+  ck("362: modal runs one option only (+5000 to all)", val(`return battle.plr.monsters.left.tempPower===5000&&battle.plr.monsters.right.tempPower===5000`), val(`return [battle.plr.monsters.left.tempPower,battle.plr.monsters.right.tempPower]`));
+  ck("362: bullet lines neutralised", val(`return ABX.get(card(362)).abilities.filter(a=>a.kind==='spell').length===0`));
+  run(`fresh(); globalThis.hd=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('HundredDemons')); battle.plr.monsters.center=mk(mm[0]); battle.plr.monsters.left=mk(hd.id); ABX.battleCtx={active:true}; globalThis.cb9=ABX.core.castBlock(battle.plr,card(1428)); go(1428,'spell')`); await settle();
+  ck("1428: Hundred Demons moved to center, target redirected", val(`return !cb9&&battle.plr.monsters.center.card.id===hd.id&&ABX.battleCtx.redirectTo==='center'`), val(`return [cb9,battle.plr.monsters.center.card.id,ABX.battleCtx.redirectTo]`));
+  run(`ABX.battleCtx=null; globalThis.cb10=ABX.core.castBlock(battle.plr,card(1428))`);
+  ck("1428: not castable outside an attack", val(`return !!cb10`));
+  run(`fresh(); globalThis.dri=window.BUDDYFIGHT_CARDS.find(c=>c.type==='Item'&&(c.attrs||[]).includes('Dragon')); battle.plr.item={card:dri,rested:false,soul:[],tempCrit:0}; battle.plr.drop=[6036]; battle.plr.life=5; globalThis.zp1=ABX.core.isProtected(battle.plr.item,'plr','destroyed',{side:'opp',card:card(21)})`);
+  ck("6036: Dragon item protected by returning Zeff to deck bottom + 1 life", val(`return zp1===true&&battle.plr.life===4&&battle.plr.deck[battle.plr.deck.length-1]===6036&&!battle.plr.drop.includes(6036)`), val(`return [zp1,battle.plr.life]`));
+  run(`fresh(); battle.plr.item={card:dri,rested:false,soul:[],tempCrit:0}; battle.plr.drop=[6036]; battle.plr.hand=[]; ABX.fireDiscarded('plr',card(6036)); ABX.core.runAbility('plr',card(6036),ab(6036,'triggered','phaseStart'),null,{event:{name:'phaseStart'},hostArea:'drop'}); globalThis.gz=battle.plr.gauge.length`); await settle();
+  ck("6036: final-phase retrieval into hand (+life)", val(`return battle.plr.hand.includes(6036)&&battle.plr.life===11`), val(`return [battle.plr.hand,battle.plr.life]`));
   console.log("pass", pass, "fail", fail); process.exit(fail ? 1 : 0);
 })();
