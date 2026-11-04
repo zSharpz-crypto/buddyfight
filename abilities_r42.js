@@ -3020,6 +3020,19 @@
   // #4414 Topfist Punishment! Keravnos Burst Fist!: "Deal 2 damage to your opponent! If your opponent has no gauge, deal 5 damage to your opponent instead!!" (it dealt 2 and then 5 more)
   OPS.r42KeravnosFist = { async run(s, ctx) { return OPS.damage.run({ op: "damage", who: "opp", n: F(otherSide(ctx.side)).gauge.length ? 2 : 5 }, ctx); }, check: () => true };
   OV42.push([4414, /deal 2 damage to your opponent.{0,3} if your opponent has no gauge/i, () => ({ kind: "spell", conds: [], steps: [{ op: "r42KeravnosFist" }] })]);
+  // #837 Death Ruler, Thirteen: "deal 1 damage to your opponent! If there are exactly 13 cards in your opponent's drop zone, deal 5 damage instead!!" (it dealt 1 and then 5 more)
+  OPS.r42DeathRuler13 = { async run(s, ctx) { return OPS.damage.run({ op: "damage", who: "opp", n: F(otherSide(ctx.side)).drop.length === 13 ? 5 : 1 }, ctx); }, check: () => true };
+  OV42.push([837, /deal 1 damage to your opponent.{0,3} if there are exactly 13 cards/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [], steps: [{ op: "r42DeathRuler13" }] })]);
+  // #2565 Gigadroid Gigantes [Act]: 3 or more «Brave Machine» revealed -> 2 damage; five revealed -> 5 damage INSTEAD (the parse dealt 5 unconditionally and ran the "instead" text again: 10-12 damage)
+  OV42.push([2565, /reveal the top five cards of your deck, if there are three or more/i, (ab) => {
+    const c = clone(ab), withCond = c.steps.find(x => x.cond && x.cond.t === "xRevealedCount"), dm = c.steps.filter(x => x.op === "damage");
+    if (!withCond || dm.length !== 2) return ab;
+    const bmNp = withCond.cond.np, bm = (n, cmp) => ({ t: "xRevealedCount", np: bmNp, n, cmp });
+    dm[0].cond = { t: "and", list: [bm(3, "ge"), bm(4, "le")] };
+    dm[1].cond = bm(5, "ge");   // no gate: five revealed already implies the gauge was paid (the reveal is gated), and a skipped 2-damage step must not block it
+    c.steps = c.steps.filter(x => x.op !== "r40StructuredExec");
+    return c;
+  }]);
   // #725 Actor Knights High Priest: "When you call a «Tarot» monster other than 'Actor Knights High Priest', you gain 1 life. (once per turn)" - was read as an enter trigger of itself
   OV42.push([725, /when you call a .tarot. monster other than/i, () => ({ kind: "triggered", trigger: { event: "otherEnter", np: np({ tribes: ["Tarot"], types: ["monster"], notNames: ["actor knights high priest"] }, "field") }, conds: [], once: "turn", steps: [{ op: "life", who: "you", n: 1 }] })]);
 
