@@ -7972,15 +7972,26 @@ const battle = {
     for (let i = 0; i < cost.gauge; i++) f.drop.push(f.gauge.pop());
     if (cost.life > 0) f.life = Math.max(1, f.life - cost.life);
 
+    // #5736: an [Equip Cost] that puts equipped items (named) into the new item's soul takes them out of their slots first (any slot), so the slot is free
+    // and the replaced item is not dropped when it is the one being paid; the cost payer is told those names are already paid (one card per name)
+    const costSoulIds = [], costPaidNames = [];
+    if (window.ABX && ABX.fieldSoulCostNames) {
+      ABX.fieldSoulCostNames(c).forEach(nm => {
+        const hit = getEquippedItems(f).find(e => !costSoulIds.includes(e.unit) && String(e.unit.card.name || "").toLowerCase().includes(nm));
+        if (!hit) return;
+        const u = hit.unit;
+        if (f.item === u) f.item = null; else if (f.item2 === u) f.item2 = null; else if (Array.isArray(f.extraItems)) f.extraItems = f.extraItems.filter(x => x !== u);
+        if (u.soul && u.soul.length) f.drop.push(...u.soul.map(getSoulCardId));
+        costSoulIds.push(u.card.id); costPaidNames.push(nm);
+      });
+      if (!f.item && f.item2) { f.item = f.item2; f.item2 = null; }
+    }
     const eqCount = getEquippedItems(f).length;
     const maxItems = getMaxAllowedItems(f, c);
     const canKeepExisting = eqCount > 0 && eqCount < maxItems;
-    let oldItemToSoul = null;   // #5736: the [Equip Cost] puts the item you are replacing into the new item's soul (it must not go to the drop zone first)
     if (f.item && !f.item.isEndrulerFlag && !canKeepExisting) {
       if (f.item.soul && f.item.soul.length) f.drop.push(...f.item.soul.map(getSoulCardId));
-      if (window.ABX && ABX.fieldSoulCostNames && ABX.fieldSoulCostNames(c).some(n => String(f.item.card.name || "").toLowerCase().includes(n))) {
-        oldItemToSoul = f.item.card.id;
-      } else if (c.eqc && f.eqcTurn !== this.turnCount) {   // [Equipment Change]: only once per turn, otherwise the old item is dropped
+      if (c.eqc && f.eqcTurn !== this.turnCount) {   // [Equipment Change]: only once per turn, otherwise the old item is dropped
         f.eqcTurn = this.turnCount;
         f.hand.push(f.item.card.id);
       } else {
@@ -8005,7 +8016,7 @@ const battle = {
         attacksLeft: c.atk_max || 1,
         soul: soulArr
       };
-      if (oldItemToSoul != null) newItem.soul.push(oldItemToSoul);
+      if (costSoulIds.length) { newItem.soul.push(...costSoulIds); newItem.paidNames = costPaidNames; }
       const placedSlot = addEquippedItemToFighter(f, newItem, c);
       if (window.ABX && ABX.payExtras && ABX.hasExtras && ABX.hasExtras(c)) ABX.payExtras(side, c, newItem);
 

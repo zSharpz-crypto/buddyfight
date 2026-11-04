@@ -21,5 +21,18 @@ const equip = async () => { run(`battle.plr.hand=[${SIEG}]; globalThis.__g=battl
   ok(r.item === GRAM && r.hand === 1 && r.gauge === 0, "only Gram: cannot equip, Gram stays");
   run(`clear()`); r = await equip();
   ok(r.item === null && r.hand === 1 && r.gauge === 0, "nothing on the field: cannot equip");
+  // two item slots (abxItemCap=2)
+  const ids = (u) => u ? u.soul.map(x => typeof x === 'object' ? x.id : x) : null;
+  run(`clear(); battle.plr.abxItemCap=2; battle.plr.monsters.left=mku(${SIGURD}); battle.plr.item=mku(${GRAM}); battle.plr.item2=mku(${GRAM})`);
+  r = await equip();
+  const st = J(`({i:battle.plr.item&&battle.plr.item.card.id, i2:battle.plr.item2&&battle.plr.item2.card.id, soul:(battle.plr.item2||battle.plr.item).soul.length})`);
+  const eq2 = J(`[battle.plr.item, battle.plr.item2].filter(Boolean).map(u=>u.card.id).sort().join()`);
+  const all2 = J(`[battle.plr.item, battle.plr.item2].filter(Boolean).map(u=>u.soul.map(x=>typeof x==='object'?x.id:x)).flat().sort().join()`);
+  ok(eq2 === `${GRAM},${SIEG}` && all2 === `${SIGURD},${GRAM}`, `two Gram equipped: exactly ONE goes into the soul, the other stays equipped (equipped ${eq2}, soul ${all2})`);
+  run(`clear(); battle.plr.abxItemCap=2; battle.plr.monsters.left=mku(${SIGURD}); battle.plr.item=mku(4388); battle.plr.item2=mku(${GRAM})`);
+  r = await equip();
+  const eq3 = J(`[battle.plr.item, battle.plr.item2].filter(Boolean).map(u=>u.card.id).sort().join()`);
+  ok(eq3 === [SIEG, 4388].sort().join() && !r.drop.includes(4388) && !r.drop.includes(GRAM), `Gram in the 2nd slot: it is paid, the unrelated item stays equipped (equipped ${eq3}, drop ${r.drop})`);
+  run(`battle.plr.abxItemCap=0`);
   console.log(fail ? `\n${fail} FAILED` : "\nALL PASSED"); process.exit(fail ? 1 : 0);
 })();

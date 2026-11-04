@@ -1537,6 +1537,10 @@
         }
         continue;
       }
+      if (part.soulFrom && part.soulFrom.area === "field" && unit && unit.paidNames) {   // #5736: this named card was already put into the soul by the equip step
+        const pn = ((part.soulFrom.np && part.soulFrom.np.filter && part.soulFrom.np.filter.names) || [])[0], pi = pn ? unit.paidNames.indexOf(pn) : -1;
+        if (pi >= 0) { unit.paidNames.splice(pi, 1); continue; }
+      }
       const spec = part.soulFrom || part.discard || part.destroy, n = spec.n || 1;
       const ctx = { side, f, e: F(otherSide(side)), card, unit, bind: {}, auto: true };
       let cands = partCands(part, side, card, -1).filter(r => !(unit && r.unit === unit));
