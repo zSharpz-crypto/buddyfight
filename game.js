@@ -9041,7 +9041,7 @@ const battle = {
         }
       } else if (targetMonster) {
         outcome.destroyedMonster = !!this.resolveMonsterVsMonster(attSide, units, defSide, targetPos, combinedPower, combinedCrit, anyPenetrate); if (outcome.destroyedMonster) outcome.destroyedCount = 1;
-        outcome.dealtDamage = outcome.destroyedMonster && (targetPos === "center" || targetPos === "center2") && anyPenetrate;
+        outcome.dealtDamage = (outcome.destroyedMonster || !!this._penViaSG) && (targetPos === "center" || targetPos === "center2") && anyPenetrate;
       } else {
         outcome.dealtDamage = dealDirect() > 0;
       }
@@ -9066,6 +9066,7 @@ const battle = {
     const attFighter = this.getFighter(attSide);
     const defFighter = this.getFighter(defSide);
     const defender = defFighter.monsters[targetPos];
+    this._penViaSG = false;
     if (!defender) return;
 
     const defEff = getUnitEffectiveCombatStats(defFighter, defender);
@@ -9081,12 +9082,14 @@ const battle = {
         defenderSurvived = true;
         this.setPrompt(`🛡️ "${defender.card.name}" prevented destruction by card effect and remained on the field!`);
       } else {
-        this._destroyByAttack = true; this._attackersNow = attUnits.map(x => x.unit);
+        this._destroyByAttack = true; this._attackersNow = attUnits.map(x => x.unit); this._sgSavedBy = null;
         let destroyed;
         try { destroyed = this.destroyMonster(defSide, targetPos); } finally { this._destroyByAttack = false; this._attackersNow = null; }
         destroyedFlag = !!destroyed;
         defenderSurvived = !destroyed;
-        if ((targetPos === "center" || targetPos === "center2") && anyPenetrate && destroyed) {
+        const sgSaved = !destroyed && this._sgSavedBy === defender; this._sgSavedBy = null;
+        if ((targetPos === "center" || targetPos === "center2") && anyPenetrate && (destroyed || sgSaved)) {
+          if (sgSaved) this._penViaSG = true;
           let penDmg = combinedCrit;
           const unreducible = !!(window.ABX && ABX.attackUnreducible && ABX.attackUnreducible(attSide, attUnits));
           if (defFighter.tempDamageReduce && defFighter.tempDamageReduce > 0 && !unreducible) {
@@ -9154,6 +9157,7 @@ const battle = {
     // #942 Demonic Demise Sword, Aqulta Gwaneff: nullify the [Soulguard] of monsters this card attacks (no soul is spent, the monster is destroyed)
     const sgNullified = (window.ABX && ABX.sgNullifiedByStatic && ABX.sgNullifiedByStatic(ownerSide)) || !!this._destroyByAttack && (this._attackersNow || []).some(u => u && u.card && /nullify the \[soulguard\] of monsters this card attacks/i.test(u.card.skill || ""));
     if (!sgNullified && (m.card.sg || m.tempSG || abxSG) && !(window.ABX && ABX.kwLost && ABX.kwLost(m, "soulguard")) && m.soul && m.soul.length > 0) {
+      if (this._destroyByAttack) this._sgSavedBy = m;   // [Penetrate] still deals its damage when [Soulguard] saved the center monster from this attack
       const discardedSoul = m.soul.pop();
       const wasFaceDown = isSoulEntryFaceDown(discardedSoul);
       const soulCardId = getSoulCardId(discardedSoul);
