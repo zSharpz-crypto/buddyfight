@@ -412,7 +412,7 @@
   // Bots / auto play keep the automatic behaviour. `fixedPos`: the effect names the zone itself ("call it to the center").
   async function chooseCallPlacement(ctx, card, fixedPos) {
     const f = ctx.f, side = ctx.side;
-    if (f.isBot || ABX.autoPlay || ctx.auto || !ABX.ui || !ABX.ui.pickOption || !ABX.ui.pickCards) return null;
+    if (f.isBot || ABX.autoPlay || ctx.auto || (core.sideIsAuto && core.sideIsAuto(side)) || !ABX.ui || !ABX.ui.pickOption || !ABX.ui.pickCards) return null;   // the online friend's side is never asked on this screen
     const max = f.maxSize || 3, sz = typeof getEffectiveCardSize === "function" ? getEffectiveCardSize(f, card) : (card.size || 0);
     const label = { left: "Left", center: "Center", right: "Right", center2: "Center (2nd)" };
     const replaced = () => (fixedPos && f.monsters[fixedPos]) ? (typeof getEffectiveCardSize === "function" ? getEffectiveCardSize(f, f.monsters[fixedPos].card) : (f.monsters[fixedPos].card.size || 0)) : 0;

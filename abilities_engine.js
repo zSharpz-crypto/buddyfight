@@ -509,6 +509,7 @@
     return (idxs || []).map(i => cands[i]).filter(Boolean);
   }
   core.pick = pick;
+  core.sideIsAuto = sideIsAuto;
   core.autoPick = autoPick;
 
   /* ============================================================
