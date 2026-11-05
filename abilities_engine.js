@@ -723,6 +723,8 @@
       for (const ab of ABX.get(src.card).abilities) {
         if (ab.kind !== "static" || (ab.unparsed && ab.unparsed.length) || !(ab.steps || []).length) continue;
         if (!ab.steps.some(x => x.op === "shield")) continue;
+        // a card sitting in a soul only works if its line is written for the soul ("If this card is in the soul of …"); an item's own continuous reduction does not
+        if (src.host && !/selfInSoul|inSoulOf/.test(JSON.stringify([ab.conds, (ab.steps || []).map(x => x.cond)]))) continue;
         const ctx = { side, f, e: F(otherSide(side)), card: src.card, unit: src.unit, soulHost: src.host, hostArea: src.host ? "soul" : "field", bind: { chosen: [] } };
         if (!(ab.conds || []).every(c => evalCond(c, ctx))) continue;
         ab.steps.forEach(x => { if (x.op === "shield" && (!x.cond || evalCond(x.cond, ctx))) out.push({ reduceBy: x.reduceBy || 0, toZero: !!x.toZero, capTo: x.capTo != null ? x.capTo : null, from: x.from || null }); });
