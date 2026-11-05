@@ -204,7 +204,7 @@
       return inner;
     }
 
-    if ((m = t.match(/^(?:the chosen|the selected|that|those|these|the same|the discarded|the revealed|the called|the dropped)\s+(card|cards|monster|monsters|item|items|spell|spells|character|characters)(?:\s+(.*))?$/i)) ||
+    if ((m = t.match(/^(?:(?:all )?(?:the )?chosen|the selected|that|those|these|the same|the discarded|the revealed|the called|the dropped)\s+(card|cards|monster|monsters|item|items|spell|spells|character|characters)(?:\s+(.*))?$/i)) ||
         (m = t.match(/^(it|them|they)(?:\s+(.*))?$/i))) {
       np.ref = "chosen";
       np.qty.all = /s$/i.test(m[1]) || /^(them|they)$/i.test(m[1]);

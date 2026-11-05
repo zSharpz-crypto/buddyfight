@@ -32,6 +32,16 @@
 
   /* ============ 1. per-card readings ============ */
   const C = (op, extra) => Object.assign({ op }, extra || {});
+  // "choose any number of cards with power on your opponent's field. If the total power is N or less, destroy all chosen cards" (#6462 Tenbu "Re:B", #2968)
+  const powerCapAbility = (max, alsoDamage) => {
+    const ch = ABX.parseSentenceSteps("choose any number of cards on your opponent's field", { conds: [] });
+    const ds = ABX.parseSentenceSteps("destroy all chosen cards", { conds: [] });
+    if (!ch || !ds || !ch.steps.length || !ds.steps.length || ch.unparsed.length || ds.unparsed.length || !ds.steps[0].np || ds.steps[0].np.ref !== "chosen") return null;
+    const choose = Object.assign({}, ch.steps[0]);
+    choose.np = Object.assign({}, choose.np, { filter: Object.assign({}, choose.np.filter, { power: { cmp: "ge", n: 1 } }), raw: "any number of cards with power on your opponent's field" });
+    const trigger = alsoDamage ? { event: "enter", self: true, alsoDamage: true } : { event: "enter", self: true };
+    return { kind: "triggered", trigger, steps: [choose, { op: "r31PowerCap", max }, ds.steps[0]] };
+  };
   const OV = [
     // #456 "This card cannot be destroyed, nor returned to your hand, and it is treated as if there is a size 3 «Armordragon» …"
     // shortcut: the "treated as a size 3 «Armordragon»" part is not counted by conditions yet
@@ -63,10 +73,9 @@
     [4160, /up to two «thunder empire» monsters into the drop zone, up to one «thunder empire» item into your hand/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, steps: [C("r31ThunderSearch")] })],
     [4257, /a «neodragon», put the top card of your deck into your gauge, a «black dragon», you gain 1 life/i, (ab) => ({ kind: ab.kind, steps: [{ op: "nullifyAttack" }, C("r31TribeBonus")] })],
     [6037, /if your flags \[reversal\] two times or more during this fight, this card gets power\+5000/i, () => ({ kind: "static", steps: [C("static", { kind: "r31", tag: "rev6037" })] })],
-    [6462, /when this card enters the field or when you take damage/i, (ab) => {
-      const r = ABX.parseSentenceSteps("choose any number of cards with power on your opponent's field. If the total power of the chosen cards is 50000 or less, destroy all chosen cards", { conds: [] });
-      return r && r.steps.length && !r.unparsed.length ? { kind: "triggered", trigger: { event: "enter", self: true, alsoDamage: true }, steps: r.steps } : null;
-    }],
+    // #6462 / #2968 Tenbu: "choose any number of cards with power on your opponent's field. If the total power (of the chosen cards) is N or less, destroy all chosen cards"
+    [6462, /when this card enters the field or when you take damage/i, () => powerCapAbility(50000, true)],
+    [2968, /choose any number of cards with power on your opponent's field\. if the total power is 15000 or less/i, () => powerCapAbility(15000, false)],
     [6474, /if this card has souls, damage dealt to you other than by your card effects is reduced by 3/i, () => ({ kind: "static", steps: [C("static", { kind: "r31", tag: "souls6474" })] })],
   ];
   const pcPrev = ABX.parseCard;
@@ -120,6 +129,25 @@
   }
 
   /* ============ 3. ops ============ */
+  // keeps the chosen cards only if their total power is at most s.max. A human who chose too much destroys nothing (that is the card text);
+  // a bot / auto player keeps the most valuable cards that still fit.
+  OPS.r31PowerCap = {
+    run(s, ctx) {
+      const ch = (ctx.bind.chosen || []).filter(r => r && r.unit && r.card);
+      const pw = (r) => getUnitEffectiveCombatStats(F(r.side), r.unit).power || 0;
+      let total = ch.reduce((a, r) => a + pw(r), 0);
+      if (total <= s.max) { ctx.bind.chosen = ch; return ch.length > 0; }
+      if (core.sideIsAuto && core.sideIsAuto(ctx.side)) {
+        let sum = 0; const keep = [];
+        core.autoPick(ch, ch.length, ctx, "harm").forEach(r => { if (sum + pw(r) <= s.max) { keep.push(r); sum += pw(r); } });
+        ctx.bind.chosen = keep; return keep.length > 0;
+      }
+      ctx.bind.chosen = [];
+      try { B.setPrompt(`${ctx.card.name}: the chosen cards have ${total} total power (more than ${s.max}), so nothing is destroyed.`); } catch (e) { /* ignore */ }
+      return false;
+    },
+    check: () => true
+  };
   OPS.r31InfPower = { run(s, ctx) { if (!ctx.unit) return false; ctx.unit.tempPower = (ctx.unit.tempPower || 0) + 99999999; fresh(); return true; }, check: () => true };   // "infinite"
   OPS.r31SaveNext = { run(s, ctx) { ctx.f.abxSaveNext = { turn: B.turnCount, minSize: s.minSize }; return true; }, check: () => true };
   OPS.r31NoDestroyByAttack = { run(s, ctx) { const us = (ctx.bind.chosen || []).filter(r => r.unit); us.forEach(r => { r.unit.abxNoAttackDestroy = B.turnCount; }); return us.length > 0; }, check: () => true };
