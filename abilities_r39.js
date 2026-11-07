@@ -291,6 +291,8 @@
         }
         // #5031 Day of Devastation Option 2 / #6201 Grace of the Sun Deity Option 2 / #5349 Buddy Trust Option 2 turn flags
         if (byOpp && f.abxProtectAllFieldTurn === B.turnCount && ["destroyed", "returned", "returned to hand", "nullified"].includes(kind)) return true;
+        // #3191 Asterism Effect option 1: "For this turn, all monsters on your field cannot be destroyed." (any source, own effects and battle too)
+        if (f.abxNoDestroyMonstersTurn === B.turnCount && kind === "destroyed" && f.monsters && Object.keys(f.monsters).some(k => f.monsters[k] === unit)) return true;
         if (byOpp && unit.abxGraceProtectedTurn === B.turnCount && ["destroyed", "returned", "returned to hand", "leave the field", "souls dropped"].includes(kind)) return true;
         if ((kind === "returned" || kind === "returned to hand") && (f.abxNoReturnTurn === B.turnCount || e.abxNoReturnTurn === B.turnCount)) return true;
         // #3747 Heavenly Crystal Dragon, Aldo Athora: cannot be destroyed by card effects

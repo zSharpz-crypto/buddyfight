@@ -973,6 +973,88 @@
     return r;
   };
 
+  // #3191 Asterism Effect option 1 was a no-op "static" step: remember it for this turn (checked in abilities_r39.js isProtected)
+  OPS.r43NoDestroyMonsters = { run(s, ctx) { ctx.f.abxNoDestroyMonstersTurn = battle.turnCount; if (battle.setPrompt) battle.setPrompt("🛡️ All monsters on your field cannot be destroyed this turn!"); return true; }, check: () => true };
+  OV42.push([3191, /choose and use one of the following two/i, (ab) => ({ kind: ab.kind, steps: ab.steps, options: [Object.assign({}, ab.options[0], { steps: [{ op: "r43NoDestroyMonsters" }] }), ab.options[1]] })]);
+  // #3747 Heavenly Crystal Dragon, Aldo Athora: "[Overturn] [Pay 1 gauge and drop a hand card when your opponent's cards would attack] For this turn, this card cannot be destroyed,
+  // all cards on your opponent's field must keep attacking alone if able, and when they do, change the target of the attacks to this card and deal 1 damage to your opponent!!"
+  // It used to be a plain act that was never offered in the defense window and only ran the generic text reader (no redirect, no damage, no lock).
+  OV42.push([3747, /\[overturn\]/i, () => ({ kind: "act", tags: ["kw:overturn", "counter"], trigger: null, once: "game", conds: [{ t: "underAttack" }], steps: [{ op: "r43AldoOverturn" }] })]);
+  OPS.r43AldoOverturn = {
+    run(s, ctx) {
+      const u = ctx.unit, f = ctx.f; if (!u) return false;
+      u.abxNo = Object.assign({}, u.abxNo, { destroyed: battle.turnCount });
+      f.abxAldoTurn = battle.turnCount; f.abxAldoUnit = u;
+      const bc = ABX.battleCtx, pos = core.posOfUnit(f, u);
+      if (bc && bc.active && pos && pos !== "item" && pos !== "item2") {   // the attack that is happening now
+        bc.redirectTo = pos;
+        core.applyDamage(otherSide(ctx.side), 1, { kind: "effect", sourceCard: ctx.card });
+        if (battle.checkWinCondition) battle.checkWinCondition();
+        if (battle.setPrompt) battle.setPrompt(`🎯 The attack's target was changed to "${ctx.card.name}" and the attacker takes 1 damage!`);
+      }
+      f.overturnUsed = true; fresh(); return true;
+    }, check: () => true
+  };
+  {
+    const aldoOn = (defSide) => { const fd = F(defSide); return fd && fd.abxAldoTurn === battle.turnCount && fd.abxAldoUnit && core.posOfUnit(fd, fd.abxAldoUnit) ? fd : null; };
+    const prevInit = battle.initiateAttackWithDefenseCheck;
+    if (typeof prevInit === "function") battle.initiateAttackWithDefenseCheck = function (side, zones, targetPos) {
+      const fd = aldoOn(otherSide(side));
+      if (fd) {
+        const pos = core.posOfUnit(fd, fd.abxAldoUnit);
+        if (Array.isArray(zones) && zones.length > 1) zones = zones.slice(0, 1);     // "must keep attacking alone"
+        if (pos && pos !== "item" && pos !== "item2" && (targetPos !== pos)) {
+          targetPos = pos;
+          core.applyDamage(side, 1, { kind: "effect", sourceCard: fd.abxAldoUnit.card });
+          if (battle.checkWinCondition) battle.checkWinCondition();
+          if (battle.matchOver) return;
+        } else if (pos && targetPos === pos) {
+          core.applyDamage(side, 1, { kind: "effect", sourceCard: fd.abxAldoUnit.card });
+          if (battle.checkWinCondition) battle.checkWinCondition();
+          if (battle.matchOver) return;
+        }
+      }
+      return prevInit.call(this, side, zones, targetPos);
+    };
+    const prevTog = battle.toggleLinkAttackerZone;
+    if (typeof prevTog === "function") battle.toggleLinkAttackerZone = function (side, zonePos) {
+      if (aldoOn(otherSide(side)) && !(this.linkAttackers || []).includes(zonePos) && (this.linkAttackers || []).length >= 1) {
+        if (battle.setPrompt) battle.setPrompt("Cards on your field must attack alone this turn (Aldo Athora)!");
+        return;
+      }
+      return prevTog.apply(this, arguments);
+    };
+  }
+  // #5677 Sunlight Aldo Athora [Overturn]: "for this turn all «Prism Dragon» on your field cannot be destroyed or leave the field by your opponent's card effects" was a no-op "static" step
+  // (only the defense+1000000 part worked). Reuses the per-unit "protected from the opponent's effects this turn" flag read in abilities_r39.js.
+  OPS.r43PrismProtect = { run(s, ctx) {
+    let n = 0;
+    core.fieldUnits(ctx.f, true).forEach(x => { if (x.unit && x.unit.card && hasTribe(x.unit.card, "PrismDragon")) { x.unit.abxGraceProtectedTurn = battle.turnCount; n++; } });
+    return true; }, check: () => true };
+  OV42.push([5677, /\[overturn\]/i, (ab) => ({ kind: "act", tags: ab.tags, conds: ab.conds, once: ab.once || "game", steps: (ab.steps || []).map(st => (st.op === "static" ? { op: "r43PrismProtect" } : st)) })]);
+  // #5578 Diablos Storm: "for this turn ... when a size 3 «Evil Demonic Dragon» monster on your field attacks, destroy up to one card on your opponent's field. If you do, drop 1 of your opponent's gauge."
+  // The parser left both clauses on the cast (they never fired on attack): keep the "cannot be reduced" part, arm the attack hook for the rest.
+  OPS.r43DiabloStorm = { run(s, ctx) { ctx.f.abxDiabloStorm = battle.turnCount; return true; }, check: () => true };
+  OV42.push([5578, /when a size 3/i, (ab) => ({ kind: "spell", steps: [clone(ab.steps[0]), { op: "r43DiabloStorm" }] })]);
+  {
+    const prevDS = ABX.fireAttack;
+    ABX.fireAttack = function (attSide, units, defSide, targetPos) {
+      const r = prevDS.apply(this, arguments);
+      try {
+        const f = F(attSide);
+        if (f && f.abxDiabloStorm === battle.turnCount) {
+          const hits = (units || []).filter(u => u && u.unit && core.matchFilter(u.unit.card, { tribes: ["Evil Demonic Dragon"], types: ["monster"], size: { n: 3, cmp: "eq" } }, { unit: u.unit, side: attSide }, { f })).length;
+          if (hits) {
+            const card = core.cardOf(5578);
+            const mk = () => ({ kind: "spell", steps: [{ op: "destroy", np: Object.assign(np({}, "field", null, "opp"), { qty: { n: 1, upTo: true, all: false, any: false, each: false } }) }, { op: "dropOppGauge", n: 1, upTo: false, gate: "ifYouDo" }] });
+            return ABX.queue(async () => { await r; for (let i = 0; i < hits; i++) await ABX.runAbility(attSide, card, mk(), null, { preApproved: true }); });
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return r;
+    };
+  }
+
   /* ==================== Stand lock coverage ==================== */
   // Ruling note: no official Q&A on Voltic Ra vs. Double Attack was found. Q1192 (Gojinmaru) calls the keyword's re-stand a "[Stand]", so a "cannot [Stand]"
   // lock stops [Double/Triple/Quadruple Attack] here. Set ABX.standLockStopsMultiAttack = false to allow them again.
