@@ -746,7 +746,10 @@
     B.checkWinCondition = function () {
       const saved = [];
       [B.plr, B.opp].forEach(f => { if (f && f.abxNoLose && f.life <= 0) { saved.push([f, f.life]); f.life = 1; } });
-      try { return ocw.apply(this, arguments); } finally { saved.forEach(([f, l]) => { f.life = l; }); }
+      // #3191 Asterism Effect: "(The game continues even if your life becomes 0 or your deck is empty.)"
+      const padded = [];
+      [B.plr, B.opp].forEach(f => { if (f && f.abxNoLose && Array.isArray(f.deck) && f.deck.length === 0) { f.deck.push(null); padded.push(f); } });
+      try { return ocw.apply(this, arguments); } finally { saved.forEach(([f, l]) => { f.life = l; }); padded.forEach(f => { const i = f.deck.lastIndexOf(null); if (i >= 0) f.deck.splice(i, 1); }); }
     };
   }
 

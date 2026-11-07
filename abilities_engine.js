@@ -180,7 +180,7 @@
 
   // stat of a card; if it is a unit on a field, use the effective (buffed) value.
   function statOf(card, unit, fighter, stat, original) {
-    if (stat === "size") return fighter && unit && !original ? getEffectiveCardSize(fighter, card) : (card.size == null ? 0 : card.size);
+    if (stat === "size") return fighter && unit && !original ? getEffectiveCardSize(fighter, card, unit) : (card.size == null ? 0 : card.size);
     if (unit && fighter && !original) {
       const e = getUnitEffectiveCombatStats(fighter, unit);
       return stat === "power" ? e.power : stat === "defense" ? e.defense : e.crit;
