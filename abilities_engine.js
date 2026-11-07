@@ -638,6 +638,8 @@
     if (unit.abxNo && LEAVE_KINDS.includes(kind) && (unit.abxNo["put to other areas"] === B.turnCount || unit.abxNo["leave the field"] === B.turnCount)) return true;
     const f = F(side);
     const byOppSide = ctx && ctx.side && ctx.side !== side;
+    // one-shot "for this turn, ... cannot be destroyed / returned / [Rest] ..." marks from a cast spell / [Act] / trigger (OPS.static protect in abilities_r42.js)
+    if (Array.isArray(unit.abxProt) && unit.abxProt.some(m => m.turn === B.turnCount && m.kinds.includes(kind) && (!m.byOpp || byOppSide))) return true;
     const sources = [];
     fieldUnits(f, true).forEach(x => {
       sources.push({ unit: x.unit, card: x.unit.card, host: null });

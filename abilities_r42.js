@@ -1032,6 +1032,28 @@
     core.fieldUnits(ctx.f, true).forEach(x => { if (x.unit && x.unit.card && hasTribe(x.unit.card, "PrismDragon")) { x.unit.abxGraceProtectedTurn = battle.turnCount; n++; } });
     return true; }, check: () => true };
   OV42.push([5677, /\[overturn\]/i, (ab) => ({ kind: "act", tags: ab.tags, conds: ab.conds, once: ab.once || "game", steps: (ab.steps || []).map(st => (st.op === "static" ? { op: "r43PrismProtect" } : st)) })]);
+  // One-shot protection ("For this turn, all «X» on your field cannot be destroyed / returned / [Rest] ... (by your opponent's card effects)") from a CAST spell, [Act] or trigger.
+  // The parser reads it as OPS.static protect, which only marks and did nothing for a spell that goes to the drop zone (80+ cards, audit 8 Nov). Marks the units for this turn;
+  // ABX.core.isProtected reads unit.abxProt. [Set] cards and "this card ..." self lines stay continuous (read from the field).
+  {
+    const prevStatic = OPS.static.run;
+    OPS.static.run = async function (s, ctx) {
+      try {
+        if (s && s.kind === "protect" && ctx && ctx.ab && ctx.ab.kind !== "static" && !(ctx.card && ctx.card.set) && !(s.self && !s.np) && (s.kinds || []).length) {
+          const kinds = s.kinds.slice();
+          const refs = s.self ? (ctx.unit ? [{ unit: ctx.unit }] : []) : core.refsFor(s.np, ctx, { owner: "you", area: "field" }).filter(r => r.unit);
+          let ch = refs;
+          const plural = !!(s.np && !/^(?:an? |one |up to |the |that |this |another )/i.test(String(s.np.raw || "")));   // "characters / monsters on your field" = all of them (the parser drops the "all")
+          if (!s.self && s.np && s.np.qty && !s.np.qty.all && !plural && !s.np.ref && refs.length > (s.np.qty.n || 1)) ch = (await core.pick(refs, s.np, ctx, { intent: "help", title: ctx.card.name + " \u2014 choose" })) || [];
+          else if (!s.self && s.np && s.np.ref) ch = (ctx.bind.chosen || []).filter(r => r.unit);
+          ch.forEach(r => { const u = r.unit; if (!u) return; u.abxProt = (u.abxProt || []).filter(m => m.turn === battle.turnCount); u.abxProt.push({ turn: battle.turnCount, kinds, byOpp: !!s.byOpp }); });
+          fresh();
+          if (ch.length) return true;
+        }
+      } catch (e) { if (ABX.debug) console.error(e); }
+      return prevStatic.apply(this, arguments);
+    };
+  }
   // #5578 Diablos Storm: "for this turn ... when a size 3 «Evil Demonic Dragon» monster on your field attacks, destroy up to one card on your opponent's field. If you do, drop 1 of your opponent's gauge."
   // The parser left both clauses on the cast (they never fired on attack): keep the "cannot be reduced" part, arm the attack hook for the rest.
   OPS.r43DiabloStorm = { run(s, ctx) { ctx.f.abxDiabloStorm = battle.turnCount; return true; }, check: () => true };
