@@ -4873,7 +4873,7 @@
   if (ABX.fireAttack) {
     const faPrev = ABX.fireAttack;
     ABX.fireAttack = function (attSide, units) {
-      (units || []).forEach(u => { if (u && u.abxWatch && u.abxWatch.length) fireWatch(u, "attack"); });
+      (units || []).forEach(w => { const u = w && (w.unit || w); if (u && u.abxWatch && u.abxWatch.length) fireWatch(u, "attack"); });
       return faPrev.apply(this, arguments);
     };
   }
@@ -4882,6 +4882,55 @@
   watchOv(2016, /if that card is destroyed, put the top card/i, "choose a monster on your opponent's field", "destroyed", "put the top card of your deck into your gauge, and draw a card");
   watchOv(2977, /when that card attacks, destroy a size 1/i, "choose a monster on your field", "attack", "destroy a size 1 or less monster on your opponent's field and put the top card of your deck into your gauge");
 
+
+  /* ---- [r42] Life-total family: #36 #199 (life would become 0), #285 (floor at 1), #2424, #5385 (win at 22 life), #5573 (life 6 or less) ---- */
+  // #199 Miracle Revival (item) / #36 (Set spell): "If your life would become 0, ..." - not wired to the life-zero check before
+  if (ABX.lifeZeroSave) {
+    const lzPrev = ABX.lifeZeroSave;
+    ABX.lifeZeroSave = function (side) {
+      if (lzPrev.apply(this, arguments)) return true;
+      const f = F(side); if (f.life > 0 || B.matchOver) return false;
+      const idOf = (x) => (x && x.id !== undefined && typeof x === "object") ? x.id : x;
+      if (f.item && !f.item.isEndrulerFlag && f.item.card.id === 199 && f.item.abxNullified !== B.turnCount) {
+        // put this card into the drop zone, reveal the top card of your deck and discard it; if it is a spell, your life becomes 3
+        f.drop.push(f.item.card.id); (f.item.soul || []).forEach(x => f.drop.push(idOf(x))); f.item = null;
+        if (f.deck.length) { const top = f.deck.shift(); f.drop.push(top); const c = core.cardOf(top); if (c && c.type === "Spell") { f.life = 3; fresh(); return true; } }
+        fresh();
+      }
+      const si = (f.setSpells || []).findIndex(sp => sp && (sp.id === 36 || (sp.card && sp.card.id === 36)));
+      if (si >= 0) {
+        // reveal all cards in this card's soul; if there is a spell among them, your life becomes 2 and you draw a card; destroy this card
+        const sp = f.setSpells[si], souls = (sp.soul || []).map(idOf);
+        const hit = souls.some(id => { const c = core.cardOf(id); return c && c.type === "Spell"; });
+        f.setSpells.splice(si, 1); f.drop.push(sp.id !== undefined ? sp.id : sp.card.id); souls.forEach(id => f.drop.push(id));
+        if (hit) { f.life = 2; if (f.deck.length) f.hand.push(f.deck.shift()); fresh(); return true; }
+        fresh();
+      }
+      return false;
+    };
+  }
+  // #285 Deal 2 damage; if the opponent's life would become 0 due to this damage, it becomes 1 instead
+  OPS.r42DamageFloor1 = { run(s, ctx) { const e = ctx.e, before = e.life; core.applyDamage(ctx.side === "plr" ? "opp" : "plr", s.n, { kind: "effect" }); if (e.life <= 0 && before > 0) e.life = 1; fresh(); return true; }, check: () => true };
+  OV42.push([285, /if your opponent's life would become 0 due to this damage/i, (ab) => ({ kind: ab.kind || "spell", tags: ab.tags, conds: ab.conds || [], steps: [{ op: "r42DamageFloor1", n: 2 }] })]);
+  // #2424 You gain 2 life. If your opponent's life is more than yours by 4 or more, you gain 6 life
+  OPS.r42LifeCatchup = { run(s, ctx) { ctx.f.life += 2; if (ctx.e.life - ctx.f.life >= 4) ctx.f.life += 6; fresh(); return true; }, check: () => true };
+  OV42.push([2424, /more than yours by 4 or more/i, (ab) => ({ kind: ab.kind || "spell", tags: ab.tags, conds: ab.conds || [], steps: [{ op: "r42LifeCatchup" }] })]);
+  // #5385 "if your life is 22 or greater, you win the fight"
+  OPS.r42WinIfLife = { run(s, ctx) { if (ctx.f.life < s.n) return false; const st = parseS("you win the fight")[0]; return st && OPS[st.op] ? OPS[st.op].run(st, ctx) : false; }, check: () => true };
+  OV42.push([5385, /if your life is 22 or greater/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42WinIfLife", n: 22 }] })]);
+  // #5573 "choose a monster on your opponent's field, destroy the chosen card. If your life is 6 or less, drop all souls of the chosen card instead, and destroy that card"
+  OPS.r42DestroyDropSouls = {
+    async run(s, ctx) {
+      const e = ctx.e, es = ctx.side === "plr" ? "opp" : "plr";
+      const cands = ["left", "center", "right"].filter(p => e.monsters[p]).map(p => ({ k: "unit", side: es, pos: p, unit: e.monsters[p], card: e.monsters[p].card, id: e.monsters[p].card.id }));
+      if (!cands.length) return false;
+      const ch = await core.pick(cands, { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", title: `${ctx.card.name} - choose an opponent's monster` });
+      const t = ch && ch[0]; if (!t) return false;
+      if (ctx.f.life <= s.life) { (t.unit.soul || []).splice(0).forEach(x => e.drop.push(x && x.id !== undefined && typeof x === "object" ? x.id : x)); }
+      battle.destroyMonster(es, t.pos); fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([5573, /if your life is 6 or less, drop all souls/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42DestroyDropSouls", life: 6 }] })]);
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

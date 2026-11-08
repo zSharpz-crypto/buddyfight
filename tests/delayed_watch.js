@@ -23,7 +23,7 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #2977 Hero World spell: chosen own monster attacks this turn -> destroy a size 1 or less opposing monster, +1 gauge
   run(`{ const me=setup(2977); op=battle.opp; op.monsters.left=mk(CARD_MAP.get(1054)); globalThis.__g=me.gauge.length; battle.castSpellFromHand('plr',0); }`); await settle();
   ck("2977 cast: nothing destroyed yet", val(`return !!battle.opp.monsters.left && !!battle.opp.monsters.center`), val(`return 0`));
-  run(`{ ABX.fireAttack('plr',[battle.plr.monsters.center],'opp','center'); }`); await settle();
+  run(`{ ABX.fireAttack('plr',[{unit:battle.plr.monsters.center,pos:'center'}],'opp','center'); }`); await settle();
   ck("2977: when the chosen monster attacks, a size 1 opposing monster is destroyed and gauge +1", val(`return ['left','center','right'].filter(p=>battle.opp.monsters[p]).length===1 && battle.plr.gauge.length===__g+1`), val(`return [['left','center','right'].filter(p=>battle.opp.monsters[p]).length, battle.plr.gauge.length, __g]`));
   console.log("pass", pass, "fail", fail);
 })();
