@@ -38,5 +38,9 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #3968: Set spell dropped -> Lifelink of size 3 monsters nullified (others unaffected)
   run(`{ const me=setup(); const sp=Object.assign({},CARD_MAP.get(3968)); me.setSpells=[sp]; ABX.runAbility('plr',sp,abOf(3968,'r42TurnNullify'),null,{auto:true}); }`); await settle();
   ck("3968: Set spell dropped; only size 3 lose Lifelink", val(`return battle.plr.setSpells.length===0 && ABX.lifelinkReduce('plr',CARD_MAP.get(size3))>=99 && ABX.lifelinkReduce('plr',CARD_MAP.get(monId))<99`), val(`return [battle.plr.setSpells.length, ABX.lifelinkReduce('plr',CARD_MAP.get(size3))]`));
+  // #3218: chosen Adventurer can attack through a center monster this turn
+  const adv = val(`return ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('Adventurer')).id`);
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(3218)); me.monsters.left=mk(CARD_MAP.get(${adv})); me.monsters.right=mk(CARD_MAP.get(1054)); globalThis.__g=me.gauge.length; ABX.runAbility('plr',CARD_MAP.get(3218),abOf(3218,'r42ThroughUnit'),me.monsters.center,{auto:true}); }`); await settle();
+  ck("3218: Adventurer can attack through, 1 gauge paid, others cannot", val(`const me=battle.plr; return ABX.canAttackThrough('plr',me.monsters.left,'opp')===true && me.gauge.length===__g-1 && !ABX.canAttackThrough('plr',me.monsters.right,'opp')`), val(`return [ABX.canAttackThrough('plr',battle.plr.monsters.left,'opp'), battle.plr.gauge.length, __g]`));
   console.log("pass", pass, "fail", fail);
 })();

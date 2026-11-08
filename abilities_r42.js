@@ -5132,6 +5132,22 @@
   tbOv(1515, /if you have a size 3 monster on your field, you may discard this card from your hand/i, "r42TurnNullify", "lifelinkHandSize3");
   tbOv(2478, /put this card from your field into your drop zone\. If you do, for this turn, nullify the \[penetrate\]/i, "r42TurnNullify", "penetrateItemDrop");
   tbOv(3968, /put this card from the field into the drop zone\. If you do, for this turn, nullify the \[lifelink\]/i, "r42TurnNullify", "lifelinkSet3");
+
+  // #3218 Shadow Dive: choose an Adventurer on your field, you may pay 1 gauge; for this turn that card can attack even if there is a monster in the opponent's center
+  OPS.r42ThroughUnit = {
+    async run(s, ctx) {
+      const f = ctx.f, c = ownMonsters(ctx, null).filter(r => (r.card.attrs || []).some(a => a.replace(/\s+/g, "").toLowerCase() === "adventurer"));
+      if (!c.length || f.gauge.length < 1) return false;
+      const ch = await core.pick(c, { qty: { n: 1, upTo: false } }, ctx, { intent: "help", min: 1, title: `${ctx.card.name} - choose an Adventurer` }), t = ch && ch[0]; if (!t) return false;
+      f.drop.push(f.gauge.pop()); t.unit.abxThroughUnit = B.turnCount; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([3218, /choose an adventurer on your field/i, (ab) => ({ kind: ab.kind, tags: ab.tags, once: ab.once, conds: ab.conds || [], steps: [{ op: "r42ThroughUnit" }] })]);
+  const prevCAT4 = ABX.canAttackThrough;
+  ABX.canAttackThrough = function (side, unit, which) {
+    if (prevCAT4 && prevCAT4.apply(this, arguments)) return true;
+    return !!(which !== "own" && unit && unit.abxThroughUnit === B.turnCount);
+  };
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
