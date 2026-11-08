@@ -25,5 +25,27 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("2977 cast: nothing destroyed yet", val(`return !!battle.opp.monsters.left && !!battle.opp.monsters.center`), val(`return 0`));
   run(`{ ABX.fireAttack('plr',[{unit:battle.plr.monsters.center,pos:'center'}],'opp','center'); }`); await settle();
   ck("2977: when the chosen monster attacks, a size 1 opposing monster is destroyed and gauge +1", val(`return ['left','center','right'].filter(p=>battle.opp.monsters[p]).length===1 && battle.plr.gauge.length===__g+1`), val(`return [['left','center','right'].filter(p=>battle.opp.monsters[p]).length, battle.plr.gauge.length, __g]`));
+  // ---- part 2 ----
+  const pk = val(`return ALL_CARDS.find(c=>c.type==='Monster'&&/Purgatory Knights/.test(c.name)).id`);
+  // #2233: next time the chosen Purgatory Knights would be destroyed -> back to hand, top deck card to gauge (only once)
+  run(`{ const me=setup(2233); me.monsters.left=mk(CARD_MAP.get(${pk})); globalThis.__g=me.gauge.length; battle.castSpellFromHand('plr',0); }`); await settle();
+  run(`battle.destroyMonster('plr','left')`); await settle();
+  ck("2233: destroyed -> returns to hand and gauge +1", val(`return !battle.plr.monsters.left && battle.plr.hand.includes(${pk}) && battle.plr.gauge.length===__g+1 && !battle.plr.drop.includes(${pk})`), val(`return [!!battle.plr.monsters.left, battle.plr.hand, battle.plr.gauge.length, __g, battle.plr.drop]`));
+  // #2598: remains on the field the next time the opponent destroys it; own effects don't count
+  run(`{ const me=setup(2598); me.monsters.center=null; me.monsters.left=mk(CARD_MAP.get(1054)); battle.activeSide='opp'; battle.turn='opp'; battle.castSpellFromHand('plr',0); }`); await settle();
+  run(`battle.destroyMonster('plr','left')`); await settle();
+  ck("2598: opponent's destruction -> it remains on the field", val(`return !!battle.plr.monsters.left`), val(`return [!!battle.plr.monsters.left, battle.plr.drop]`));
+  run(`battle.destroyMonster('plr','left')`); await settle();
+  ck("2598: only the next time (second destruction works)", val(`return !battle.plr.monsters.left`), 0);
+  // #5865: damage by card effects reduced to 0, 1 damage back per damage reduced (once)
+  run(`{ const me=setup(5865); me.monsters.center=mk(CARD_MAP.get(5865)); ABX.runAbility('plr',CARD_MAP.get(5865),ABX.parseCard(CARD_MAP.get(5865)).abilities.find(a=>(a.steps||[]).some(x=>x.op==='r42DmgShield')),me.monsters.center,{auto:true}); }`); await settle();
+  run(`ABX.core.applyDamage('plr',3,{kind:'effect'})`); await settle();
+  ck("5865: 3 effect damage -> I take 0, opponent takes 3", val(`return battle.plr.life===10 && battle.opp.life===7`), val(`return [battle.plr.life, battle.opp.life]`));
+  run(`ABX.core.applyDamage('plr',2,{kind:'effect'})`); await settle();
+  ck("5865: only the next time (second damage lands)", val(`return battle.plr.life===8`), val(`return battle.plr.life`));
+  // #1426: chosen monster attacks a monster -> a soul card goes to the drop zone, then the attacked monster is destroyed
+  run(`{ const me=setup(1426); me.monsters.center=mk(CARD_MAP.get(1054)); const t=mk(CARD_MAP.get(1054)); t.soul=[1054]; battle.opp.monsters.center=t; battle.castSpellFromHand('plr',0); }`); await settle();
+  run(`ABX.fireAttack('plr',[{unit:battle.plr.monsters.center,pos:'center'}],'opp','center')`); await settle();
+  ck("1426: attacked monster loses a soul to the drop zone and is destroyed", val(`return !battle.opp.monsters.center && battle.opp.drop.filter(i=>i===1054).length>=2`), val(`return [!!battle.opp.monsters.center, battle.opp.drop]`));
   console.log("pass", pass, "fail", fail);
 })();

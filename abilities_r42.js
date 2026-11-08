@@ -4857,9 +4857,10 @@
       return true;
     }, check: () => true
   };
-  const fireWatch = (unit, ev) => {
+  const watchFns = {};
+  const fireWatch = (unit, ev, extra) => {
     const ws = (unit && unit.abxWatch || []).filter(w => w.ev === ev && w.turn === B.turnCount);
-    ws.forEach(w => { if (w.once) unit.abxWatch.splice(unit.abxWatch.indexOf(w), 1); ABX.runAbility(w.side, w.card, { kind: "triggered", conds: [], steps: w.steps.map(clone) }, null, { auto: true }); });
+    ws.forEach(w => { if (w.once) unit.abxWatch.splice(unit.abxWatch.indexOf(w), 1); if (w.fn) { try { watchFns[w.fn](w, unit, extra || {}); } catch (e) { if (ABX.debug) console.error(e); } return; } ABX.runAbility(w.side, w.card, { kind: "triggered", conds: [], steps: w.steps.map(clone) }, null, { auto: true }); });
   };
   if (typeof B.destroyMonster === "function") {
     const dmPrev = B.destroyMonster;
@@ -4872,8 +4873,8 @@
   }
   if (ABX.fireAttack) {
     const faPrev = ABX.fireAttack;
-    ABX.fireAttack = function (attSide, units) {
-      (units || []).forEach(w => { const u = w && (w.unit || w); if (u && u.abxWatch && u.abxWatch.length) fireWatch(u, "attack"); });
+    ABX.fireAttack = function (attSide, units, defSide, targetPos) {
+      (units || []).forEach(w => { const u = w && (w.unit || w); if (u && u.abxWatch && u.abxWatch.length) fireWatch(u, "attack", { attSide, defSide, targetPos }); });
       return faPrev.apply(this, arguments);
     };
   }
@@ -5147,6 +5148,53 @@
   ABX.canAttackThrough = function (side, unit, which) {
     if (prevCAT4 && prevCAT4.apply(this, arguments)) return true;
     return !!(which !== "own" && unit && unit.abxThroughUnit === B.turnCount);
+  };
+
+  /* ---- [r42] Delayed one-shot family, part 2: #1426 #2233 #2598 #5865 ---- */
+  // #1426: this turn, when the chosen monster attacks an opposing monster: put a card from the attacked monster's soul into the drop zone, then destroy it
+  watchFns.attackedSoulDestroy = (w, unit, x) => {
+    if (!["left", "center", "right"].includes(x.targetPos)) return;
+    const d = F(x.defSide).monsters[x.targetPos]; if (!d) return;
+    if ((d.soul || []).length) F(x.defSide).drop.push(sidOf(d.soul.pop()));
+    battle.destroyMonster(x.defSide, x.targetPos);
+  };
+  OPS.r42WatchFn = { run(s, ctx) { const ch = (ctx.bind.chosen || []).filter(r => r.unit); if (!ch.length) return false; ch.forEach(r => { (r.unit.abxWatch = r.unit.abxWatch || []).push({ turn: B.turnCount, ev: s.ev, fn: s.fn, side: ctx.side, card: ctx.card, once: true }); }); return true; }, check: () => true };
+  OV42.push([1426, /when that monster attacks your opponent's monster/i, (ab) => ({ kind: ab.kind || "spell", tags: ab.tags, conds: ab.conds || [], steps: [...parseS("choose a monster on your field"), { op: "r42WatchFn", ev: "attack", fn: "attackedSoulDestroy" }] })]);
+  // #2233 / #2598: "the next time that card would be destroyed ..." replacement saves
+  OPS.r42SaveRepl = { run(s, ctx) { const ch = (ctx.bind.chosen || []).filter(r => r.unit); if (!ch.length) return false; ch.forEach(r => { r.unit.abxSaveRepl = { turn: B.turnCount, mode: s.mode, gauge: !!s.gauge, oppOnly: !!s.oppOnly, side: ctx.side }; }); return true; }, check: () => true };
+  if (ABX.wouldLeaveSave) {
+    const wlsPrev = ABX.wouldLeaveSave;
+    ABX.wouldLeaveSave = function (side, pos, unit, byAttack) {
+      if (wlsPrev.apply(this, arguments)) return true;
+      const r = unit && unit.abxSaveRepl;
+      if (!r || r.turn !== B.turnCount) return false;
+      if (r.oppOnly && B.activeSide === side && !byAttack) return false;   // only the opponent's card effects / attacks
+      unit.abxSaveRepl = null;
+      if (r.mode === "hand") {
+        const f = F(side); if (!pos || f.monsters[pos] !== unit) return false;
+        f.monsters[pos] = null; f.hand.push(unit.card.id); (unit.soul || []).forEach(x => f.drop.push(sidOf(x)));
+        if (r.gauge && f.deck.length) f.gauge.push(f.deck.shift());
+        fresh();
+      }
+      return true;
+    };
+  }
+  OV42.push([2233, /the next time that card would be destroyed, return that card into your hand/i, (ab) => ({ kind: ab.kind || "spell", tags: ab.tags, conds: ab.conds || [], steps: [...parseS("choose a monster with \"Purgatory Knights\" in its card name on your field"), { op: "r42SaveRepl", mode: "hand", gauge: true }] })]);
+  OV42.push([2598, /the next time that card would be destroyed by your opponent's card or returned to your hand/i, (ab) => ({ kind: ab.kind || "spell", tags: ab.tags, conds: ab.conds || [], steps: [...parseS("choose a card on your field"), { op: "r42SaveRepl", mode: "stay", oppOnly: true }] })]);
+  // #5865: for this turn, the next time you would take damage by card effects and this card is on your field, it is reduced to 0, and deal 1 damage to your opponent for each damage reduced
+  OPS.r42DmgShield = { run(s, ctx) { ctx.f.abxDmgShield = { turn: B.turnCount, unit: ctx.unit, card: ctx.card.id }; return true; }, check: () => true };
+  OV42.push([5865, /the next time you would take damage by card effects/i, (ab) => ({ kind: ab.kind || "act", tags: ab.tags, conds: ab.conds || [], steps: [{ op: "r42DmgShield" }] })]);
+  const adPrev5865 = core.applyDamage;
+  core.applyDamage = function (side, n, src) {
+    try {
+      const f = F(side), sh = f.abxDmgShield;
+      if (sh && sh.turn === B.turnCount && n > 0 && src && src.kind === "effect" && !src.unreducible && ["left", "center", "right", "item"].some(p => (p === "item" ? f.item : f.monsters[p]) && (p === "item" ? f.item : f.monsters[p]).card.id === sh.card)) {
+        f.abxDmgShield = null;
+        adPrev5865.call(this, side === "plr" ? "opp" : "plr", n, { kind: "effect" });
+        return 0;
+      }
+    } catch (e) { /* ignore */ }
+    return adPrev5865.apply(this, arguments);
   };
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
