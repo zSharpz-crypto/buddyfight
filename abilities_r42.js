@@ -4847,6 +4847,41 @@
     };
     OV42.push([5209, /three or more .{0,3}junior detective league/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: [], steps: [{ op: "r42DetectiveLock" }] })]);
   }
+  /* ---- [r42] Delayed one-shot watches: "Choose a monster ... For this turn, when that monster is destroyed / attacks, <effect>" ----
+   * OPS.r42Watch stores {turn, ev, steps, side, card} on each chosen unit; wrappers on battle.destroyMonster and ABX.fireAttack run it. */
+  OPS.r42Watch = {
+    run(s, ctx) {
+      const ch = (ctx.bind && ctx.bind.chosen || []).filter(r => r.unit);
+      if (!ch.length) return false;
+      ch.forEach(r => { (r.unit.abxWatch = r.unit.abxWatch || []).push({ turn: B.turnCount, ev: s.ev, steps: s.steps, side: ctx.side, card: ctx.card, once: !!s.once }); });
+      return true;
+    }, check: () => true
+  };
+  const fireWatch = (unit, ev) => {
+    const ws = (unit && unit.abxWatch || []).filter(w => w.ev === ev && w.turn === B.turnCount);
+    ws.forEach(w => { if (w.once) unit.abxWatch.splice(unit.abxWatch.indexOf(w), 1); ABX.runAbility(w.side, w.card, { kind: "triggered", conds: [], steps: w.steps.map(clone) }, null, { auto: true }); });
+  };
+  if (typeof B.destroyMonster === "function") {
+    const dmPrev = B.destroyMonster;
+    B.destroyMonster = function (side, pos) {
+      const u = F(side).monsters[pos], had = u && u.abxWatch && u.abxWatch.length;
+      const r = dmPrev.apply(this, arguments);
+      if (had && F(side).monsters[pos] !== u) fireWatch(u, "destroyed");
+      return r;
+    };
+  }
+  if (ABX.fireAttack) {
+    const faPrev = ABX.fireAttack;
+    ABX.fireAttack = function (attSide, units) {
+      (units || []).forEach(u => { if (u && u.abxWatch && u.abxWatch.length) fireWatch(u, "attack"); });
+      return faPrev.apply(this, arguments);
+    };
+  }
+  const watchOv = (id, re, chooseText, ev, effect) => OV42.push([id, re, (ab) => ({ kind: ab.kind || "spell", tags: ab.tags, once: ab.once, conds: ab.conds || [], steps: [...parseS(chooseText), { op: "r42Watch", ev, steps: parseS(effect) }] })]);
+  watchOv(1440, /when that monster is destroyed, draw a card/i, "choose a monster on your opponent's field", "destroyed", "draw a card and you gain 1 life");
+  watchOv(2016, /if that card is destroyed, put the top card/i, "choose a monster on your opponent's field", "destroyed", "put the top card of your deck into your gauge, and draw a card");
+  watchOv(2977, /when that card attacks, destroy a size 1/i, "choose a monster on your field", "attack", "destroy a size 1 or less monster on your opponent's field and put the top card of your deck into your gauge");
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
