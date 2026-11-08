@@ -4907,4 +4907,11 @@
   };
   root.evaluateCardConditions = wrapped;
   try { if (typeof globalThis !== "undefined") globalThis.evaluateCardConditions = wrapped; } catch (e) { /* ignore */ }
+
+  /* ---- [r42] Fragment clauses that carry no effect of their own: the "once per turn" limit is already applied as ability.once, and [Counterattack] is a reminder keyword ---- */
+  ABX.ACTION_RULES.unshift(
+    [/^\[counterattack\]$/i, () => ({ op: "noop", note: "reminder keyword" }), false],
+    [/^(?:"[^"]+"|this card|this ability|[^"]{1,60}?) (?:can|may) only be (?:used|activated)$/i, () => ({ op: "noop", note: "once-per-turn limit is ability.once" }), false]
+  );
+  if (ABX.resetCaches) ABX.resetCaches();
 })(typeof window !== "undefined" ? window : globalThis);
