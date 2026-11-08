@@ -5070,6 +5070,68 @@
   soOv(2596, /put cards from the soul of this card on the bottom of your deck/i, "soulToDeckBottomDestroy", null, true);
   soOv(264, /you may look at this card's soul, and reveal it/i, "secretSoulReveal", null, true);
   soOv(6417, /put up to one .weaponry. from your deck into your hand or this card's soul/i, "deckTribeSoulOrHand", { step: { tribe: "Weaponry" } }, true);
+
+  /* ---- [r42] "If you do, for this turn, ..." family: add stats of a discarded/dropped card (#3 #312 #4196), nullify [Lifelink]/[Penetrate] this turn (#1515 #2478 #3968) ---- */
+  const prevLLR = ABX.lifelinkReduce;
+  ABX.lifelinkReduce = function (side, card) {
+    const r = prevLLR ? prevLLR.apply(this, arguments) : 0;
+    try { const nl = F(side).abxNoLL; if (card && nl && nl.turn === B.turnCount && (!nl.size || card.size === nl.size)) return 99; } catch (e) { /* ignore */ }
+    return r;
+  };
+  if (typeof root.getUnitEffectiveCombatStats === "function") {
+    const gsPrev = root.getUnitEffectiveCombatStats;
+    const gsWrap = function (fighter, unit) { const st = gsPrev.apply(this, arguments); if (st && st.pen && root.abxNoPenTurn === B.turnCount) st.pen = false; return st; };
+    root.getUnitEffectiveCombatStats = gsWrap;
+    try { if (typeof globalThis !== "undefined") globalThis.getUnitEffectiveCombatStats = gsWrap; } catch (e) { /* ignore */ }
+  }
+  OPS.r42TurnBoost = {
+    async run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u) return false;
+      if (s.mode === "dropOwnAddCrit") {   // #3: may put one of your monsters from the field into the drop zone; add its critical to this card
+        const c = ownMonsters(ctx, null).filter(r => r.unit !== u); if (!c.length) return false;
+        const ch = await core.pick(c, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - put a monster into the drop zone` }), t = ch && ch[0]; if (!t) return false;
+        const crit = critOf(ctx.side, t.unit); battle.destroyMonster(ctx.side, t.pos);
+        const i = f.drop.lastIndexOf(t.id); if (i < 0 && F(ctx.side).monsters[t.pos] === null) { /* destroyed into the drop zone */ }
+        u.tempCrit = (u.tempCrit || 0) + crit; fresh(); return true;
+      }
+      if (s.mode === "discardAddStats") {   // #312 / #4196: may discard a hand card; add its power, defense and critical to this card
+        if (!f.hand.length) return false;
+        const c = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) }));
+        const ch = await core.pick(c, { qty: { n: 1, upTo: true } }, ctx, { intent: "cost", min: 0, title: `${ctx.card.name} - discard a card` }), r = ch && ch[0]; if (!r) return false;
+        const i = f.hand.indexOf(r.id); f.hand.splice(i, 1); f.drop.push(r.id); if (ABX.fireDiscarded) ABX.fireDiscarded(ctx.side, r.card);
+        u.tempPower = (u.tempPower || 0) + (r.card.power || 0); u.tempDef = (u.tempDef || 0) + (r.card.defense || 0); u.tempCrit = (u.tempCrit || 0) + (r.card.crit || 0);
+        fresh(); return true;
+      }
+      return false;
+    }, check: () => true
+  };
+  OPS.r42TurnNullify = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      if (s.mode === "lifelinkHandSize3") {   // #1515: with a size 3 monster on your field, discard this card from your hand and pay 1 life
+        if (!ownMonsters(ctx, null).some(r => r.card.size === 3) || f.life <= 1) return false;
+        const sr = ctx.selfRef; if (!sr || sr.area !== "hand") return false;
+        const i = f.hand[sr.idx] === sr.id ? sr.idx : f.hand.indexOf(sr.id); if (i < 0) return false;
+        f.hand.splice(i, 1); f.drop.push(sr.id); f.life -= 1; f.abxNoLL = { turn: B.turnCount, size: 0 }; fresh(); return true;
+      }
+      if (s.mode === "penetrateItemDrop") {   // #2478: put this card from your field into the drop zone
+        if (!f.item || f.item.card.id !== ctx.card.id) return false;
+        f.drop.push(f.item.card.id); (f.item.soul || []).forEach(x => f.drop.push(sidOf(x))); f.item = null; root.abxNoPenTurn = B.turnCount; fresh(); return true;
+      }
+      if (s.mode === "lifelinkSet3") {   // #3968: put this Set spell into the drop zone; size 3 monsters on your field lose [Lifelink]
+        const i = (f.setSpells || []).indexOf(ctx.card); if (i < 0) return false;
+        f.setSpells.splice(i, 1); f.drop.push(ctx.card.id !== undefined ? ctx.card.id : ctx.card.card.id); f.abxNoLL = { turn: B.turnCount, size: 3 }; fresh(); return true;
+      }
+      return false;
+    }, check: () => true
+  };
+  const tbOv = (id, re, op, mode) => OV42.push([id, re, (ab) => ({ kind: ab.kind, tags: ab.tags, once: ab.once, trigger: ab.trigger, conds: ab.conds || [], steps: [{ op, mode }] })]);
+  tbOv(3, /put one of your monster from the field into the drop zone/i, "r42TurnBoost", "dropOwnAddCrit");
+  tbOv(312, /add to this card the power, defense and critical of the card discarded/i, "r42TurnBoost", "discardAddStats");
+  tbOv(4196, /increase this card's power, defense, and critical by those of the discarded card/i, "r42TurnBoost", "discardAddStats");
+  tbOv(1515, /if you have a size 3 monster on your field, you may discard this card from your hand/i, "r42TurnNullify", "lifelinkHandSize3");
+  tbOv(2478, /put this card from your field into your drop zone\. If you do, for this turn, nullify the \[penetrate\]/i, "r42TurnNullify", "penetrateItemDrop");
+  tbOv(3968, /put this card from the field into the drop zone\. If you do, for this turn, nullify the \[lifelink\]/i, "r42TurnNullify", "lifelinkSet3");
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
