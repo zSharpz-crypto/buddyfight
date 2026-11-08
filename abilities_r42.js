@@ -4996,6 +4996,80 @@
   cdOv(3749, /equal to 2 plus the number of times your opponent's cards attacked/i, "attackCount", [{ op: "lifeLock" }]);
   cdOv(4267, /equal to 2 plus the number of monsters your cards destroyed/i, "killCount");
   cdOv(4600, /equal to the total critical of all attacking monsters/i, "attackersCrit");
+
+  /* ---- [r42] "this card's soul" family: #264 #2029 #2596 #3019 #3508 #6417 ---- */
+  const soulHost = (ctx) => ctx.unit || ((ctx.f.setSpells || []).includes(ctx.card) ? ctx.card : null);
+  const sidOf = (x) => (x && typeof x === "object" && x.id !== undefined ? x.id : x);
+  const chooseOne = async (ctx, title, labels) => {
+    if (ctx.auto || ABX.autoPlay || ctx.f.isBot || !(ABX.ui && ABX.ui.pickOption)) return 1;   // auto-play: the hand option (index 1)
+    return ABX.ui.pickOption({ title: `${ctx.card.name} - ${title}`, options: labels.map(l => ({ label: l })) });
+  };
+  OPS.r42SoulOps = {
+    async run(s, ctx) {
+      const f = ctx.f, e = ctx.e, host = soulHost(ctx), es = oppSideOf(ctx);
+      switch (s.mode) {
+        case "dropToSoulSides": {   // #2029: only when this card enters on your left or right
+          const pos = ["left", "center", "right"].find(p => f.monsters[p] === ctx.unit);
+          if (!host || !pos || pos === "center" || !f.drop.length) return false;
+          const c = f.drop.map((id, idx) => ({ k: "zone", side: ctx.side, area: "drop", idx, id, card: core.cardOf(id) }));
+          const ch = await core.pick(c, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - put into its soul` }), r = ch && ch[0];
+          if (!r) return false; f.drop.splice(f.drop.indexOf(r.id), 1); host.soul = host.soul || []; host.soul.push(r.id); fresh(); return true;
+        }
+        case "lookTopSoulOrHand": {   // #3019
+          if (!f.deck.length) return false;
+          const id = f.deck.shift(), pick = await chooseOne(ctx, `top card: ${core.cardOf(id).name}`, ["Put it into this card's soul", "Put it into your hand"]);
+          if (pick === 0 && host) { host.soul = host.soul || []; host.soul.push(id); } else f.hand.push(id);
+          fresh(); return true;
+        }
+        case "millThreeThenOne": {   // #3508
+          const top = f.deck.splice(0, 3); if (!top.length) return false; top.forEach(id => f.drop.push(id));
+          const c = top.map(id => ({ k: "zone", side: ctx.side, area: "drop", idx: f.drop.lastIndexOf(id), id, card: core.cardOf(id) }));
+          const ch = await core.pick(c, { qty: { n: 1, upTo: false } }, ctx, { intent: "help", min: 1, title: `${ctx.card.name} - choose one of the milled cards` }), r = ch && ch[0]; if (!r) return true;
+          const pick = await chooseOne(ctx, `${r.card.name}`, ["Put it into this card's soul", "Put it into your hand"]);
+          const i = f.drop.lastIndexOf(r.id); if (i >= 0) f.drop.splice(i, 1);
+          if (pick === 0 && host) { host.soul = host.soul || []; host.soul.push(r.id); } else f.hand.push(r.id);
+          fresh(); return true;
+        }
+        case "soulToDeckBottomDestroy": {   // #2596: bottom-of-deck cost must reach the critical of the chosen card, then destroy it
+          const cands = [...["left", "center", "right"].filter(p => e.monsters[p]).map(p => ({ k: "unit", side: es, pos: p, unit: e.monsters[p], card: e.monsters[p].card, id: e.monsters[p].card.id })), ...(e.item && !e.item.isEndrulerFlag ? [{ k: "item", side: es, pos: "item", unit: e.item, card: e.item.card, id: e.item.card.id }] : [])]
+            .filter(r => host && (host.soul || []).length >= Math.max(1, critOf(es, r.unit)));
+          if (!cands.length) return false;
+          const ch = await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { intent: "harm", min: 0, title: `${ctx.card.name} - destroy (pay souls equal to its critical)` }), t = ch && ch[0]; if (!t) return false;
+          const n = Math.max(1, critOf(es, t.unit)); for (let i = 0; i < n; i++) f.deck.push(sidOf(host.soul.pop()));
+          if (t.pos === "item") { e.drop.push(t.unit.card.id); e.item = null; } else battle.destroyMonster(es, t.pos);
+          fresh(); return true;
+        }
+        case "secretSoulReveal": {   // #264: reveal the face-down soul card; same size as the monster that entered -> destroy it and deal 2; then destroy this card
+          if (!host || !(host.soul || []).length) return false;
+          const rev = core.cardOf(sidOf(host.soul[0])), ev = ctx.event && ctx.event.unit, entered = ev && ev.card;
+          if (rev && entered && rev.size === entered.size) {
+            const pos = ["left", "center", "right"].find(p => e.monsters[p] === ev); if (pos) battle.destroyMonster(es, pos);
+            core.applyDamage(es, 2, { kind: "effect" });
+          }
+          const i = (f.setSpells || []).indexOf(ctx.card);
+          if (i >= 0) { f.setSpells.splice(i, 1); f.drop.push(ctx.card.id !== undefined ? ctx.card.id : ctx.card.card.id); host.soul.forEach(x => f.drop.push(sidOf(x))); host.soul = []; }
+          fresh(); return true;
+        }
+        case "deckTribeSoulOrHand": {   // #6417: up to one «Weaponry» from the deck into the hand or this card's soul, then shuffle
+          const np = NP_(`${s.tribe} monster`) || NP_(`«${s.tribe}»`);
+          const c = f.deck.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) })).filter(r => r.card && (r.card.attrs || []).some(a => a.replace(/\s+/g, "").toLowerCase() === s.tribe.replace(/\s+/g, "").toLowerCase()));
+          if (c.length) {
+            const ch = await core.pick(c, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - search your deck` }), r = ch && ch[0];
+            if (r) { f.deck.splice(f.deck.indexOf(r.id), 1); const pick = await chooseOne(ctx, `${r.card.name}`, ["Put it into this card's soul", "Put it into your hand"]); if (pick === 0 && host) { host.soul = host.soul || []; host.soul.push(r.id); } else f.hand.push(r.id); }
+          }
+          if (battle.shuffleFighterDeck) battle.shuffleFighterDeck(ctx.side); fresh(); return true;
+        }
+      }
+      return false;
+    }, check: () => true
+  };
+  const soOv = (id, re, mode, extra, keep) => OV42.push([id, re, (ab) => ({ kind: ab.kind, tags: ab.tags, once: ab.once, trigger: keep ? ab.trigger : (extra && extra.trigger) || ab.trigger, conds: ab.conds || [], steps: [{ op: "r42SoulOps", mode, ...(extra && extra.step || {}) }] })]);
+  soOv(2029, /put up to one card from your drop zone into this card's soul/i, "dropToSoulSides", null, true);
+  soOv(3019, /look at the top card of your deck\. Then, put that card into this card's soul or your hand/i, "lookTopSoulOrHand", null, true);
+  soOv(3508, /put the top three cards of your deck into the drop zone/i, "millThreeThenOne", null, true);
+  soOv(2596, /put cards from the soul of this card on the bottom of your deck/i, "soulToDeckBottomDestroy", null, true);
+  soOv(264, /you may look at this card's soul, and reveal it/i, "secretSoulReveal", null, true);
+  soOv(6417, /put up to one .weaponry. from your deck into your hand or this card's soul/i, "deckTribeSoulOrHand", { step: { tribe: "Weaponry" } }, true);
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
