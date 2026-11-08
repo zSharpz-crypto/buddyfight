@@ -4931,6 +4931,71 @@
     }, check: () => true
   };
   OV42.push([5573, /if your life is 6 or less, drop all souls/i, (ab) => ({ kind: "triggered", trigger: ab.trigger, conds: ab.conds || [], steps: [{ op: "r42DestroyDropSouls", life: 6 }] })]);
+
+  /* ---- [r42] Count-based damage family: "deal damage equal to ..." (#869 #1360 #1672 #1762 #3749 #4267 #4600) ---- */
+  const oppSideOf = (ctx) => (ctx.side === "plr" ? "opp" : "plr");
+  const dealOpp = (ctx, n, unreducible) => { if (n <= 0) return false; const os = oppSideOf(ctx), dealt = core.applyDamage(os, n, { kind: "effect", unreducible: !!unreducible }); if (dealt > 0 && ABX.fireDamaged) ABX.fireDamaged(os); fresh(); return true; };
+  const critOf = (side, unit) => { try { return getUnitEffectiveCombatStats(F(side), unit).crit || 0; } catch (e) { return (unit.card.crit == null ? 1 : unit.card.crit) + (unit.tempCrit || 0); } };
+  const ownMonsters = (ctx, np) => ["left", "center", "right"].filter(p => ctx.f.monsters[p]).map(p => ({ k: "unit", side: ctx.side, pos: p, unit: ctx.f.monsters[p], card: ctx.f.monsters[p].card, id: ctx.f.monsters[p].card.id })).filter(r => !np || core.matchFilter(r.card, np.filter || {}, { unit: r.unit, side: ctx.side }, ctx));
+  // kills this turn: monsters destroyed during the other fighter's turn were destroyed by the active fighter's cards
+  if (typeof B.destroyMonster === "function") {
+    const dmK = B.destroyMonster;
+    B.destroyMonster = function (side, pos) {
+      const u = F(side).monsters[pos], r = dmK.apply(this, arguments);
+      if (u && F(side).monsters[pos] !== u && B.activeSide !== side) { const by = F(B.activeSide), k = by.abxKills; by.abxKills = (k && k.turn === B.turnCount) ? { turn: k.turn, n: k.n + 1 } : { turn: B.turnCount, n: 1 }; }
+      return r;
+    };
+  }
+  const killsThisTurn = (f) => (f.abxKills && f.abxKills.turn === B.turnCount ? f.abxKills.n : 0);
+  OPS.r42CountDamage = {
+    async run(s, ctx) {
+      const f = ctx.f, e = ctx.e;
+      switch (s.mode) {
+        case "destroyKnightNullify": {   // #869
+          const np = NP_("monster with \"Purgatory Knights\" in its card name on your field"), c = ownMonsters(ctx, np);
+          if (!c.length) return false;
+          const ch = await core.pick(c, { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", title: `${ctx.card.name} - destroy one of your monsters` }), t = ch && ch[0]; if (!t) return false;
+          const crit = critOf(ctx.side, t.unit); battle.destroyMonster(ctx.side, t.pos);
+          if (OPS.nullifyAttack) OPS.nullifyAttack.run({}, ctx);
+          return dealOpp(ctx, crit, false) || true;
+        }
+        case "rideSouls": {   // #1360
+          dealOpp(ctx, 2, true); const n = f.item && !f.item.isEndrulerFlag ? (f.item.soul || []).length : 0; return dealOpp(ctx, n, true) || true;
+        }
+        case "dropSoulsDamage": {   // #1672
+          dealOpp(ctx, 2, false);
+          const hosts = [...["left", "center", "right"].map(p => f.monsters[p]), f.item && !f.item.isEndrulerFlag ? f.item : null].filter(u => u && (u.soul || []).length);
+          if (!hosts.length) return true;
+          const host = hosts.length === 1 || ABX.autoPlay || f.isBot ? hosts.sort((a, b) => b.soul.length - a.soul.length)[0] : hosts[0];
+          const n = Math.min(3, host.soul.length); for (let i = 0; i < n; i++) { const x = host.soul.pop(); f.drop.push(x && x.id !== undefined && typeof x === "object" ? x.id : x); }
+          return dealOpp(ctx, n, false) || true;
+        }
+        case "destroyAllCrit": {   // #1762
+          const np = NP_("Black Dragon monsters on your field"), c = ownMonsters(ctx, np); let total = 0;
+          c.forEach(r => { total += critOf(ctx.side, r.unit); battle.destroyMonster(ctx.side, r.pos); });
+          return dealOpp(ctx, total, false) || c.length > 0;
+        }
+        case "attackCount": return dealOpp(ctx, 2 + (core.turnStats(e).attacks || 0), true);   // #3749
+        case "killCount": return dealOpp(ctx, 2 + killsThisTurn(f), true);                    // #4267
+        case "attackersCrit": {   // #4600
+          const bc = ABX.battleCtx; if (!bc || !bc.active) return false;
+          const total = (bc.attUnits || []).reduce((a, u) => a + critOf(bc.attSide, u), 0);
+          if (OPS.nullifyAttack) OPS.nullifyAttack.run({}, ctx);
+          return dealOpp(ctx, total, false) || true;
+        }
+      }
+      return false;
+    }, check: () => true
+  };
+  const NP_ = (t) => { const np = ABX.parseNP(t); return np && !np.junk ? np : null; };
+  const cdOv = (id, re, mode, extra) => OV42.push([id, re, (ab) => ({ kind: ab.kind || "spell", tags: ab.tags, once: ab.once, conds: ab.conds || [], steps: [...(extra || []), { op: "r42CountDamage", mode }] })]);
+  cdOv(869, /deal damage to your opponent equal to the critical of the card destroyed/i, "destroyKnightNullify");
+  cdOv(1360, /equal to number of cards in the soul of a card you are \[ride\] on/i, "rideSouls");
+  cdOv(1672, /equal to the number of cards you put into your drop zone/i, "dropSoulsDamage");
+  cdOv(1762, /equal to the total critical of the destroyed monsters/i, "destroyAllCrit");
+  cdOv(3749, /equal to 2 plus the number of times your opponent's cards attacked/i, "attackCount", [{ op: "lifeLock" }]);
+  cdOv(4267, /equal to 2 plus the number of monsters your cards destroyed/i, "killCount");
+  cdOv(4600, /equal to the total critical of all attacking monsters/i, "attackersCrit");
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
