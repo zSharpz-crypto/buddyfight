@@ -7827,7 +7827,19 @@ const battle = {
       if (window.ABX && ABX.fireLeave) ABX.fireLeave(retO, retC, false, true);
     }
 
-    if (this.getCurrentSizeUsed(f) + newSize > maxAllowedSize) {
+    // [Call Cost] "Put a monster from your field into this card's soul": the cost is paid FIRST (those monsters leave the field), and only then is the size limit enforced
+    const fieldSoulPay = !isAbilityCall && window.ABX && ABX.fieldSoulCostAny && ABX.fieldSoulCostAny(c);
+    const dropOverflow = () => {
+      if (this.getCurrentSizeUsed(f) + 0 <= maxAllowedSize) return;
+      MONSTER_POSITIONS.forEach(pos => {
+        if (pos !== zonePos && f.monsters[pos] && this.getCurrentSizeUsed(f) > maxAllowedSize) {
+          const retC = f.monsters[pos].card, retO = f.monsters[pos].oppressedBy || side;
+          this.sendMonsterToDropWithAnimation(side, pos, true);
+          if (window.ABX && ABX.fireLeave) ABX.fireLeave(retO, retC, false, true);
+        }
+      });
+    };
+    if (!fieldSoulPay && this.getCurrentSizeUsed(f) + newSize > maxAllowedSize) {
       MONSTER_POSITIONS.forEach(pos => {
         if (pos !== zonePos && f.monsters[pos] && this.getCurrentSizeUsed(f) + newSize > maxAllowedSize) {
           const retC = f.monsters[pos].card, retO = f.monsters[pos].oppressedBy || side;
@@ -7885,7 +7897,10 @@ const battle = {
     f.monsters[zonePos] = unit;
     if (callLimit) (f.callLimitUsed = f.callLimitUsed || {})[c.name] = this.turnCount;
     if (onTopHost) unit.soul.unshift(...(onTopHost.soul || []), onTopHost.card.id);
-    if (!isAbilityCall && window.ABX && ABX.payExtras && ABX.hasExtras(c)) ABX.payExtras(side, c, unit);
+    if (!isAbilityCall && window.ABX && ABX.payExtras && ABX.hasExtras(c)) {
+      const paidExtras = ABX.payExtras(side, c, unit);
+      if (fieldSoulPay) Promise.resolve(paidExtras).then(() => { try { dropOverflow(); this.renderBattle(); } catch (e) { /* ignore */ } });
+    }
     const eff = getUnitEffectiveCombatStats(f, unit);
     unit.attacksLeft = eff.qa ? 4 : eff.ta ? 3 : eff.da ? 2 : (c.atk_max || 1);
     if (isBuddyCall) markFighterBuddyCalled(f, c.id);

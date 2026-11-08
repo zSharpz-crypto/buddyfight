@@ -1384,6 +1384,18 @@
       // [r42] #5736 two NAMED cards that themselves contain quotes: Put a "Projection Shell, "Sigurd"" and a "Heroical Armor, "Gram"" from your field into its soul (the name list was cut at the inner quotes: never payable)
       const mNest = /^put an? "(.+)" and an? "(.+)" from your field into (?:its|this card's|this monster's) soul\.?$/i.exec(String(p.text || ""));
       if (mNest) { [mNest[1], mNest[2]].forEach(nm => out.push({ soulFrom: { area: "field", n: 1, np: { raw: "a card", qty: { n: 1 }, filter: { names: [lc(nm)] } } }, text: p.text })); return; }
+      // [r42] field-soul cost counts the parser reads as "a monster": "Put all «X» monsters from your field", "Put one or more monsters from your field" (junk "more")
+      if (p.soulFrom && p.soulFrom.area === "field" && !p.r42Counted) {
+        const t0 = String(p.text || "");
+        if (/^put all\b/i.test(t0)) { p.soulFrom.n = 99; p.soulFrom.all = true; p.soulFrom.upTo = true; p.r42Counted = true; }
+        else if (/^put one or more\b/i.test(t0)) { p.soulFrom.n = 99; p.soulFrom.upTo = true; p.soulFrom.min = 1; if (p.soulFrom.np) p.soulFrom.np.junk = undefined; p.r42Counted = true; }
+      }
+      // [r42] "Put any number of monsters from your field into this card's soul" / "You may put as many «Armorknight» as you like from your field into this card's soul" (#3739 #1121)
+      const mAnyN = !p.soulFrom && String(p.text || "").match(/^(?:you may )?put (?:any number of|as many) (.+?)(?: as you like)? (?:on|from) your field into (?:this card's|its) soul\.?$/i);
+      if (mAnyN) {
+        const what = mAnyN[1].trim(), flt = /^(?:monsters?|cards?)$/i.test(what) ? (/^monsters?$/i.test(what) ? { types: ["monster"] } : {}) : { tribes: [what.replace(/[«»]/g, "").trim()] };
+        out.push({ soulFrom: { area: "field", n: 99, upTo: true, min: 0, np: { raw: what, qty: { n: 99 }, filter: flt } }, text: p.text }); return;
+      }
       if (p.soulFrom || p.discard || p.destroy) {
         // parser reads "Put up to two «X» from your drop zone into its soul" as n=1: fix the count here (e.g. #6010)
         const um = p.soulFrom && /^put up to (one|two|three|four|\d+)\b/i.exec(p.text || "");
@@ -1508,11 +1520,13 @@
       if (p.returnDrop) return (F(side).drop || []).filter(id => { const c = cardOf(id); return c && tribeEq(c, p.returnDrop.tribe); }).length >= p.returnDrop.n;
       if (p.soulFrom && p.soulFrom.all) return true;   // "put all of them": nothing to pay when there are none
       if (p.chooseSoulFromAny) return partCands(p, side, card, exclHandIdx).length >= 1;
-      if (p.soulFrom && p.soulFrom.upTo) return true;   // "up to N": zero is fine
+      if (p.soulFrom && p.soulFrom.upTo) return (p.soulFrom.min || 0) <= partCands(p, side, card, exclHandIdx).length;   // "up to N": zero is fine; "one or more": at least one
       return partCands(p, side, card, exclHandIdx).length >= ((p.soulFrom || p.discard || p.destroy).n || 1);
     });
   };
   ABX.hasExtras = (card) => extraParts(card).length > 0;
+  // true when a Call/Equip Cost puts cards from YOUR FIELD into the soul (the cost must be paid before the size limit is enforced)
+  ABX.fieldSoulCostAny = (card) => extraParts(card).some(p => p.soulFrom && p.soulFrom.area === "field");
   // true when the extra [Call Cost] parts put cards into the soul (so the [Soulguard] default soul is replaced); discard/destroy-only extras do not count
   ABX.hasSoulExtras = (card) => extraParts(card).some(p => p.soulFrom || p.allHandToSoul || p.chooseSoulFromAny) || !!ABX.onTopCost(card);
   // unit may be null (card not on the field yet is fine for discard); soul parts need the new unit or [Set] spell host
@@ -1550,7 +1564,7 @@
       const ctx = { side, f, e: F(otherSide(side)), card, unit, bind: {}, auto: true };
       let cands = partCands(part, side, card, -1).filter(r => !(unit && r.unit === unit));
       const np = { qty: { n }, raw: spec.np ? spec.np.raw : "a card" };
-      const chosen = await pick(cands, np, ctx, { intent: "cost", title: `${card.name} — pay the Cost`, subtitle: part.text, min: spec.upTo ? 0 : Math.min(n, cands.length), max: n });
+      const chosen = await pick(cands, np, ctx, { intent: "cost", title: `${card.name} — pay the Cost`, subtitle: part.text, min: spec.all ? cands.length : spec.upTo ? Math.min((ABX.autoPlay || f.isBot) ? n : (spec.min || 0), cands.length) : Math.min(n, cands.length), max: n });
       for (const r of chosen) {
         if (part.destroy) { const pos = core.posOfUnit(f, r.unit); if (pos) B.destroyMonster(side, pos); continue; }
         const id = detach(r); if (id == null) continue;
