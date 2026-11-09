@@ -440,3 +440,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Magic World: #2719 and #4187 now require discarding two 72 Pillars / two Wizard before their effect (the fallback skipped the cost). #99 already had an earlier override (a duplicate I wrote was removed). Test: tests/magic_b.js.
 
 - Cinderella Girls: #5655 Chiyo Shirayuki bonus (drop opp gauge, top card to gauge) only when she is on your field; #5640 Act stands only if a soul was dropped. #5445 #5446 #5643 verified working via the r40 fallback (face-down buddy zone). Test: tests/cinderella_a.js.
+
+- BanG Dream: #5495 cast needs Afterglow total size 3+ on your field (new generic hook: cast-rule conds of type r42* are enforced in evaluateCardConditions). The "opponent card destroyed/returned this turn" half is not tracked yet. NOTE: tests/dead_batch_b.js has 1 failing check (#80 revealed spell cast free) that fails without my change too. Test: tests/bandori_a.js.

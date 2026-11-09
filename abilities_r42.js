@@ -4406,6 +4406,27 @@
   }, check: () => true };
   OV42.push([5655, /after that, if there is .chiyo shirayuki. on your field/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op === "damage" || x.op === "life"), { op: "r42ChiyoBonus" }] }) : ab]);
   OV42.push([5640, /you may drop a soul from this card\. if your do, .stand. this card/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "stand" ? Object.assign({}, x, { gate: "ifYouDo" }) : x) }) : ab]);
+  /* ---- BanG Dream #5495: cast needs Afterglow characters of total size 3+ (the "opponent's card destroyed/returned this turn" half is not tracked) ---- */
+  XC42.r42AfterglowSize3 = (c, ctx) => Object.values(ctx.f.monsters).filter(u => u && (u.card.attrs || []).some(a => core.lc(a) === "afterglow")).reduce((n, u) => n + (Number(u.card.size) || 0), 0) >= 3;
+  ABX.COND_OK.add("r42AfterglowSize3");
+  OV42.push([5495, /you may only cast this card if a card on your opponent's field was destroyed or returned/i, (ab) => ab.kind === "rule" ? Object.assign({}, ab, { action: "cast", steps: [], conds: [{ t: "r42AfterglowSize3" }] }) : ab]);
+  { // cast-rule conditions written with custom r42 condition types are checked here (the base evaluator only knows its own phrases)
+    const prevEcc2 = root.evaluateCardConditions;
+    root.evaluateCardConditions = function (card, fighter, enemy, isAbilityCall) {
+      const r = prevEcc2.apply(this, arguments);
+      try {
+        if (r && r.met !== false && card && (card.type === "Spell" || card.type === "Impact") && fighter && !isAbilityCall) {
+          const rules = (ABX.get(card).abilities || []).filter(a => a.kind === "rule" && a.action === "cast" && (a.conds || []).some(c => c && /^r42/.test(c.t)));
+          const side = fighter === B.plr ? "plr" : "opp";
+          for (const ab of rules) {
+            const probe = { side, f: fighter, e: enemy, card, unit: null, ab, bind: { chosen: [], revealed: [], looked: [] }, lastDone: true, auto: true, log: [], event: { name: "cast" } };
+            if (!ab.conds.every(c => ABX.evalCond(c, probe))) { const reasons = (r.reasons || []).concat(["Casting requirement not met: " + String(ab.raw || ab.cleaned || "").replace(/\s+/g, " ").slice(0, 110)]); return Object.assign({}, r, { met: false, reasons, summary: `⚠️ ${reasons[0]}` }); }
+          }
+        }
+      } catch (e) { if (ABX.debug) console.error(e); }
+      return r;
+    };
+  }
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
