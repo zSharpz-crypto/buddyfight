@@ -3855,6 +3855,17 @@
   OV42.push([4460, /then, if that item has a soul/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "r42ElectroSoul" }) }) : ab]);
   OV42.push([4995, /then, if your .electrodeity. item has a soul/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "r42ElectroSoul" }) }) : ab]);
   OV42.push([5950, /if your opponent.s cards attacked three times or more/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "and", list: [{ t: "r42OppAtk3" }, { t: "r42ElectroSoul" }] }) }) : ab]);
+  OPS.r42NullifyAndLock = {
+    run(s, ctx) {
+      const cc = ABX.castCtx, name = cc && cc.card && cc.card.name, caster = cc && cc.side;
+      if (!OPS.nullifyCast.run({ what: "spell" }, ctx)) return false;
+      if (name && caster) { const f = F(caster); const L = f.abxSpellLock && f.abxSpellLock.turn === B.turnCount ? f.abxSpellLock : (f.abxSpellLock = { turn: B.turnCount, names: [] }); L.names.push(name); }
+      return true;
+    }, check: () => true
+  };
+  OV42.push([6382, /nullify the spell cast by your opponent, and for this turn, your opponent cannot cast spells with the same card name/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullifyAndLock" }] }) : ab)]);
+  OPS.r42NullifyLockRev = { run(s, ctx) { const ok = OPS.nullifyCast.run({ what: "spell" }, ctx); if (!ok) return false; if (((ctx.f.godclock && ctx.f.godclock.reversalCount) || 0) >= 4) { const cc = ABX.castCtx; const f = F(cc.side); const L = f.abxSpellLock && f.abxSpellLock.turn === B.turnCount ? f.abxSpellLock : (f.abxSpellLock = { turn: B.turnCount, names: [] }); L.names.push(cc.card.name); } return true; }, check: () => true };
+  OV42.push([6162, /nullify the spell cast by your opponent\. then, if your flags/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullifyLockRev" }] }) : ab) ]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
@@ -5736,6 +5747,20 @@
   root.evaluateCardConditions = wrapped;
   try { if (typeof globalThis !== "undefined") globalThis.evaluateCardConditions = wrapped; } catch (e) { /* ignore */ }
 
+  /* ---- [r42] "Nullify the spell cast by your opponent, and for this turn your opponent cannot cast spells with the same card name" (#6382): cast lock by name ---- */
+  const ecc42 = root.evaluateCardConditions;
+  root.evaluateCardConditions = function (card, fighter) {
+    const r = ecc42.apply(this, arguments);
+    try {
+      const L = fighter && fighter.abxSpellLock;
+      if (L && L.turn === (typeof battle !== "undefined" ? battle.turnCount : -1) && card && card.type === "Spell" && L.names.includes(card.name)) {
+        const reasons = (r.reasons || []).concat([`"${card.name}" cannot be cast this turn (nullified earlier)`]);
+        return Object.assign({}, r, { met: false, reasons, summary: `⚠️ ${reasons[reasons.length - 1]}` });
+      }
+    } catch (e) { /* ignore */ }
+    return r;
+  };
+  try { if (typeof globalThis !== "undefined") globalThis.evaluateCardConditions = root.evaluateCardConditions; } catch (e) { /* ignore */ }
   /* ---- [r42] Fragment clauses that carry no effect of their own: the "once per turn" limit is already applied as ability.once, and [Counterattack] is a reminder keyword ---- */
   ABX.ACTION_RULES.unshift(
     [/^\[counterattack\]$/i, () => ({ op: "noop", note: "reminder keyword" }), false],

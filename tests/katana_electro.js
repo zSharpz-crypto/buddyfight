@@ -1,4 +1,4 @@
-// node tests/hero_d.js - Katana Electrodeity soul-gated effects (#4460 #4995 #5950)
+// node tests/hero_d.js - Katana Electrodeity soul-gated effects (#4460 #4995 #5950) + spell-name lock (#6382 #6162)
 const { createEnv } = require("./headless.js");
 const { run, flush } = createEnv();
 const val = (js) => JSON.parse(run(`JSON.stringify((function(){${js}})())`));
@@ -23,5 +23,11 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("4460 item with soul: power +3000 and crit +1", val(`const u=battle.plr.monsters.center; return (u.tempPower||0)===__p+3000 && (u.tempCrit||0)===__c+1`), val(`const u=battle.plr.monsters.center; return [u.tempPower,u.tempCrit]`));
   run(`{ const me=setup(); me.item=__item(false); me.monsters.center=mk(CARD_MAP.get(__em)); globalThis.__c=me.monsters.center.tempCrit||0; ABX.fireEnter('plr',CARD_MAP.get(4460),mk(CARD_MAP.get(4460))); }`); await settle();
   ck("4460 item without soul: power only, no crit", val(`const u=battle.plr.monsters.center; return (u.tempPower||0)===3000 && (u.tempCrit||0)===__c`), val(`const u=battle.plr.monsters.center; return [u.tempPower,u.tempCrit]`));
+  // #6382 / #6162: nullify the cast spell and lock its name for the turn
+  for (const [id, rev, locked] of [[6382, 0, true], [6162, 4, true], [6162, 1, false]]) {
+    run(`{ const me=setup(); me.item=__item(true); me.godclock={reversalCount:${rev}}; battle.opp.hand=[]; const cc=ABX.castCtx={active:true,side:'opp',card:CARD_MAP.get(1604),kind:'spell',nullified:false}; globalThis.__cc=cc; ABX.fireSpell('plr',CARD_MAP.get(${id})); }`); await settle();
+    ck(id+" rev "+rev+": spell nullified, name lock "+(locked?"on":"off"), val(`const r=evaluateCardConditions(CARD_MAP.get(1604), battle.opp, battle.plr); return __cc.nullified===true && (r.met===false && /cannot be cast this turn/.test(JSON.stringify(r.reasons)))===${locked}`), val(`return [__cc.nullified, evaluateCardConditions(CARD_MAP.get(1604), battle.opp, battle.plr).reasons]`));
+    run(`ABX.castCtx=null`);
+  }
   console.log(`\npass ${pass} fail ${fail}`);
 })();
