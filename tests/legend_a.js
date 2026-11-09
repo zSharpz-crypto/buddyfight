@@ -50,5 +50,12 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #6026 grants Dragon for the turn, then 6139 can drop it
   run(`{ const me=setup(), op=battle.opp; op.monsters.left=mk(CARD_MAP.get(1054)); const ab=ABX.get(CARD_MAP.get(6026)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(6026),ab,null,{event:{name:'act'}}); }`); await settle();
   ck("6026: chosen card gets Dragon this turn", val(`return battle.opp.monsters.left.abxAttrAdd==='Dragon'`), val(`return [battle.opp.monsters.left&&battle.opp.monsters.left.abxAttrAdd]`));
+  // #352 destroys an opposing Set spell when no spell is being cast; returns to hand with Berserk Gard in drop
+  run(`{ const me=setup(), op=battle.opp; op.setSpells=[CARD_MAP.get(352)]; me.drop=[]; me.hand=[1054]; ABX.castCtx=null; ABX.fireSpell('plr',CARD_MAP.get(352),{free:true}); }`); await settle();
+  ck("352: opposing Set spell destroyed", val(`return (battle.opp.setSpells||[]).length===0`), val(`return [(battle.opp.setSpells||[]).length]`));
+  // #2648 search hand/deck for Miserea and call it to the center
+  run(`globalThis.__m=ALL_CARDS.find(c=>c.name==='Judgment of the Cold-blooded King, Miserea').id`);
+  run(`{ const me=setup(); me.deck=[1054,__m,1054]; ABX.fireSpell('plr',CARD_MAP.get(2648),{free:true}); }`); await settle();
+  ck("2648: Miserea found in deck and called to center", val(`const c=battle.plr.monsters.center; return !!c && c.card.id===__m && battle.plr.deck.length===2`), val(`const c=battle.plr.monsters.center; return [c&&c.card.id,__m,battle.plr.deck.length]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();

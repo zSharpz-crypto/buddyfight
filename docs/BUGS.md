@@ -394,3 +394,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Legend Advent (#5049 #5052): bonus (+3 life / +2 gauge) now only when the card entered via its own Advent Counter Act (flag set around the Act, read by fireEnter). Test: tests/legend_a.js.
 
 - Legend leftovers: #3548 free call only on a turn a card was discarded; #6139 drops up to two Dragon-attribute opp cards plus souls; #6026 grants Dragon for the turn (abxAttrAdd, honored by #6139 only). Test: tests/legend_a.js.
+
+- Legend: #352 counter now nullifies the cast spell or destroys a Set spell before the Berserk Gard return tail; #2648 searches hand/deck for Miserea and calls it to center (its "may only cast if Mission Card without soul" restriction still NOT enforced); #5519 #1004 still open. Test: tests/legend_a.js.

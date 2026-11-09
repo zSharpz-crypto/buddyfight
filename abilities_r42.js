@@ -4004,6 +4004,25 @@
   OV42.push([3548, /to those who are evil/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { conds: [{ t: "r42DiscardedTurn" }], steps: noFb(ab.steps) }) : ab]);
   OV42.push([6139, /choose up to two cards on your opponent's field with .dragon./i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DropDragons" }] }) : ab]);
   OV42.push([6026, /\[counter\] \[act\] choose a card on your opponent's field/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42GrantDragon" }] }) : ab]);
+  OPS.r42NullOrDestroySpell = { async run(s, ctx) {
+    const cc = ABX.castCtx;
+    if (cc && cc.active && cc.side !== ctx.side) return OPS.nullifyCast.run({ what: "spell" }, ctx);
+    return OPS.r41DestroyOneSet.run({}, ctx);
+  }, check: () => true };
+  OV42.push([352, /nullify the spell cast by your opponent, or destroy a spell/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullOrDestroySpell" }, ...noFb(ab.steps)] }) : ab]);
+  OPS.r42SearchCallCenter = { async run(s, ctx) {
+    const f = ctx.f, nm = (id) => core.lc((core.cardOf(id) || {}).name || "") === s.name;
+    let hi = f.hand.findIndex(nm), fromDeck = false;
+    if (hi < 0) { const di = f.deck.findIndex(nm); if (di >= 0) { f.hand.push(f.deck.splice(di, 1)[0]); hi = f.hand.length - 1; fromDeck = true; } }
+    if (hi < 0 || hi >= f.hand.length) return false;
+    let pos = "center";
+    if (f.monsters.center) { if (typeof canPlaceSecondCenter === "function" && canPlaceSecondCenter(f, core.cardOf(f.hand[hi]))) pos = "center2"; else return fromDeck ? (OPS.shuffle.run({ who: "you" }, ctx), false) : false; }
+    B.abxFreeCall = true;
+    try { B.completeMonsterCall(ctx.side, pos, hi, false, true); } finally { B.abxFreeCall = false; }
+    if (fromDeck && OPS.shuffle && OPS.shuffle.run) await OPS.shuffle.run({ who: "you" }, ctx);
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([2648, /search your hand or deck for up to one .judgment of the cold-blooded king, miserea./i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SearchCallCenter", name: "judgment of the cold-blooded king, miserea" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
