@@ -6298,6 +6298,9 @@
   OV42.push([3521, /put the chosen card face down on your opponent.s center/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: (ab.conds || []).concat([{ t: "r42OppCenterEmpty" }]), steps: noFb(ab.steps).map(x => Object.assign({}, x, { cond: { t: "r42OppCenterEmpty" } })).concat([{ op: "r42FaceDownMonster", gate: "ifYouDo", size: 0, power: 6000, defense: 6000, crit: 2 }]) }) : ab]);   // the parsed step conds also counted MY center monster
   OV42.push([6349, /top two cards of your opponent.s deck face down/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).concat([{ op: "r42OppDeckToField", gate: "ifYouDo", n: 2, size: 0, power: 1000, defense: 1000, crit: 1 }]) }) : ab]);
 
+  /* ---- [r42] #753 Black Dragon Shield: "Reduce the damage to 0, and you gain 1 life" = a next-damage shield that also gains life (it used to gain 2 life and reduce nothing) ---- */
+  OV42.push([753, /reduce the damage to 0, and you gain 1 life/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "shield", mode: "next", toZero: true, from: "any", gainLife: 1, src: "Reduce the damage to 0, and you gain 1 life" }] }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

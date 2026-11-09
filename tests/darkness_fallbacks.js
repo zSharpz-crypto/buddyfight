@@ -64,5 +64,9 @@ const attack = async (pos) => { run(`ABX.fireAttack('plr',[{unit:battle.plr.mons
   run(`clear(); battle.plr.monsters.center=mku(3521); battle.opp.monsters.center=mku(46); battle.opp.drop=[46]; globalThis.__u=battle.plr.monsters.center;
        { const ab=ABX.get(CARD_MAP.get(3521)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(3521),ab,__u,{event:{name:'act'}}); }`); await settle();
   ok(!J(`__u.rested`) && J(`battle.opp.drop.length`) === 1, "#3521 opponent has a center monster: nothing happens");
+  // #753 Black Dragon Shield: damage becomes 0 and you gain 1 life (exactly once)
+  run(`clear(); globalThis.__l=battle.plr.life;`); await cast(753);
+  run(`globalThis.__dealt=ABX.core.applyDamage('plr', 3, {kind:'attack'});`); await settle();
+  ok(J(`battle.plr.life-__l`) === 1, `#753 3 damage reduced to 0, +1 life only (life change ${J("battle.plr.life-__l")})`);
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();
