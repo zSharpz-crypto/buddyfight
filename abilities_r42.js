@@ -29,7 +29,7 @@
   const OVER_SELF_PAY = new Set([6512, 4115]);   // their ops already pay the printed cost
   const OV42 = [
     /* ---- catalog check: #2920 Vermolt only triggers when it enters the CENTER ---- */
-    [2920, /when this card enters your center/i, (ab) => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [{ t: "selfPos", pos: "center" }], steps: clone(ab.steps || []) })],
+    [2920, /when this card enters your center/i, (ab) => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [{ t: "selfPos", pos: "center" }], steps: parseS("destroy a monster on your opponent's field") })],
     /* ---- Dimension Dragon review ---- */
     // #4633 Zorune: the looked cards go back on top (any order) and ONLY then, if a DD was dropped, a card is drawn
     [4633, /look at the top three cards of your deck/i, (ab) => {
@@ -3628,6 +3628,33 @@
     }, check: () => true
   };
   OV42.push([847, /move it to your opponent.s center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42PullToCenter" }] })]);
+  /* ---- [r42] Star Dragon conditional effects: #2920 #2381 #2888 #3286 #3334 #1677 ---- */
+  XC42.r42SelfCenter = (c, ctx) => !!(ctx.unit && ctx.f.monsters.center === ctx.unit);
+  XC42.r42DropAtMost = (c, ctx) => ctx.f.drop.length <= c.n;
+  XC42.r42HasNamed = (c, ctx) => ["left", "center", "right"].some(p => ctx.f.monsters[p] && core.lc(ctx.f.monsters[p].card.name) === c.name) || (ctx.f.setSpells || []).some(x => x && core.lc(x.name || (core.cardOf(x.id) || {}).name || "") === c.name);
+  ["r42SelfCenter", "r42DropAtMost", "r42HasNamed"].forEach(t => ABX.COND_OK.add(t));
+  OPS.r42GaugeOrLife = {
+    async run(s, ctx) {
+      let gauge = true;
+      if (!(ABX.autoPlay || ctx.f.isBot) && ABX.ui && ABX.ui.pickOption && ctx.f.deck.length) { const i = await ABX.ui.pickOption({ title: ctx.card.name, options: ["Put the top card of your deck into your gauge", "Gain 1 life"] }); gauge = i !== 1; }
+      if (gauge && ctx.f.deck.length) ctx.f.gauge.push(ctx.f.deck.shift()); else ctx.f.life += 1;
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([2381, /if you have three or less cards in your drop zone, put the top card/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [...parseS("put up to two cards from your drop zone on the bottom of your deck in any order"), Object.assign({ op: "r42GaugeOrLife" }, { cond: { t: "r42DropAtMost", n: 3 } })] })]);
+  OPS.r42GaugeBySize = {
+    run(s, ctx) {
+      const r = (ctx.bind.lastDestroyed || []).find(x => x && x.card); if (!r) return false;
+      const n = Math.max(0, Number(r.card.size) || 0); for (let i = 0; i < n && ctx.f.deck.length; i++) ctx.f.gauge.push(ctx.f.deck.shift());
+      fresh(); return n > 0;
+    }, check: () => true
+  };
+  ABX.ACTION_RULES.unshift(
+    [/^(?:if you do,? )?put (?:the number of )?cards from the top of your deck into your gauge equal to the size of that (?:destroyed )?(?:monster|card)$/i, () => ({ op: "r42GaugeBySize" }), false],
+    [/^during that attack phase, your opponent cannot use or cast \[counter\]$/i, () => ({ op: "oppNoCounter" }), false]
+  );
+  OV42.push([3286, /during an attack phase, when this card leaves the field/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { trigger: { event: "leave", self: true }, conds: [{ t: "phase", phase: "attack" }], unparsed: [], steps: parseS("put the top card of your deck into your gauge, and you gain 1 life") }) : ab)]);
+  OV42.push([3334, /if you have a .gate of pardon, -forgiven-. on your field or three or less/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("put the top card of your deck into your gauge"), ...parseS("draw a card").map(x => Object.assign({}, x, { cond: { t: "or", list: [{ t: "r42HasNamed", name: "gate of pardon, -forgiven-" }, { t: "r42DropAtMost", n: 3 }] } }))] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
