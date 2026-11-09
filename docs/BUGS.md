@@ -396,3 +396,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Legend leftovers: #3548 free call only on a turn a card was discarded; #6139 drops up to two Dragon-attribute opp cards plus souls; #6026 grants Dragon for the turn (abxAttrAdd, honored by #6139 only). Test: tests/legend_a.js.
 
 - Legend: #352 counter now nullifies the cast spell or destroys a Set spell before the Berserk Gard return tail; #2648 searches hand/deck for Miserea and calls it to center (its "may only cast if Mission Card without soul" restriction still NOT enforced); #5519 #1004 still open. Test: tests/legend_a.js.
+
+- Legend: #2068 discard two Legend World cards (final phase) then stand; #2089 discard, look/reorder top 3 of either deck, draw (reorder/choice only for human players, auto keeps order). #3340 #2788 #5519 #1004 still open. Test: tests/legend_a.js.

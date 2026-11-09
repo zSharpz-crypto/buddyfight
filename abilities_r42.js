@@ -4023,6 +4023,44 @@
     fresh(); return true;
   }, check: () => true };
   OV42.push([2648, /search your hand or deck for up to one .judgment of the cold-blooded king, miserea./i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SearchCallCenter", name: "judgment of the cold-blooded king, miserea" }] }) : ab]);
+  /* ---- #2068 (discard two Legend World, stand self) and #2089 (discard, reorder top 3 of either deck, draw) ---- */
+  OPS.r42DiscardLegendStand = { async run(s, ctx) {
+    const f = ctx.f, isLw = (id) => { const c = core.cardOf(id); return c && (c.world === "Legend World" || (c.worlds || []).includes("Legend World")); };
+    const cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(r => isLw(r.id));
+    if (cands.length < 2) return false;
+    const ch = ABX.autoPlay || f.isBot ? cands.slice(0, 2) : await core.pick(cands, { qty: { n: 2 } }, ctx, { intent: "cost", min: 2, max: 2, title: `${ctx.card.name} - discard two Legend World cards` });
+    if (ch.length < 2) return false;
+    ch.map(r => r.id).forEach(id => { const i = f.hand.indexOf(id); if (i >= 0) { f.hand.splice(i, 1); f.drop.push(id); ABX.fireDiscarded && ABX.fireDiscarded(ctx.side, core.cardOf(id)); } });
+    const u = ctx.unit; if (u) { u.rested = false; u.attacksLeft = Math.max(u.attacksLeft || 0, 1); }
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([2068, /discard two <legend world> cards from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardLegendStand" }] }) : ab]);
+  OPS.r42DiscardLookReorderDraw = { async run(s, ctx) {
+    const f = ctx.f, auto = ABX.autoPlay || f.isBot;
+    if (!f.hand.length) return false;
+    const hc = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) }));
+    const dch = auto ? [] : await core.pick(hc, { qty: { n: 1 } }, ctx, { intent: "cost", min: 0, max: 1, title: `${ctx.card.name} - you may discard a card` });
+    const d = auto ? hc[0] : dch[0];
+    if (!d) return false;
+    const di = f.hand.indexOf(d.id); f.hand.splice(di, 1); f.drop.push(d.id); ABX.fireDiscarded && ABX.fireDiscarded(ctx.side, core.cardOf(d.id));
+    let target = f;
+    if (!auto && ctx.e.deck.length) {
+      const dc = [{ k: "zone", side: ctx.side, area: "deck", idx: 0, id: f.deck[0], card: core.cardOf(f.deck[0]) }, { k: "zone", side: otherSide(ctx.side), area: "deck", idx: 0, id: ctx.e.deck[0], card: core.cardOf(ctx.e.deck[0]) }].filter(r => r.id != null);
+      const c = await core.pick(dc, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, title: "Whose deck? (top card shown)" });
+      if (c[0] && c[0].side !== ctx.side) target = ctx.e;
+    }
+    const ids = target.deck.splice(0, 3), out = [];
+    while (ids.length) {
+      if (auto || ids.length === 1) { out.push(ids.shift()); continue; }
+      const cands = ids.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) }));
+      const r = (await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, title: `Pick the card to put ${out.length ? "next" : "on top"}` }))[0] || cands[0];
+      ids.splice(ids.indexOf(r.id), 1); out.push(r.id);
+    }
+    target.deck.unshift(...out);
+    if (f.deck.length) f.hand.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([2089, /if you do, look at the top three cards of either player's deck/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardLookReorderDraw" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

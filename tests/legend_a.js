@@ -57,5 +57,14 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   run(`globalThis.__m=ALL_CARDS.find(c=>c.name==='Judgment of the Cold-blooded King, Miserea').id`);
   run(`{ const me=setup(); me.deck=[1054,__m,1054]; ABX.fireSpell('plr',CARD_MAP.get(2648),{free:true}); }`); await settle();
   ck("2648: Miserea found in deck and called to center", val(`const c=battle.plr.monsters.center; return !!c && c.card.id===__m && battle.plr.deck.length===2`), val(`const c=battle.plr.monsters.center; return [c&&c.card.id,__m,battle.plr.deck.length]`));
+  // #2068 discard two Legend World cards in final phase -> stand
+  run(`globalThis.__lw=ALL_CARDS.find(c=>c.type==='Monster'&&c.world==='Legend World'&&c.id!==2068).id`);
+  for (const two of [false, true]) {
+    run(`{ const me=setup(); battle.phase='final'; const u=mk(CARD_MAP.get(2068)); u.rested=true; me.monsters.center=u; me.hand=${two?'[__lw,__lw]':'[__lw,1054]'}; const ab=ABX.get(CARD_MAP.get(2068)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2068),ab,u,{event:{name:'act'}}); }`); await settle();
+    ck("2068 "+(two?"two Legend World cards: stands":"only one: stays rested"), val(`const u=battle.plr.monsters.center; return u.rested===${!two} && battle.plr.hand.length===${two?0:2}`), val(`return [battle.plr.monsters.center.rested,battle.plr.hand.length]`));
+  }
+  // #2089 discard, then draw one (own deck order kept in auto-play)
+  run(`{ const me=setup(); me.hand=[1054]; me.deck=[11,12,13,14]; globalThis.__d=me.drop.length; const ab=ABX.get(CARD_MAP.get(2089)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2089),ab,mk(CARD_MAP.get(2089)),{event:{name:'act'}}); }`); await settle();
+  ck("2089: discarded 1, drew 1", val(`const p=battle.plr; return p.drop.length===__d+1 && p.hand.length===1 && p.hand[0]===11 && p.deck.length===3`), val(`const p=battle.plr; return [p.drop.length-__d,p.hand,p.deck.length]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
