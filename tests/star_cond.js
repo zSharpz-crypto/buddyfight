@@ -30,5 +30,15 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("3286 leaves during attack phase: +1 gauge, +1 life", val(`return battle.plr.gauge.length===__g+1 && battle.plr.life===__l+1`), val(`return [battle.plr.gauge.length,__g,battle.plr.life,__l]`));
   run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(3286)); battle.phase='main'; globalThis.__g=me.gauge.length; battle.destroyMonster('plr','center'); }`); await settle();
   ck("3286 leaves during main phase: nothing", val(`return battle.plr.gauge.length===__g`));
+  // #2384 move + redirect
+  run(`{ const me=setup(); const g=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('Guardians')).id; me.monsters.left=mk(CARD_MAP.get(g)); ABX.battleCtx={active:true,attSide:'opp',defSide:'plr',redirectTo:null}; ABX.fireSpell('plr',CARD_MAP.get(2384)); }`); await settle();
+  ck("2384: Guardians moved to center and attack redirected", val(`return battle.plr.monsters.center && !battle.plr.monsters.left && ABX.battleCtx.redirectTo==='center'`), val(`return [battle.plr.monsters, ABX.battleCtx]`));
+  run(`ABX.battleCtx=null`);
+  // #4037 self to deck bottom, stand chosen, +1 life (attack phase only)
+  run(`{ const me=setup(); battle.phase='attack'; me.life=10; me.monsters.center=mk(CARD_MAP.get(4037)); const g=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('Guardians')).id; me.monsters.left=mk(CARD_MAP.get(g)); me.monsters.left.rested=true; globalThis.__dl=me.deck.length; const ab=ABX.actAbilities(CARD_MAP.get(4037))[0]; ABX.runAbility('plr',CARD_MAP.get(4037),ab,me.monsters.center,{event:{name:'act'}}); }`); await settle();
+  ck("4037: left standing, self back in deck, +1 life", val(`const p=battle.plr; return !p.monsters.center && !p.monsters.left.rested && p.life===11 && p.deck.length===__dl+1`), val(`const p=battle.plr; return [p.monsters.center&&1,p.monsters.left.rested,p.life,p.deck.length,__dl]`));
+  // #3208 drop card to bottom of owner's deck, +1 life
+  run(`{ const me=setup(); me.life=10; battle.opp.drop=[1054]; me.drop=[]; globalThis.__od=battle.opp.deck.length; ABX.fireEv&&0; const ab=ABX.get(CARD_MAP.get(3208)).abilities.find(a=>a.kind==='triggered'&&a.steps[0].op==='r42DropToBottomLife'); ABX.runAbility('plr',CARD_MAP.get(3208),ab,mk(CARD_MAP.get(3208)),{event:{name:'attack'}}); }`); await settle();
+  ck("3208: opp drop card to bottom of opp deck, +1 life", val(`return battle.opp.deck.length===__od+1 && battle.opp.drop.length===0 && battle.plr.life===11`), val(`return [battle.opp.deck.length,__od,battle.opp.drop.length,battle.plr.life]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();

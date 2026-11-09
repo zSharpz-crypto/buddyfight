@@ -3655,6 +3655,58 @@
   );
   OV42.push([3286, /during an attack phase, when this card leaves the field/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { trigger: { event: "leave", self: true }, conds: [{ t: "phase", phase: "attack" }], unparsed: [], steps: parseS("put the top card of your deck into your gauge, and you gain 1 life") }) : ab)]);
   OV42.push([3334, /if you have a .gate of pardon, -forgiven-. on your field or three or less/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("put the top card of your deck into your gauge"), ...parseS("draw a card").map(x => Object.assign({}, x, { cond: { t: "or", list: [{ t: "r42HasNamed", name: "gate of pardon, -forgiven-" }, { t: "r42DropAtMost", n: 3 }] } }))] }) : ab)]);
+  /* ---- [r42] Star Dragon redirect / deck-bottom cards: #2384 #4037 #3208 #4889 ---- */
+  OPS.r42MoveRedirect = {
+    async run(s, ctx) {
+      const f = ctx.f, bc = ABX.battleCtx;
+      if (!bc || !bc.active) return false;
+      const list = ["left", "center", "right"].filter(p => f.monsters[p] && core.matchFilter(f.monsters[p].card, s.filter, null, ctx)).map(p => ({ k: "unit", side: ctx.side, pos: p, unit: f.monsters[p], card: f.monsters[p].card, id: f.monsters[p].card.id }));
+      if (!list.length) return false;
+      const ch = await core.pick(list, { qty: { n: 1, upTo: false } }, ctx, { intent: "help", min: 1, title: `${ctx.card.name} - move to your center` });
+      const r = ch && ch[0]; if (!r) return false;
+      if (r.pos !== "center") { const other = f.monsters.center; f.monsters.center = r.unit; f.monsters[r.pos] = other || null; if (B.setPrompt) B.setPrompt(`💨 "${r.card.name}" moved to the center and takes the attack!`); }
+      bc.redirectTo = "center"; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([2384, /move a .neodragon. or .guardians. on your field to your center/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42MoveRedirect", filter: { tribes: ["Neodragon", "Guardians"] } }] }) : ab)]);
+  OPS.r42SelfToDeckStand = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      if (B.phase !== "attack" || B.activeSide !== side) return false;
+      const pos = ["left", "center", "right"].find(p => f.monsters[p] && (f.monsters[p] === ctx.unit || (!ctx.unit && f.monsters[p].card.id === ctx.card.id)));
+      if (!pos) return false;
+      const list = ["left", "center", "right"].filter(p => p !== pos && f.monsters[p] && core.matchFilter(f.monsters[p].card, s.filter, null, ctx)).map(p => ({ k: "unit", side, pos: p, unit: f.monsters[p], card: f.monsters[p].card, id: f.monsters[p].card.id }));
+      if (!list.length) return false;
+      const ch = await core.pick(list, { qty: { n: 1, upTo: false } }, ctx, { intent: "help", min: 1, title: `${ctx.card.name} - choose a monster to [Stand]` });
+      const r = ch && ch[0]; if (!r) return false;
+      let top = false;
+      if (!(ABX.autoPlay || f.isBot) && ABX.ui && ABX.ui.pickOption) { const i = await ABX.ui.pickOption({ title: ctx.card.name, subtitle: "Put this card from the field on the deck?", options: ["Top of the deck", "Bottom of the deck", "Don't"], allowNone: true }); if (i == null || i < 0 || i === 2) return false; top = i === 0; }
+      const u = f.monsters[pos]; f.monsters[pos] = null;
+      (u.soul || []).forEach(x => f.drop.push(x && x.id ? x.id : x));
+      if (top) f.deck.unshift(u.card.id); else f.deck.push(u.card.id);
+      r.unit.rested = false; f.life += 1; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([4037, /put this card from the field on the top or the bottom of your deck/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SelfToDeckStand", filter: { tribes: ["Cosmo Dragoon", "Guardians"] } }] })]);
+  OPS.r42DropToBottomLife = {
+    async run(s, ctx) {
+      const cands = [];
+      [["plr", F("plr")], ["opp", F("opp")]].forEach(([sd, fx]) => fx.drop.forEach((id, idx) => cands.push({ k: "zone", side: sd, area: "drop", idx, id, card: core.cardOf(id) })));
+      if (!cands.length) return false;
+      const ch = await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - put a drop zone card on the bottom of its owner's deck` });
+      const r = ch && ch[0]; if (!r) return false;
+      const fx = F(r.side), i = fx.drop.indexOf(r.id); if (i < 0) return false;
+      fx.drop.splice(i, 1); fx.deck.push(r.id); ctx.f.life += 1; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([3208, /put up to one card from your opponent.s or your drop zone at the bottom/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DropToBottomLife" }] }) : ab)]);
+  OPS.r42AstroTurn = { run(s, ctx) { ctx.f.abxAstroTurn = B.turnCount; return true; }, check: () => true };
+  OV42.push([4889, /when an .astrodragon. on your field attacks, you gain 1 life/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42AstroTurn" }] }) : ab)]);
+  const fa4889 = ABX.fireAttack;
+  ABX.fireAttack = function (attSide, units) {
+    try { const f = F(attSide); if (f && f.abxAstroTurn === B.turnCount) (units || []).map(x => (x && x.unit) || x).forEach(u => { if (u && u.card && core.matchFilter(u.card, { tribes: ["Astrodragon"] }, null, { side: attSide, f, bind: {} })) f.life += 1; }); } catch (e) { /* ignore */ }
+    return fa4889.apply(this, arguments);
+  };
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
