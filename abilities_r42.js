@@ -6527,6 +6527,23 @@
   };
   OV42.push([1266, /your opponent reveals (?:his or her|their) hand/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42RefuReveal" }] }) : ab]);
 
+  /* ---- [r42] #5994 Electrobeast Emissary, Shino: the "look at the top seven" never happened. Look, take up to one size 3 Electrodeity, put the rest on the bottom; ONLY if you took one, drop a hand card. ---- */
+  OPS.r42ShinoLook = {
+    async run(s, ctx) {
+      const f = ctx.f, before = f.hand.length;
+      await OPS.lookPick.run(s.lookStep, ctx);
+      if (f.hand.length > before) await OPS.discard.run(s.dropStep, ctx);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([5994, /look at top seven cards of your deck/i, (ab) => {
+    if (ab.kind !== "triggered") return ab;
+    const lookStep = parseS("look at the top seven cards of your deck, put up to one size 3 «Electrodeity» from among them into your hand, and put the rest on the bottom of your deck in any order").find(x => x.op === "lookPick");
+    const dropStep = parseS("drop a hand card")[0];
+    return lookStep && dropStep ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ShinoLook", lookStep, dropStep }] }) : ab;
+  }]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

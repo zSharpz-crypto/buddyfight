@@ -24,5 +24,11 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   // #1266 One-Eyed Ninja, Refu: opponent reveals hand; choose a card -> bottom of their deck; then they draw two cards
   run(`clear(); battle.plr.monsters.center=mku(1266); battle.opp.hand=[46,46,1045]; globalThis.__oh=battle.opp.hand.length; globalThis.__od=battle.opp.deck.length;`); await enter(1266, "center");
   ok(J(`battle.opp.hand.length-__oh`) === 1 && J(`battle.opp.deck.length-__od`) === -1, `#1266 opp hand 3 -> 4 (one to the deck bottom, draws 2), deck 30 -> 29 (hand ${J("battle.opp.hand.length")}, deck ${J("battle.opp.deck.length")})`);
+  // #5994 Electrobeast Emissary, Shino: look at the top 7; up to one size 3 Electrodeity into the hand, the rest to the bottom of the deck; if you took one, drop a hand card
+  run(`clear(); battle.plr.monsters.center=mku(5994); battle.plr.hand=[46,46]; battle.plr.deck[3]=4443; globalThis.__dk=battle.plr.deck.length;`); await enter(5994, "center");
+  ok(J(`battle.plr.hand.includes(4443)`) && J(`battle.plr.hand.length`) === 2 && J(`battle.plr.drop.length`) === 1 && J(`battle.plr.deck.length`) === J(`__dk`) - 1 && !J(`battle.plr.deck.includes(4443)`),
+     `#5994 #4443 to hand, one hand card dropped, deck -1 (hand ${J("battle.plr.hand.length")}, has#4443 ${J("battle.plr.hand.includes(4443)")}, drop ${J("battle.plr.drop.length")}, deck ${J("battle.plr.deck.length")}/${J("__dk")})`);
+  run(`clear(); battle.plr.monsters.center=mku(5994); battle.plr.hand=[46,46]; globalThis.__dk=battle.plr.deck.length;`); await enter(5994, "center");
+  ok(J(`battle.plr.hand.length`) === 2 && J(`battle.plr.drop.length`) === 0 && J(`battle.plr.deck.length`) === J(`__dk`), "#5994 no size 3 Electrodeity among the top 7: nothing is taken, nothing is dropped");
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();
