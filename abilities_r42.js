@@ -3741,6 +3741,60 @@
   );
   OV42.push([6053, /your opponent chooses and puts a hand card on the bottom of their deck/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: (ab.steps || []).map(x => x.op === "r40StructuredExec" ? { op: "r42OppHandBottom", cond: { t: "r42Reversal", n: 2 } } : x) }) : ab)]);
   OV42.push([6155, /nullify the attack\. then, if your flag/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("nullify the attack"), { op: "r42AttackersToBottom", draw: true, cond: { t: "r42Reversal", n: 4 } }] }) : ab)]);
+  /* ---- [r42] Magic World / Star Dragon deck & board effects: #2393 #1312 #21 #1858 #4747 #23 ---- */
+  OPS.r42DeckToGaugeOrDrop = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const cands = f.deck.map((id, idx) => ({ k: "zone", side, area: "deck", idx, id, card: core.cardOf(id) })).filter(c => c.card && core.matchFilter(c.card, s.filter, null, ctx));
+      if (!cands.length) return false;
+      const ch = await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - put a card from your deck into your gauge or drop zone` });
+      const r = ch && ch[0]; if (!r) return false;
+      let gauge = true;
+      if (!(ABX.autoPlay || f.isBot) && ABX.ui && ABX.ui.pickOption) { const i = await ABX.ui.pickOption({ title: ctx.card.name, subtitle: `"${r.card.name}"`, options: ["Gauge", "Drop zone"] }); gauge = i !== 1; }
+      const i = f.deck.indexOf(r.id); if (i < 0) return false;
+      f.deck.splice(i, 1); (gauge ? f.gauge : f.drop).push(r.id); fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([2393, /put up to one monster from your deck into your gauge or drop zone/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DeckToGaugeOrDrop", filter: { types: ["monster"] } }, { op: "shuffle" }, ...parseS("you gain 1 life")] }) : ab)]);
+  OV42.push([1312, /put up to one .dragonarms. from your deck into your gauge or drop zone/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DeckToGaugeOrDrop", filter: { tribes: ["Dragonarms"] } }, { op: "shuffle" }] }) : ab)]);
+  OPS.r42PushFromCenter = {
+    async run(s, ctx) {
+      const e = ctx.e, u = e.monsters.center;
+      if (!u || Number(u.card.size) > 2) return false;
+      const open = ["left", "right"].filter(p => !e.monsters[p]); if (!open.length) return false;
+      let pos = open[0];
+      if (open.length > 1 && !(ABX.autoPlay || ctx.f.isBot) && ABX.ui && ABX.ui.pickOption) { const i = await ABX.ui.pickOption({ title: ctx.card.name, subtitle: `Move "${u.card.name}" to which open area?`, options: open.map(x => x.toUpperCase()) }); pos = open[i >= 0 ? i : 0]; }
+      e.monsters[pos] = u; e.monsters.center = null; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([21, /move a size 2 or less monster in your opponent.s center to the open left or right/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42PushFromCenter" }] }) : ab)]);
+  OPS.r42BothOneDamage = {
+    run(s, ctx) {
+      const cnt = (fx) => ["left", "center", "right"].filter(p => fx.monsters[p]).length;
+      if (cnt(ctx.f) !== 1 || cnt(ctx.e) !== 1) return false;
+      core.applyDamage(otherSide(ctx.side), 1, { kind: "effect", sourceCard: ctx.card }); return true;
+    }, check: () => true
+  };
+  OV42.push([1858, /if both you and your opponent have one monster each on the field/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "restSelf" }, ...parseS("deal 1 damage to your opponent"), { op: "r42BothOneDamage" }] }) : ab)]);
+  OPS.r42Look3 = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side, ids = f.deck.splice(0, 3);
+      if (!ids.length) return false;
+      const take = async (title, to) => {
+        if (!ids.length) return;
+        const cands = ids.map((id, idx) => ({ k: "zone", side, area: "deck", idx, id, card: core.cardOf(id) }));
+        const ch = (ABX.autoPlay || f.isBot) ? [cands[0]] : await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, title });
+        const r = ch && ch[0] || cands[0]; ids.splice(ids.indexOf(r.id), 1); to.push(r.id);
+      };
+      await take(`${ctx.card.name} - put one card into your gauge`, f.gauge);
+      await take(`${ctx.card.name} - put one card into your hand`, f.hand);
+      ids.forEach(id => f.drop.push(id)); fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([4747, /look at the top three cards of your deck, put one card from among them into your gauge/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Look3" }, ...parseS("you gain 1 life")] }) : ab)]);
+  XC42.r42DropNamed = (c, ctx) => ctx.f.drop.some(id => { const x = core.cardOf(id); return x && core.lc(x.name) === c.name; });
+  ABX.COND_OK.add("r42DropNamed");
+  OV42.push([23, /key of solomon, first volume. in your drop zone, draw a card/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("you gain 1 life"), ...parseS("draw a card").map(x => Object.assign({}, x, { cond: { t: "r42DropNamed", name: "key of solomon, first volume" } }))] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

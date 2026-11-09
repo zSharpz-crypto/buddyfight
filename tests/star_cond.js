@@ -51,5 +51,23 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     ck("6155 reversal x"+n+": attacker "+(atkGone?"bottomed and I draw":"stays"), val(`return (!battle.opp.monsters.center)===${atkGone} && battle.plr.hand.length===__h+${atkGone?1:0}`), val(`return [!!battle.opp.monsters.center, battle.plr.hand.length, __h]`));
     run(`ABX.battleCtx=null`);
   }
+  // Magic World / deck effects
+  run(`globalThis.__key=ALL_CARDS.find(c=>c.name==='Key of Solomon, First Volume').id; globalThis.__dr=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('Dragonarms')).id;`);
+  run(`{ const me=setup(); me.deck=[__dr,1054,1054]; me.life=10; globalThis.__g=me.gauge.length; ABX.fireSpell('plr',CARD_MAP.get(1312)); }`); await settle();
+  ck("1312: Dragonarms from deck to gauge", val(`return battle.plr.gauge.length===__g+1 && !battle.plr.deck.includes(__dr)`), val(`return [battle.plr.gauge.length,__g]`));
+  run(`{ const me=setup(); me.deck=[1054,1054,1054]; me.life=10; globalThis.__g=me.gauge.length; ABX.fireSpell('plr',CARD_MAP.get(2393)); }`); await settle();
+  ck("2393: monster to gauge, +1 life", val(`return battle.plr.gauge.length===__g+1 && battle.plr.life===11`), val(`return [battle.plr.gauge.length,__g,battle.plr.life]`));
+  run(`{ const me=setup(); battle.opp.monsters.center=mk(CARD_MAP.get(1054)); ABX.fireSpell('plr',CARD_MAP.get(21)); }`); await settle();
+  ck("21: opp center monster pushed to left", val(`return !battle.opp.monsters.center && !!battle.opp.monsters.left`));
+  for (const [mine, theirs, exp] of [[1, 1, 2], [2, 1, 1]]) {
+    run(`{ const me=setup(); me.item=null; me.monsters.center=mk(CARD_MAP.get(1054)); ${mine>1?'me.monsters.left=mk(CARD_MAP.get(1054));':''} battle.opp.monsters.center=mk(CARD_MAP.get(1054)); battle.opp.life=10; const ab=ABX.get(CARD_MAP.get(1858)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(1858),ab,mk(CARD_MAP.get(1858)),{event:{name:'act'}}); }`); await settle();
+    ck("1858 "+mine+" vs "+theirs+" monsters: opp loses "+exp, val(`return battle.opp.life===${10-exp}`), val(`return battle.opp.life`));
+  }
+  run(`{ const me=setup(); me.deck=[1054,1054,1054,1054]; me.life=10; globalThis.__g=me.gauge.length; globalThis.__h=me.hand.length; globalThis.__d=me.drop.length; ABX.fireSpell('plr',CARD_MAP.get(4747)); }`); await settle();
+  ck("4747: gauge+1, hand+1, drop+1, life+1", val(`const p=battle.plr; return p.gauge.length===__g+1 && p.hand.length===__h+1 && p.drop.length===__d+1 && p.life===11`), val(`const p=battle.plr; return [p.gauge.length-__g,p.hand.length-__h,p.drop.length-__d,p.life]`));
+  run(`{ const me=setup(); me.drop=[__key]; me.life=10; globalThis.__h=me.hand.length; ABX.fireSpell('plr',CARD_MAP.get(23)); }`); await settle();
+  ck("23 with Key in drop: +1 life and draw", val(`return battle.plr.life===11 && battle.plr.hand.length===__h+1`));
+  run(`{ const me=setup(); me.drop=[]; me.life=10; globalThis.__h=me.hand.length; ABX.fireSpell('plr',CARD_MAP.get(23)); }`); await settle();
+  ck("23 without Key: +1 life, no draw", val(`return battle.plr.life===11 && battle.plr.hand.length===__h`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
