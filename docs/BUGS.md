@@ -432,3 +432,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Hero World: #4525 drops a Battle Building monster and adds a Battle Building [Set] spell (shuffles); #1628 top card to gauge then keep/drop the next (human prompt: select = keep, cancel = drop; auto keeps). #3498 needs per-turn gauge-put tracking (not available). Test: tests/hero_e.js.
 
 - Hero World: #3216 discard a Caardian + 1 gauge -> draw 2 (discard step was missing); #2001 opp top card milled: monster -> Double Attack, spell + 1 gauge -> destroy (spell branch untested). Skipped #6416 (needs different-name spell counting). Test: tests/hero_e.js.
+
+- Hero World: #6295 look three (gauge, hand, rest to drop or item soul - choice only for humans); #6306 item-soul bonus (>=1 soul: 2 gauge + 2 life, >=3: draw; "cannot be nullified" part not implemented); #3287 Computer monster back from drop only if one was destroyed this turn. Test: tests/hero_e.js.

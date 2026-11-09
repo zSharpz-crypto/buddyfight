@@ -49,5 +49,19 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #2001 opp top card: monster -> Double Attack
   run(`{ const me=setup(), op=battle.opp; op.deck=[105,1054]; op.drop=[]; const u=mk(CARD_MAP.get(2001)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(2001)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2001),ab,u,{event:{name:'act'}}); }`); await settle();
   ck("2001: opp top monster milled -> Double Attack", val(`return battle.opp.drop.length===1 && battle.plr.monsters.center.tempDA===true`), val(`return [battle.opp.drop.length,battle.plr.monsters.center.tempDA]`));
+  // #6295 look three: one to gauge, one to hand, rest dropped (auto)
+  run(`{ const me=setup(); me.gauge=[]; me.hand=[]; me.drop=[]; me.deck=[1,2,3,4]; ABX.fireSpell('plr',CARD_MAP.get(6295),{free:true}); }`); await settle();
+  ck("6295: 1 gauge, 1 hand, 1 dropped, deck 1 left", val(`const p=battle.plr; return p.gauge.length===1 && p.hand.length===1 && p.drop.length===1 && p.deck.length===1`), val(`const p=battle.plr; return [p.gauge,p.hand,p.drop,p.deck]`));
+  // #6306 item soul bonus: 1 soul -> 2 gauge + 2 life, no draw; 3 souls -> also draw
+  for (const souls of [0, 1, 3]) {
+    run(`{ const me=setup(); me.gauge=[]; me.hand=[]; me.life=10; me.deck=[1,2,3,4,5]; me.item=mk(CARD_MAP.get(199)); me.item.soul=new Array(${souls}).fill(1054); ABX.fireSpell('plr',CARD_MAP.get(6306),{free:true}); }`); await settle();
+    ck("6306 item with " + souls + " souls", val(souls === 0 ? `const p=battle.plr; return p.gauge.length===0 && p.life===10` : `const p=battle.plr; return p.gauge.length===2 && p.life===12 && p.hand.length===${souls >= 3 ? 1 : 0}`), val(`const p=battle.plr; return [p.gauge.length,p.life,p.hand.length]`));
+  }
+  // #3287 Computer monster destroyed this turn -> one back from drop
+  run(`globalThis.__comp=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).some(a=>/^computer$/i.test(a))).id`);
+  for (const hit of [true, false]) {
+    run(`{ const me=setup(); me.hand=[]; me.drop=[__comp]; ${hit ? "me.abxDestroyedTurn={[__comp]:battle.turnCount};" : ""} ABX.fireSpell('plr',CARD_MAP.get(3287),{free:true}); }`); await settle();
+    ck("3287 " + (hit ? "Computer destroyed: returned" : "none destroyed: stays"), val(hit ? `return battle.plr.hand.includes(__comp) && battle.plr.drop.length===0` : `return battle.plr.hand.length===0 && battle.plr.drop.length===1`), val(`return [battle.plr.hand,battle.plr.drop]`));
+  }
   console.log(`\npass ${pass} fail ${fail}`);
 })();

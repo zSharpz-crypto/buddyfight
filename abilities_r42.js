@@ -4345,6 +4345,40 @@
     fresh(); return true;
   }, check: () => true };
   OV42.push([2001, /put the top card of your opponent's deck into his or her drop zone\. if that card is a monster/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42OppTopCheck" }] }) : ab]);
+  /* ---- Hero World: #6295 look three (gauge/hand/rest to drop or item soul), #6306 item-soul bonus, #3287 Computer back from drop ---- */
+  OPS.r42LookThreeGaugeHandSoul = { async run(s, ctx) {
+    const f = ctx.f, auto = ABX.autoPlay || f.isBot, ids = f.deck.splice(0, 3); if (!ids.length) return false;
+    const takeOne = async (title, to) => {
+      if (!ids.length) return;
+      const cands = ids.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) }));
+      const ch = auto ? [cands[0]] : await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, max: 1, title });
+      const r = ch[0] || cands[0]; ids.splice(ids.indexOf(r.id), 1); to.push(r.id);
+    };
+    await takeOne(`${ctx.card.name} - put one into your gauge`, f.gauge);
+    await takeOne(`${ctx.card.name} - put one into your hand`, f.hand);
+    const item = [f.item, f.item2].find(Boolean);
+    if (ids.length && item && !auto) {
+      const ch = await core.pick([{ k: "zone", side: ctx.side, area: "deck", idx: 0, id: ids[0], card: core.cardOf(ids[0]) }], { qty: { n: 1 } }, ctx, { intent: "help", min: 0, max: 1, title: `${ctx.card.name} - select to put the rest into your item's soul (cancel = drop)` });
+      if (ch.length) { item.soul = item.soul || []; item.soul.push(...ids.splice(0)); }
+    }
+    f.drop.push(...ids); fresh(); return true;
+  }, check: () => true };
+  OV42.push([6295, /look at the top three cards of your deck, put one from among them into your gauge/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42LookThreeGaugeHandSoul" }] }) : ab]);
+  OPS.r42ItemSoulBonus = { run(s, ctx) {
+    const f = ctx.f, item = [f.item, f.item2].find(it => it && (it.soul || []).length >= 1); if (!item) return false;
+    for (let i = 0; i < 2 && f.deck.length; i++) f.gauge.push(f.deck.shift());
+    f.life += 2;
+    if (item.soul.length >= 3 && f.deck.length) f.hand.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([6306, /if one or more souls are in the item on your field/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "nullifyAttack" }, { op: "r42ItemSoulBonus" }] }) : ab]);
+  OPS.r42ComputerBack = { run(s, ctx) {
+    const f = ctx.f, dt = f.abxDestroyedTurn || {}, isComp = (id) => (((core.cardOf(+id) || {}).attrs) || []).some(a => core.lc(a) === "computer");
+    if (!Object.keys(dt).some(id => dt[id] === B.turnCount && isComp(id))) return false;
+    const i = f.drop.findIndex(id => isComp(id) && core.cardOf(id).type === "Monster"); if (i < 0) return false;
+    f.hand.push(f.drop.splice(i, 1)[0]); fresh(); return true;
+  }, check: () => true };
+  OV42.push([3287, /if a .computer. monster on your field was destroyed, put a .computer. monster from your drop zone/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "nullifyAttack" }, { op: "r42ComputerBack" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
