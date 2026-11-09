@@ -3406,6 +3406,16 @@
   OV42.push([4972, /cosmo change|galaxy exalt/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Mill", n: 2 }, { op: "r42ModeFrom", areas: ["drop"], free: false, modes: ["transform"], filter: { tribes: ["Galaxy Exalt"] } }] }) : ab)]);
   OPS.r42Mill = { run(s, ctx) { const f = ctx.f; for (let i = 0; i < s.n && f.deck.length; i++) f.gauge.push(f.deck.shift()); fresh(); return true; }, check: () => true };
   OV42.push([6413, /when this card enters the field by \[g\.evo\], choose up to one card with/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [{ t: "gevoEntered" }], steps: [{ op: "r42ModeFrom", areas: ["hand", "drop"], free: true }] })]);
+  /* ---- [r42] "if you are [Impact Transform] into a card" family (#6300 #6302 #2642) ---- */
+  const XC42 = ABX.extraCond = ABX.extraCond || {};
+  XC42.r42ImpactTf = (c, ctx) => { const it = ctx.f && ctx.f.item; return !!(it && !it.isEndrulerFlag && it.card && window.IMX && IMX.isImpactMonster(it.card)); };
+  XC42.r42TfName = (c, ctx) => { const it = ctx.f && ctx.f.item; return !!(it && !it.isEndrulerFlag && it.isTransformed && it.card && String(it.card.name || "").toLowerCase().includes(c.name)); };
+  XC42.r42OppAtk3 = (c, ctx) => ((core.turnStats && ctx.e ? core.turnStats(ctx.e).attacks : 0) || 0) >= 3;
+  ["r42ImpactTf", "r42TfName", "r42OppAtk3"].forEach(t => ABX.COND_OK.add(t));
+  const gate = (steps, cond) => steps.map(x => Object.assign({}, x, { cond }));
+  OV42.push([6300, /\[counter\] nullify the attack\. then, if you are \[impact transform\]/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: parseS("nullify the attack").concat(gate(parseS("put the top card of your deck into your gauge, you gain 1 life, and draw a card"), { t: "r42ImpactTf" })) })]);
+  OV42.push([6302, /\[counter\] nullify the attack\. then, if your opponent.s cards attacked three times/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: parseS("nullify the attack").concat(gate(parseS("end this phase"), { t: "and", list: [{ t: "r42OppAtk3" }, { t: "r42ImpactTf" }] })) })]);
+  OV42.push([2642, /the third guy/i, (ab) => Object.assign({}, ab, { conds: [{ t: "r42TfName", name: "gaigrander" }], unparsed: [], steps: parseS("draw a card") })]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

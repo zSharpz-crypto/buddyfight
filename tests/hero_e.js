@@ -23,5 +23,17 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("4972: milled 2, paid 2 (gauge +2 -2)", val(`return battle.plr.gauge.length===__g && battle.plr.deck.length<=__d-2`), val(`return [battle.plr.gauge.length,__g,battle.plr.deck.length,__d]`));
   run(`{ const me=setup(); me.drop=[1054]; ABX.fireSpell('plr',CARD_MAP.get(4972)); }`); await settle();
   ck("4972 with no Galaxy Exalt in drop: no transform", val(`return !battle.plr.item`));
+  // #6300 / #6302: counters with "if you are [Impact Transform] into a card"
+  const impItem = `me.item={card:CARD_MAP.get(__imp),rested:false,attacksLeft:1,soul:[],isTransformed:true}`;
+  run(`globalThis.__imp=ALL_CARDS.find(c=>IMX.isImpactMonster(c)).id;`);
+  run(`{ const me=setup(); ${impItem}; globalThis.__g=me.gauge.length; globalThis.__l=me.life; globalThis.__h=me.hand.length; ABX.fireSpell('plr',CARD_MAP.get(6300)); }`); await settle();
+  ck("6300 impact transformed: gauge+1, life+1, draw 1", val(`const p=battle.plr; return p.gauge.length===__g+1 && p.life===__l+1 && p.hand.length===__h+1`), val(`const p=battle.plr; return [p.gauge.length-__g,p.life-__l,p.hand.length-__h]`));
+  run(`{ const me=setup(); globalThis.__g=me.gauge.length; globalThis.__l=me.life; globalThis.__h=me.hand.length; ABX.fireSpell('plr',CARD_MAP.get(6300)); }`); await settle();
+  ck("6300 not impact transformed: no bonus", val(`const p=battle.plr; return p.gauge.length===__g && p.life===__l && p.hand.length===__h`), val(`const p=battle.plr; return [p.gauge.length-__g,p.life-__l,p.hand.length-__h]`));
+  // #2642 The Third Guy: enters while transformed into a Gaigrander card -> draw
+  run(`{ const me=setup(); me.item={card:CARD_MAP.get(6223)||ALL_CARDS.find(c=>/gaigrander/i.test(c.name)),rested:false,attacksLeft:1,soul:[],isTransformed:true}; globalThis.__h=me.hand.length; ABX.fireEnter&&ABX.fireEnter('plr',CARD_MAP.get(2642),mk(CARD_MAP.get(2642))); }`); await settle();
+  ck("2642 with Gaigrander transform: draws", val(`return battle.plr.hand.length===__h+1`), val(`return [battle.plr.hand.length,__h]`));
+  run(`{ const me=setup(); globalThis.__h=me.hand.length; ABX.fireEnter&&ABX.fireEnter('plr',CARD_MAP.get(2642),mk(CARD_MAP.get(2642))); }`); await settle();
+  ck("2642 without transform: no draw", val(`return battle.plr.hand.length===__h`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
