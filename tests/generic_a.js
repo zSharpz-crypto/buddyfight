@@ -38,5 +38,9 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     run(`{ const me=setup(); me.hand=[__fool]; me.drop=${ok ? "[__fool]" : "[]"}; me.abxExtraTurn=0; const u=mk(CARD_MAP.get(741)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(741)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(741),ab,u,{event:{name:'act'}}); }`); await settle();
     ck("741 " + (ok ? "Fool in hand and drop: extra turn" : "no Fool in drop: nothing"), val(ok ? `const p=battle.plr; return p.abxExtraTurn===1 && p.hand.length===0 && p.drop.filter(x=>x===__fool).length===0 && p.deck.slice(-2).every(x=>x===__fool) && p.gauge.length===4` : `return !battle.plr.abxExtraTurn && battle.plr.hand.length===1`), val(`const p=battle.plr; return [p.abxExtraTurn,p.hand.length,p.gauge.length,p.deck.slice(-2)]`));
   }
+  // #699 one damage per Actor Knights monster among the top five
+  run(`globalThis.__ak=ALL_CARDS.find(c=>c.type==='Monster'&&/actor knights/i.test(c.name)).id`);
+  run(`{ const me=setup(), op=battle.opp; op.life=10; me.deck=[__ak,1054,__ak,1054,1054,9,9]; ABX.fireSpell('plr',CARD_MAP.get(699),{free:true}); }`); await settle();
+  ck("699: 2 Actor Knights among top five -> 2 damage, deck size kept", val(`return battle.opp.life===8 && battle.plr.deck.length===7`), val(`return [battle.opp.life,battle.plr.deck.length]`));
   console.log("\npass " + pass + " fail " + fail);
 })();

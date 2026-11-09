@@ -4293,6 +4293,15 @@
     return OPS.extraPhase.run({ what: "turn" }, ctx);
   }, check: () => true };
   OV42.push([741, /you may pay 3 gauge, and choose an .actor knights the fool. from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42CompleteDominance" }] }) : ab]);
+  /* ---- Generic #699: reveal five, 1 damage per "Actor Knights" monster among them, revealed cards to the bottom ---- */
+  OPS.r42RevealFiveActorDamage = { run(s, ctx) {
+    const f = ctx.f, ids = f.deck.splice(0, 5); if (!ids.length) return false;
+    const n = ids.filter(id => { const c = core.cardOf(id); return c && c.type === "Monster" && core.lc(c.name || "").includes("actor knights"); }).length;
+    f.deck.push(...ids);
+    if (n > 0) core.applyDamage(otherSide(ctx.side), n, { kind: "effect", sourceCard: ctx.card });
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([699, /reveal five cards from the top of your deck\. for each monster with .actor knights./i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42RevealFiveActorDamage" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

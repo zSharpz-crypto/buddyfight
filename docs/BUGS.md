@@ -426,3 +426,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Generic: #1886 discard Battle Deity Robo or pay 2 life then 2 gauge; #1086 discard then next damage -2 (-4 if BDR); #2790 Act discards two size 3+ monsters + pays 2 gauge for +5 life. #1086 test checks reduceBy via a JSON scan of the fighter, not an actual damage event. Open Generic: #694 #699 #741 #1887 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
 
 - Generic: #741 Complete Dominance (pay 3 gauge, Fool from hand + drop to deck bottom, extra turn). Open Generic: #694 #699 #1887 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
+
+- Generic: #699 reveal five, 1 damage per Actor Knights monster, cards back to bottom (original order, not player-chosen). #1887 deferred: field-Act battle context has defUnit null (abilities_engine.js ~1851), so the attacked monster is unknown. Open Generic: #694 #1887 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
