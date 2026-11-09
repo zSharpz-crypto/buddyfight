@@ -6544,6 +6544,21 @@
     return lookStep && dropStep ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ShinoLook", lookStep, dropStep }] }) : ab;
   }]);
 
+
+  /* ---- [r42] #39 Asmodai Eternal Rolling Back-drop!: reveal the top five, deal 1 + (revealed cards named "Asmodai") damage, THEN put them on the bottom (the generic fallback counted after the cards had moved) ---- */
+  OPS.r42BackDropImpact = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      const rev = f.deck.splice(0, 5);
+      const n = rev.filter(id => /asmodai/i.test((core.cardOf(id) || {}).name || "")).length;
+      core.applyDamage(otherSide(ctx.side), 1 + n, { kind: "effect", sourceCard: ctx.card });
+      f.deck.push(...rev);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([39, /reveal the five cards from the top of your deck/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42BackDropImpact" }] }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
