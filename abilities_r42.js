@@ -3548,6 +3548,22 @@
     }, check: () => true
   };
   OV42.push([6345, /for the future|look at all of your gauge/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Mill", n: 2 }, { op: "r42GaugeToHand", anyNames: ["jackknife", "abygale"] }] }) : ab)]);
+  /* ---- [r42] Darkness Dragon misc: #3480 (opp discards), #3499 (thirteen), #3563 (gauge -> drop per opp monster) ---- */
+  XC42.r42Thirteen = (c, ctx) => !!ctx.e && (ctx.e.life === 13 || ctx.e.drop.length === 13 || ctx.e.deck.length === 13);
+  ABX.COND_OK.add("r42Thirteen");
+  OV42.push([3499, /if your opponent has 13 life, thirteen cards/i, (ab) => Object.assign({}, ab, { conds: [{ t: "r42Thirteen" }], unparsed: [], steps: parseS("deal 7 damage to your opponent") })]);
+  ABX.ACTION_RULES.unshift([/^your opponent chooses a card from (?:his or her|their) hand,? and (?:discards|drops) it$/i, () => ({ op: "oppDiscard", n: 1 }), false]);
+  OPS.r42GaugeToDropByOppMons = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side, n = Math.min(["left", "center", "right"].filter(p => ctx.e.monsters[p]).length, f.gauge.length);
+      if (!n) return false;
+      const cands = f.gauge.map((id, idx) => ({ k: "zone", side, area: "gauge", idx, id, card: core.cardOf(id) }));
+      const ch = (ABX.autoPlay || f.isBot) ? cands.slice(0, n) : await core.pick(cands, { qty: { n } }, ctx, { intent: "cost", min: n, title: `${ctx.card.name} - put ${n} card(s) from your gauge into the drop zone` });
+      (ch || []).forEach(r => { const i = f.gauge.indexOf(r.id); if (i >= 0) { f.gauge.splice(i, 1); f.drop.push(r.id); } });
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([3563, /put the number of cards from your gauge into the drop zone equal to the number of monsters/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Mill", n: 4 }, { op: "r42GaugeToDropByOppMons" }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
@@ -5050,6 +5066,10 @@
   watchOv(1440, /when that monster is destroyed, draw a card/i, "choose a monster on your opponent's field", "destroyed", "draw a card and you gain 1 life");
   watchOv(2016, /if that card is destroyed, put the top card/i, "choose a monster on your opponent's field", "destroyed", "put the top card of your deck into your gauge, and draw a card");
   watchOv(2977, /when that card attacks, destroy a size 1/i, "choose a monster on your field", "attack", "destroy a size 1 or less monster on your opponent's field and put the top card of your deck into your gauge");
+  // #3706 Counter: chosen opp monster, this turn when it attacks or is destroyed -> top card to gauge, gain 1 life
+  OV42.push([3706, /when the chosen card attacks or is destroyed/i, (ab) => { const E = parseS("put the top card of your deck into your gauge and you gain 1 life"); return { kind: ab.kind || "spell", tags: ab.tags, once: ab.once, conds: ab.conds || [], steps: [...parseS("choose a monster on your opponent's field"), { op: "r42Watch", ev: "destroyed", steps: E }, { op: "r42Watch", ev: "attack", steps: E }] }; }]);
+  // #3672 Enter: chosen opp card, this turn when destroyed -> top card to gauge, draw
+  OV42.push([3672, /for this turn, when the chosen card is destroyed/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("choose a card on your opponent's field"), { op: "r42Watch", ev: "destroyed", steps: parseS("put the top card of your deck into your gauge, and draw a card") }] }) : ab)]);
 
 
   /* ---- [r42] Life-total family: #36 #199 (life would become 0), #285 (floor at 1), #2424, #5385 (win at 22 life), #5573 (life 6 or less) ---- */
