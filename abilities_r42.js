@@ -3927,6 +3927,11 @@
     }, check: () => true
   };
   OV42.push([2066, /for each skull warrior among them, deal 1 damage/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42MillCountDamage", n: 4, filter: { tribes: ["Skull Warrior"] } }] }) : ab)]);
+  /* ---- [r42] Secret Sword cast from the soul: #3960 gets a bonus only when it was cast that way ---- */
+  const csfs42 = OPS.castSelfFromSoul.run;
+  OPS.castSelfFromSoul.run = async function () { ABX._castFromSoul = true; try { return await csfs42.apply(this, arguments); } finally { ABX._castFromSoul = false; } };
+  OPS.r42SoulCastBonus = { run(s, ctx) { if (!ABX._castFromSoul) return false; for (let i = 0; i < s.n && ctx.f.deck.length; i++) ctx.f.gauge.push(ctx.f.deck.shift()); fresh(); return true; }, check: () => true };
+  OV42.push([3960, /then, if this card was cast from the soul of/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("deal 2 damage to your opponent"), ...parseS("[stand] a card on your field"), { op: "r42SoulCastBonus", n: 3 }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

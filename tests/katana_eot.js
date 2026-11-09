@@ -1,4 +1,4 @@
-// node tests/hero_d.js - Katana end-of-turn / attack spells (#338 #3700 #272 #329 #1181 #2066)
+// node tests/hero_d.js - Katana end-of-turn / attack spells (#338 #3700 #272 #329 #1181 #2066 #3960)
 const { createEnv } = require("./headless.js");
 const { run, flush } = createEnv();
 const val = (js) => JSON.parse(run(`JSON.stringify((function(){${js}})())`));
@@ -37,5 +37,10 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("329: discards a card, then adds the Set Demon Way spell to hand", val(`const p=battle.plr; return p.hand.includes(__dws) && p.drop.includes(1054)`), val(`return [battle.plr.hand,battle.plr.drop]`));
   run(`{ const me=setup(); me.hand=[]; me.deck=[1054,__dws,1054]; ABX.fireEnter('plr',CARD_MAP.get(329),mk(CARD_MAP.get(329))); }`); await settle();
   ck("329 with nothing to discard: no search", val(`return !battle.plr.hand.includes(__dws)`), val(`return battle.plr.hand`));
+  // #3960: gauge bonus only when cast from the soul of Secret Sword, Lethal Formation
+  for (const soul of [false, true]) {
+    run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(1054)); me.monsters.center.rested=true; battle.opp.life=10; globalThis.__g=me.gauge.length; ABX._castFromSoul=${soul}; ABX.fireSpell('plr',CARD_MAP.get(3960)); }`); await settle(); run(`ABX._castFromSoul=false`);
+    ck("3960 "+(soul?"from soul":"normal cast")+": 2 damage, stand, gauge +"+(soul?3:0), val(`return battle.opp.life===8 && !battle.plr.monsters.center.rested && battle.plr.gauge.length===__g+${soul?3:0}`), val(`return [battle.opp.life, battle.plr.monsters.center.rested, battle.plr.gauge.length-__g]`));
+  }
   console.log(`\npass ${pass} fail ${fail}`);
 })();
