@@ -3477,6 +3477,37 @@
   OV42.push([780, /the monster in your opponent.s center becomes \[stand\]/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42StandForceAtk", pos: "center", crit: 1 }] }) : ab)]);
   OV42.push([3424, /\[stand\] the chosen monster, and that monster attacks your opponent/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42StandForceAtk", pos: "choose", restSelf: true }] })]);
   OV42.push([3711, /\[stand\] a monster on your field, and for this turn/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42StandBoost", power: 3000 }] }) : ab)]);
+  /* ---- [r42] Darkness Dragon counter locks + size set: #1625 #6354 #6361 ---- */
+  OPS.r42NoCounterAtkMon = { run(s, ctx) { ctx.f.abxNoCtrMonTurn = B.turnCount; return true; }, check: () => true };
+  const nc42 = ABX.noCounterThisBattle;
+  ABX.noCounterThisBattle = function (attSide, units, targetPos) {
+    if (nc42 && nc42.apply(this, arguments)) return true;
+    try {
+      const f = F(attSide), us = (units || []).map(x => (x && x.unit) || x).filter(Boolean);
+      if (targetPos && targetPos !== "fighter") {
+        if (f.abxNoCtrMonTurn === B.turnCount) return true;                                                                   // #1625
+        if (us.length === 1 && (f.setSpells || []).some(c => c && c.id === 6354)) return true;                              // #6354 (attacking alone)
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  OV42.push([1625, /during the battle in which a card on your field attacks an opponent.s monster/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NoCounterAtkMon" }] })]);
+  OV42.push([6354, /cannot \[counter\] during the battle that a monster on your field is attacking/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "noop", note: "[Set] counter lock is read by noCounterThisBattle" }] }) : ab)]);
+  OPS.r42SetSize = {
+    async run(s, ctx) {
+      const e = ctx.e, es = ctx.side === "plr" ? "opp" : "plr";
+      const list = ["left", "center", "right"].filter(p => e.monsters[p]).map(p => ({ k: "unit", side: es, pos: p, unit: e.monsters[p], card: e.monsters[p].card, id: e.monsters[p].card.id }));
+      if (!list.length) return false;
+      const ch = await core.pick(list, { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", min: 1, title: `${ctx.card.name} - choose a monster on your opponent's field` });
+      const r = ch && ch[0]; if (!r) return false;
+      if (ctx.f.gauge.length < 1) return false;
+      const yes = ABX.autoPlay || ctx.f.isBot || !ABX.ui || !ABX.ui.confirm ? true : await ABX.ui.confirm({ title: ctx.card.name, text: "Pay 1 gauge to change the chosen card's size to " + s.size + "?", card: ctx.card });
+      if (!yes) return false;
+      ctx.f.drop.push(ctx.f.gauge.pop());
+      r.unit.abxSizeSet = s.size; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([6361, /change the chosen card.s size to 3/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SetSize", size: 3 }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

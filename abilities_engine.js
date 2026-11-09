@@ -1748,6 +1748,7 @@
     const side = B.plr === fighter ? "plr" : B.opp === fighter ? "opp" : null;
     if (!side) return 0;
     if (unit && unit.abxSize0 && unit.abxSize0.whileName && !ABX.nameOnField(unit.abxSize0.whileName)) unit.abxSize0 = false;
+    if (unit && unit.abxSizeSet != null) return unit.abxSizeSet - (Number(card.size) || 0);   // "change the chosen card's size to N until it leaves the field" (#6361)
     if (unit && unit.abxSize0) return -99;   // "That card becomes size 0 until it leaves the field" / "as long as "X" is on the field"
     inSize++;
     let d = 0;

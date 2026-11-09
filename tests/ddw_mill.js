@@ -41,5 +41,13 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #3711: stand own monster, power +3000
   run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(1054)); me.monsters.center.rested=true; ABX.fireSpell('plr',CARD_MAP.get(3711)); }`); await settle();
   ck("3711: monster stood with +3000 power", val(`const u=battle.plr.monsters.center; return !u.rested && u.tempPower===3000`), val(`const u=battle.plr.monsters.center; return [u.rested,u.tempPower]`));
+  // #1625 / #6354 counter locks (attack on a monster, not on the fighter)
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(1054)); ABX.fireSpell('plr',CARD_MAP.get(1625)); }`); await settle();
+  ck("1625: no counters when attacking a monster, but not when attacking the fighter", val(`const u=[{unit:battle.plr.monsters.center,pos:'center'}]; return ABX.noCounterThisBattle('plr',u,'center')===true && !ABX.noCounterThisBattle('plr',u,'fighter')`));
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(1054)); me.monsters.left=mk(CARD_MAP.get(1054)); me.setSpells=[{id:6354,soul:[]}]; }`);
+  ck("6354 set: lock when a monster attacks a monster alone, not as a link attack", val(`const p=battle.plr.monsters; const one=[{unit:p.center,pos:'center'}], two=one.concat([{unit:p.left,pos:'left'}]); return ABX.noCounterThisBattle('plr',one,'center')===true && !ABX.noCounterThisBattle('plr',two,'center') && !ABX.noCounterThisBattle('plr',one,'fighter')`));
+  // #6361 Omni Lord act: pay 1 gauge, chosen opp monster becomes size 3
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(6361)); battle.opp.monsters.left=mk(CARD_MAP.get(1054)); globalThis.__g=me.gauge.length; const ab=ABX.actAbilities(CARD_MAP.get(6361))[0]; ABX.runAbility('plr',CARD_MAP.get(6361),ab,me.monsters.center,{event:{name:'act'}}); }`); await settle();
+  ck("6361: opp monster is size 3 and 1 gauge paid", val(`return getEffectiveCardSize(battle.opp, battle.opp.monsters.left.card, battle.opp.monsters.left)===3 && battle.plr.gauge.length===__g-1`), val(`return [getEffectiveCardSize(battle.opp, battle.opp.monsters.left.card, battle.opp.monsters.left), battle.plr.gauge.length, __g]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
