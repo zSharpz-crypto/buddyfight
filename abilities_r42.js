@@ -3707,6 +3707,40 @@
     try { const f = F(attSide); if (f && f.abxAstroTurn === B.turnCount) (units || []).map(x => (x && x.unit) || x).forEach(u => { if (u && u.card && core.matchFilter(u.card, { tribes: ["Astrodragon"] }, null, { side: attSide, f, bind: {} })) f.life += 1; }); } catch (e) { /* ignore */ }
     return fa4889.apply(this, arguments);
   };
+  /* ---- [r42] Star Dragon [Reversal] tails: #6053 (opp puts a hand card on the bottom of their deck), #6155 (attackers to the bottom of the opp deck) ---- */
+  const revCount = (f) => (f && f.godclock && f.godclock.reversalCount) || 0;
+  XC42.r42Reversal = (c, ctx) => revCount(ctx.f) >= c.n;
+  ABX.COND_OK.add("r42Reversal");
+  OPS.r42OppHandBottom = {
+    async run(s, ctx) {
+      const e = ctx.e; if (!e.hand.length) return false;
+      const cands = e.hand.map((id, idx) => ({ k: "zone", side: otherSide(ctx.side), area: "hand", idx, id, card: core.cardOf(id) }));
+      const ch = await core.pick(cands, { qty: { n: 1 } }, ctx, { chooserSide: otherSide(ctx.side), intent: "cost", title: "Choose a hand card to put on the bottom of your deck" });
+      const r = ch && ch[0]; if (!r) return false;
+      const i = e.hand.indexOf(r.id); if (i < 0) return false;
+      e.hand.splice(i, 1); e.deck.push(r.id); fresh(); return true;
+    }, check: () => true
+  };
+  OPS.r42AttackersToBottom = {
+    run(s, ctx) {
+      const bc = ABX.battleCtx; if (!bc || !bc.active) return false;
+      const af = F(bc.attSide); let n = 0;
+      (bc.attUnits || []).slice().forEach(u => {
+        const pos = ["left", "center", "right"].find(p => af.monsters[p] === u); if (!pos) return;
+        (u.soul || []).forEach(x => af.drop.push(x && x.id ? x.id : x));
+        af.monsters[pos] = null; af.deck.push(u.card.id); n++;
+      });
+      if (n && s.draw) { const f = ctx.f; if (f.deck.length) f.hand.push(f.deck.shift()); }
+      fresh(); return n > 0;
+    }, check: () => true
+  };
+  ABX.ACTION_RULES.unshift(
+    [/^(?:then,? )?if your flags? \[?reversal\]? two times or more during this fight, your opponent chooses and puts a hand card on the bottom of their deck[.!]*$/i, () => ({ op: "r42OppHandBottom", cond: { t: "r42Reversal", n: 2 } }), false],
+    [/^(?:then,? )?if your flags? \[?reversal\]? four times or more during this fight, for this turn, nullify the abilities of all attacking cards and put them on the bottom of your opponent.s deck[.!]*$/i, () => ({ op: "r42AttackersToBottom", draw: true, cond: { t: "r42Reversal", n: 4 } }), false],
+    [/^if one or more cards were put, draw a card[.!]*$/i, () => ({ op: "noop", note: "draw is part of r42AttackersToBottom" }), false]
+  );
+  OV42.push([6053, /your opponent chooses and puts a hand card on the bottom of their deck/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: (ab.steps || []).map(x => x.op === "r40StructuredExec" ? { op: "r42OppHandBottom", cond: { t: "r42Reversal", n: 2 } } : x) }) : ab)]);
+  OV42.push([6155, /nullify the attack\. then, if your flag/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("nullify the attack"), { op: "r42AttackersToBottom", draw: true, cond: { t: "r42Reversal", n: 4 } }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

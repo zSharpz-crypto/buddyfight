@@ -1,4 +1,4 @@
-// node tests/hero_d.js - Star Dragon conditional effects (#2920 #2381 #2888 #3286 #3334 #1677)
+// node tests/hero_d.js - Star Dragon conditional effects (#2920 ... #6155)
 const { createEnv } = require("./headless.js");
 const { run, flush } = createEnv();
 const val = (js) => JSON.parse(run(`JSON.stringify((function(){${js}})())`));
@@ -40,5 +40,16 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #3208 drop card to bottom of owner's deck, +1 life
   run(`{ const me=setup(); me.life=10; battle.opp.drop=[1054]; me.drop=[]; globalThis.__od=battle.opp.deck.length; ABX.fireEv&&0; const ab=ABX.get(CARD_MAP.get(3208)).abilities.find(a=>a.kind==='triggered'&&a.steps[0].op==='r42DropToBottomLife'); ABX.runAbility('plr',CARD_MAP.get(3208),ab,mk(CARD_MAP.get(3208)),{event:{name:'attack'}}); }`); await settle();
   ck("3208: opp drop card to bottom of opp deck, +1 life", val(`return battle.opp.deck.length===__od+1 && battle.opp.drop.length===0 && battle.plr.life===11`), val(`return [battle.opp.deck.length,__od,battle.opp.drop.length,battle.plr.life]`));
+  // #6053 / #6155 Reversal tails
+  const rev = (n) => `battle.plr.godclock=battle.plr.godclock||{}; battle.plr.godclock.reversalCount=${n};`;
+  for (const [n, exp] of [[2, 1], [1, 2]]) {
+    run(`{ const me=setup(); ${rev(n)} battle.opp.hand=[1054,1054]; battle.opp.monsters.left=mk(CARD_MAP.get(1054)); globalThis.__od=battle.opp.deck.length; const ab=ABX.get(CARD_MAP.get(6053)).abilities.find(a=>a.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(6053),ab,mk(CARD_MAP.get(6053)),{event:{name:'x'}}); }`); await settle();
+    ck("6053 reversal x"+n+": opp hand "+exp, val(`return battle.opp.hand.length===${exp}`), val(`return [battle.opp.hand.length, battle.opp.life]`));
+  }
+  for (const [n, atkGone] of [[4, true], [3, false]]) {
+    run(`{ const me=setup(); ${rev(n)} battle.opp.monsters.center=mk(CARD_MAP.get(1054)); globalThis.__h=me.hand.length; ABX.battleCtx={active:true,attSide:'opp',defSide:'plr',redirectTo:null,nullified:false,attUnits:[battle.opp.monsters.center]}; ABX.fireSpell('plr',CARD_MAP.get(6155)); }`); await settle();
+    ck("6155 reversal x"+n+": attacker "+(atkGone?"bottomed and I draw":"stays"), val(`return (!battle.opp.monsters.center)===${atkGone} && battle.plr.hand.length===__h+${atkGone?1:0}`), val(`return [!!battle.opp.monsters.center, battle.plr.hand.length, __h]`));
+    run(`ABX.battleCtx=null`);
+  }
   console.log(`\npass ${pass} fail ${fail}`);
 })();
