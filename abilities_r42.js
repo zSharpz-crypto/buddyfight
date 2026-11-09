@@ -4230,6 +4230,26 @@
     fresh(); return true;
   }, check: () => true };
   OV42.push([115, /choose a monster on your field, and for this turn, increase its power or defense by the power of a weapon/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42WeaponPowerBoost" }] }) : ab]);
+  /* ---- Generic: #695 look at top card, top or bottom; #6206 reset hand/gauge/drop into the deck ---- */
+  OPS.r42LookTopOrBottom = { async run(s, ctx) {
+    const f = ctx.f; if (!f.deck.length) return false;
+    const id = f.deck[0];
+    if (!(ABX.autoPlay || f.isBot)) {
+      const ch = await core.pick([{ k: "zone", side: ctx.side, area: "deck", idx: 0, id, card: core.cardOf(id) }], { qty: { n: 1 } }, ctx, { intent: "help", min: 0, max: 1, title: `${ctx.card.name} - select the card to KEEP it on top (cancel = bottom)` });
+      if (!ch.length) f.deck.push(f.deck.shift());
+    }
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([695, /look at the top card of your deck, and put it on the top or the bottom/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42LookTopOrBottom" }] }) : ab]);
+  OPS.r42KronosReset = { async run(s, ctx) {
+    const f = ctx.f;
+    f.deck.push(...f.hand.splice(0), ...f.gauge.splice(0), ...f.drop.splice(0));
+    for (let i = f.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [f.deck[i], f.deck[j]] = [f.deck[j], f.deck[i]]; }
+    for (let i = 0; i < 6 && f.deck.length; i++) f.hand.push(f.deck.shift());
+    for (let i = 0; i < 2 && f.deck.length; i++) f.gauge.push(f.deck.shift());
+    f.life = 10; fresh(); return true;
+  }, check: () => true };
+  OV42.push([6206, /return all cards from your hand, gauge and drop zone to your deck/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42KronosReset" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

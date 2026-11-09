@@ -420,3 +420,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Danger World: #4204 Counter Act now requires a Duel Golem destroyed this turn (fallback removed); #3962 same condition added to its drop-zone call but NOT tested (drop-zone act availability unverified). Open: #115 #119 #129 #135 #1076 #2428 #4783. Test: tests/danger_a.js.
 
 - Danger World: #129 life gain 4 minus Invigorating Breath in drop; #115 chosen monster gets a Weapon power bonus + Counterattack (power only, the "or defense" choice is not offered). Open: #119 #135 #1076 #2428 #4783. Test: tests/danger_a.js.
+
+- Generic: #695 look at top card, keep on top or send to bottom (human: select = keep, cancel = bottom; auto keeps); #6206 return hand/gauge/drop to deck, shuffle, draw 6, 2 to gauge, life 10 (its "four Reversals" cast rule and once-per-fight not re-verified). Open Generic: #694 #699 #741 #1086 #1886 #1887 #2790 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
