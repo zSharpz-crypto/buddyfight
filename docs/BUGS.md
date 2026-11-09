@@ -436,3 +436,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Hero World: #6295 look three (gauge, hand, rest to drop or item soul - choice only for humans); #6306 item-soul bonus (>=1 soul: 2 gauge + 2 life, >=3: draw; "cannot be nullified" part not implemented); #3287 Computer monster back from drop only if one was destroyed this turn. Test: tests/hero_e.js.
 
 - Hero World: #4471 gauge+life only when the ridden Mobile Aerial Team (item) has 2+ souls. Skipped #3226 (opponent optional call + return-to-hand) and #1042 (declare card name). Test: tests/hero_e.js.
+
+- Magic World: #2719 and #4187 now require discarding two 72 Pillars / two Wizard before their effect (the fallback skipped the cost). #99 already had an earlier override (a duplicate I wrote was removed). Test: tests/magic_b.js.

@@ -4387,6 +4387,14 @@
     f.life += 2; fresh(); return true;
   }, check: () => true };
   OV42.push([4471, /if the .mobile aerial team. you are \[ride\] on has two or more souls/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "nullifyAttack" }, { op: "r42AerialSoulBonus" }] }) : ab]);
+  /* ---- Magic World: #2719 two 72 Pillars / #4187 two Wizard discard costs (the fallback skipped them); #99 discard any number, destroy that many ---- */
+  OPS.r42DiscardTwoOfAttr = { async run(s, ctx) {
+    const ch = await pickHand(ctx, (c) => !!c && (c.attrs || []).some(a => core.lc(a) === s.attr), 2, `${ctx.card.name} - discard two`);
+    if (!ch) return false;
+    discardIds(ctx, ch.map(r => r.id)); fresh(); return true;
+  }, check: () => true };
+  OV42.push([2719, /discard two .72 pillars. from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardTwoOfAttr", attr: "pillars" }, ...noFb(ab.steps)] }) : ab]);
+  OV42.push([4187, /you may discard two wizard from your hand/i, (ab) => ab.kind === "act" && !(ab.tags || []).includes("counter") ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardTwoOfAttr", attr: "wizard" }, ...noFb(ab.steps)] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
