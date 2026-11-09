@@ -6459,6 +6459,14 @@
   };
   OV42.push([2331, /if the card discarded from your hand by this card.s \[cast cost\]/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42LuaNova" }] }) : ab]);
 
+  /* ---- [r42] #3110 Lost Dragonarms, Giant Fragment: [Quadruple Attack] only if the host has FOUR copies of this card in its soul (it was given every time) ---- */
+  XC42.r42FourFragments = (c, ctx) => { const h = ctx.soulHost || ctx.unit; return !!h && (h.soul || []).filter(x => (x && typeof x === "object" ? x.id : x) === 3110).length >= 4; };
+  ABX.COND_OK.add("r42FourFragments");
+  OV42.push([3110, /four "lost dragonarms, giant fragment" in its soul/i, (ab) => {
+    const st = noFb(ab.steps);
+    return ab.kind === "act" && st.length >= 3 ? Object.assign({}, ab, { unparsed: [], steps: st.slice(0, 2).concat([Object.assign({}, st[2], { cond: { t: "r42FourFragments" }, gate: undefined })]) }) : ab;
+  }]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

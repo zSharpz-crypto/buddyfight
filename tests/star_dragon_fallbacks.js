@@ -44,5 +44,24 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   r = eff(); ok(r[0] === 0 && r[2] === 1 && r[3] === false, `#2331 Star Dragon World card discarded: +1 gauge, opponent's monster destroyed, no life (life +${r[0]}, gauge +${r[2]}, opp monster kept ${r[3]})`);
   await lua(446);   // neither world: nothing
   r = eff(); ok(r[0] === 0 && r[1] === 0 && r[3] === true, `#2331 other world discarded: nothing happens (life +${r[0]}, deck -${r[1]}, opp monster kept ${r[3]})`);
+  // #3175 Gaimlett: when attacked, deal 1 damage to the opponent only if it has two or more souls
+  for (const [souls, dmg] of [[1, 0], [2, 1], [3, 1]]) {
+    run(`clear(); battle.plr.monsters.center=mku(3175); battle.plr.monsters.center.soul=Array(${souls}).fill(46); battle.opp.monsters.center=mku(46); globalThis.__ol=battle.opp.life;
+         ABX.fireAttack('opp',[{unit:battle.opp.monsters.center}],'plr','center');`); await settle();
+    ok(J(`__ol-battle.opp.life`) === dmg, `#3175 attacked with ${souls} soul(s): ${dmg} damage to the attacker's controller (got ${J("__ol-battle.opp.life")})`);
+  }
+  // #5127 Celesphere Decision: 4 damage that cannot be reduced (a 2-point damage shield must not reduce it)
+  run(`clear(); battle.opp.life=6; ABX.core.st(battle.opp).shields.push({mode:'next',reduceBy:2,toZero:false,capTo:null,gainLife:0,from:null,turn:battle.turnCount});`); await cast(5127);
+  ok(J(`battle.opp.life`) === 2, `#5127 4 damage, not reduced by a shield (opp life ${J("battle.opp.life")}, expected 2)`);
+  // #2466 Arms Commander: draw two cards
+  run(`clear(); globalThis.__h=battle.plr.hand.length;`); await cast(2466);
+  ok(J(`battle.plr.hand.length-__h`) === 2, `#2466 draws 2 (got ${J("battle.plr.hand.length-__h")})`);
+  // #3110 Lost Dragonarms, Giant Fragment (soul [Act]): pay 1 gauge -> host gets [Penetrate]; [Quadruple Attack] ONLY with four copies in its soul
+  for (const [copies, qa] of [[1, false], [4, true]]) {
+    run(`clear(); globalThis.__host=mku(1203); __host.soul=Array(${copies}).fill(3110); battle.plr.monsters.center=__host; globalThis.__g=battle.plr.gauge.length;
+         { const c=CARD_MAP.get(3110); const ab=ABX.get(c).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',c,ab,__host,{event:{name:'act'},auto:true,preApproved:true,hostArea:'soul',soulHost:__host}); }`); await settle();
+    const st = J(`getUnitEffectiveCombatStats(battle.plr,__host)`);
+    ok(st.pen === true && !!st.qa === qa && J(`__g-battle.plr.gauge.length`) === 1, `#3110 ${copies} copy/copies in soul: Penetrate ${st.pen}, Quadruple Attack ${!!st.qa} (expected ${qa}), gauge -${J("__g-battle.plr.gauge.length")}`);
+  }
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();
