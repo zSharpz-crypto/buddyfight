@@ -3847,6 +3847,14 @@
     }, check: () => true
   };
   OV42.push([1871, /change the size of this card to the size of your choice/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SelfSize" }] }) : ab)]);
+  /* ---- [r42] Katana "Electrodeity item has a soul" family: #4460 #4995 #5950 (the parser ran the gated parts unconditionally AND added a fallback copy) ---- */
+  XC42.r42ElectroSoul = (c, ctx) => { const it = ctx.f && ctx.f.item; return !!(it && !it.isEndrulerFlag && it.card && core.matchFilter(it.card, { tribes: ["Electrodeity"] }, null, ctx) && (it.soul || []).length > 0); };
+  ABX.COND_OK.add("r42ElectroSoul");
+  const noFb = (steps) => (steps || []).filter(x => x.op !== "r40StructuredExec");
+  const gateAll = (steps, from, cond) => noFb(steps).map((x, i) => i >= from ? Object.assign({}, x, { cond: x.cond ? { t: "and", list: [x.cond, cond] } : cond }) : x);
+  OV42.push([4460, /then, if that item has a soul/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "r42ElectroSoul" }) }) : ab]);
+  OV42.push([4995, /then, if your .electrodeity. item has a soul/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "r42ElectroSoul" }) }) : ab]);
+  OV42.push([5950, /if your opponent.s cards attacked three times or more/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "and", list: [{ t: "r42OppAtk3" }, { t: "r42ElectroSoul" }] }) }) : ab]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
