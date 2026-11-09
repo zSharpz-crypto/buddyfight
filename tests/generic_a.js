@@ -18,5 +18,19 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #6206 reset: everything shuffled, draw 6, 2 to gauge, life 10
   run(`{ const me=setup(); me.life=2; me.deck=[1,2,3,4,5,6,7,8,9,10]; me.hand=[11,12]; me.gauge=[13,14]; me.drop=[15]; globalThis.__tot=me.deck.length+me.hand.length+me.gauge.length+me.drop.length; ABX.fireSpell('plr',CARD_MAP.get(6206),{free:true}); }`); await settle();
   ck("6206: 6 in hand, 2 in gauge, life 10, no cards lost", val(`const p=battle.plr; return p.hand.length===6 && p.gauge.length===2 && p.life===10 && p.drop.length===0 && p.deck.length+8===__tot`), val(`const p=battle.plr; return [p.hand.length,p.gauge.length,p.life,p.drop.length,p.deck.length,__tot]`));
+  // #1886 discard BDR (else pay 2 life) -> top two to gauge
+  for (const hasBdr of [true, false]) {
+    run(`{ const me=setup(); me.gauge=[]; me.deck=[1,2,3]; me.life=10; me.hand=${hasBdr ? "[1087]" : "[1054]"}; ABX.fireEnter('plr',CARD_MAP.get(1886),mk(CARD_MAP.get(1886))); }`); await settle();
+    ck("1886 " + (hasBdr ? "discards BDR, no life paid" : "pays 2 life"), val(`const p=battle.plr; return p.gauge.length===2 && p.life===${hasBdr ? 10 : 8} && p.hand.length===${hasBdr ? 0 : 1}`), val(`const p=battle.plr; return [p.gauge.length,p.life,p.hand]`));
+  }
+  // #1086 discard -> next damage reduced by 2 (4 for BDR)
+  for (const bdr of [false, true]) {
+    run(`{ const me=setup(); me.hand=[${bdr ? 1087 : 1054}]; battle.turn='opp'; battle.activeSide='opp'; const ab=ABX.get(CARD_MAP.get(1086)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(1086),ab,null,{event:{name:'act'}}); }`); await settle();
+    ck("1086 " + (bdr ? "BDR discarded: reduce 4" : "other discarded: reduce 2"), val(`const S=battle.plr.abxState||battle.plr.abx||null; const all=JSON.stringify(battle.plr); return battle.plr.hand.length===0 && all.indexOf('"reduceBy":${bdr ? 4 : 2}')>=0`), val(`return [battle.plr.hand.length]`));
+  }
+  // #2790 discard two size 3+ monsters + 2 gauge -> +5 life
+  run(`globalThis.__big=ALL_CARDS.find(c=>c.type==='Monster'&&Number(c.size)>=3).id`);
+  run(`{ const me=setup(); me.hand=[__big,__big]; me.life=10; const u=mk(CARD_MAP.get(2790)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(2790)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2790),ab,u,{event:{name:'act'}}); }`); await settle();
+  ck("2790: two big monsters + 2 gauge -> +5 life", val(`const p=battle.plr; return p.life===15 && p.hand.length===0 && p.gauge.length===5`), val(`const p=battle.plr; return [p.life,p.hand.length,p.gauge.length]`));
   console.log("\npass " + pass + " fail " + fail);
 })();

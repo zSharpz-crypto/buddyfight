@@ -4250,6 +4250,38 @@
     f.life = 10; fresh(); return true;
   }, check: () => true };
   OV42.push([6206, /return all cards from your hand, gauge and drop zone to your deck/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42KronosReset" }] }) : ab]);
+  /* ---- Generic: #1886 discard BDR or pay 2 life -> 2 gauge; #1086 discard -> shield 2 (4 for BDR); #2790 discard two size 3+ monsters + 2 gauge -> +5 life ---- */
+  const pickHand = async (ctx, pred, n, title) => {
+    const f = ctx.f, cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(r => pred(r.card));
+    if (cands.length < n) return null;
+    const ch = (ABX.autoPlay || f.isBot) ? cands.slice(0, n) : await core.pick(cands, { qty: { n } }, ctx, { intent: "cost", min: n, max: n, title });
+    return ch.length === n ? ch : null;
+  };
+  const discardIds = (ctx, ids) => ids.forEach(id => { const i = ctx.f.hand.indexOf(id); if (i >= 0) { ctx.f.hand.splice(i, 1); ctx.f.drop.push(id); ABX.fireDiscarded && ABX.fireDiscarded(ctx.side, core.cardOf(id)); } });
+  const isBDR = (c) => !!c && (c.attrs || []).some(a => core.lc(a) === "battledeityrobo");
+  OPS.r42BdrOrLifeGauge = { async run(s, ctx) {
+    const f = ctx.f, ch = await pickHand(ctx, isBDR, 1, `${ctx.card.name} - discard a Battle Deity Robo (cancel to pay 2 life)`);
+    if (ch) discardIds(ctx, [ch[0].id]);
+    else if (f.life > 2) f.life -= 2; else return false;
+    for (let i = 0; i < 2 && f.deck.length; i++) f.gauge.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([1886, /discard a .battle deity robo. from your hand or pay 2 life/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42BdrOrLifeGauge" }] }) : ab]);
+  OPS.r42DiscardShield = { async run(s, ctx) {
+    const ch = await pickHand(ctx, () => true, 1, `${ctx.card.name} - discard a card`);
+    if (!ch) return false;
+    const big = isBDR(ch[0].card); discardIds(ctx, [ch[0].id]);
+    OPS.shield.run({ mode: "next", reduceBy: big ? 4 : 2, from: "any" }, ctx); fresh(); return true;
+  }, check: () => true };
+  OV42.push([1086, /discard a card from your hand during your opponent's turn/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardShield" }] }) : ab]);
+  OPS.r42TwoBigGainLife = { async run(s, ctx) {
+    const f = ctx.f; if (f.gauge.length < 2) return false;
+    const ch = await pickHand(ctx, (c) => c && c.type === "Monster" && (Number(c.size) || 0) >= 3, 2, `${ctx.card.name} - discard two size 3+ monsters`);
+    if (!ch) return false;
+    discardIds(ctx, ch.map(r => r.id)); for (let i = 0; i < 2; i++) f.drop.push(f.gauge.pop());
+    f.life += 5; fresh(); return true;
+  }, check: () => true };
+  OV42.push([2790, /you may discard two size 3 or greater monsters from your hand and pay 2 gauge/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42TwoBigGainLife" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

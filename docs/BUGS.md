@@ -422,3 +422,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Danger World: #129 life gain 4 minus Invigorating Breath in drop; #115 chosen monster gets a Weapon power bonus + Counterattack (power only, the "or defense" choice is not offered). Open: #119 #135 #1076 #2428 #4783. Test: tests/danger_a.js.
 
 - Generic: #695 look at top card, keep on top or send to bottom (human: select = keep, cancel = bottom; auto keeps); #6206 return hand/gauge/drop to deck, shuffle, draw 6, 2 to gauge, life 10 (its "four Reversals" cast rule and once-per-fight not re-verified). Open Generic: #694 #699 #741 #1086 #1886 #1887 #2790 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
+
+- Generic: #1886 discard Battle Deity Robo or pay 2 life then 2 gauge; #1086 discard then next damage -2 (-4 if BDR); #2790 Act discards two size 3+ monsters + pays 2 gauge for +5 life. #1086 test checks reduceBy via a JSON scan of the fighter, not an actual damage event. Open Generic: #694 #699 #741 #1887 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
