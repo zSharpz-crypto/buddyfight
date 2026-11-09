@@ -6258,6 +6258,46 @@
   OV42.push([3498, /if you did not put any cards in your gauge during this turn/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 0, { t: "r42NoGaugeThisTurn" }).slice(0, 1) })]);
   OV42.push([3703, /two or more world names on your field/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "xWorldNames", area: "field", n: 2 }).slice(0, 2) })]);
 
+  /* ---- [r42] Darkness Dragon, batch 2 (tests/darkness_fallbacks.js) ----
+   *   #2612 Devos: "Pay 1 gauge & Pay 1 life" - the life was never paid.
+   *   #3521 Quenatar: opponent's center is empty -> rest this card, the chosen card from their drop zone becomes a face-down 6000/6000 monster there.
+   *   #6349 Deathgaze Reaper: pay 1 life -> up to the top two cards of their deck become face-down 1000/1000 monsters on separate open areas. */
+  const faceDownCard = (rawId, st) => Object.assign({}, core.cardOf(rawId) || core.cardOf(46), { id: rawId, name: st.name || "Face-Down Monster", type: "Monster", size: st.size || 0, power: st.power, defense: st.defense, crit: st.crit, attrs: [] });
+  const faceDownUnit = (card) => ({ card, rested: false, attacksLeft: 1, soul: [], tempPower: 0, tempDef: 0, tempCrit: 0, faceDown: true });
+  OPS.r42FaceDownMonster = {
+    run(s, ctx) {
+      const es = otherSide(ctx.side), of = F(es);
+      const ch = (ctx.bind.chosen || []).find(x => x && x.area === "drop" && x.side === es);
+      if (!ch || of.monsters.center) return false;
+      const idx = of.drop.lastIndexOf(ch.id);
+      if (idx < 0) return false;
+      of.drop.splice(idx, 1);
+      of.monsters.center = faceDownUnit(faceDownCard(ch.id, s));
+      return true;
+    }
+  };
+  OPS.r42OppDeckToField = {
+    run(s, ctx) {
+      const of = F(otherSide(ctx.side));
+      let placed = 0;
+      for (const pos of ["left", "center", "right"]) {
+        if (placed >= (s.n || 1) || !of.deck.length) break;
+        if (of.monsters[pos]) continue;
+        of.monsters[pos] = faceDownUnit(faceDownCard(of.deck.shift(), s));
+        placed++;
+      }
+      return placed > 0;
+    }
+  };
+  XC42.r42OppCenterEmpty = (c, ctx) => !F(otherSide(ctx.side)).monsters.center;
+  ABX.COND_OK.add("r42OppCenterEmpty");
+  OV42.push([2612, /pay 1 gauge (?:&|and) pay 1 life|"wind summoning blade"/i, (ab) => {
+    const call = (ab.steps || []).find(x => x.op === "call");
+    return call ? Object.assign({}, ab, { unparsed: [], steps: parseS("pay 1 gauge").concat(parseS("pay 1 life"), [Object.assign({}, call, { gate: "ifYouDo" })]) }) : ab;
+  }]);
+  OV42.push([3521, /put the chosen card face down on your opponent.s center/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: (ab.conds || []).concat([{ t: "r42OppCenterEmpty" }]), steps: noFb(ab.steps).map(x => Object.assign({}, x, { cond: undefined })).concat([{ op: "r42FaceDownMonster", gate: "ifYouDo", size: 0, power: 6000, defense: 6000, crit: 2 }]) }) : ab]);   // the parsed step conds also counted MY center monster
+  OV42.push([6349, /top two cards of your opponent.s deck face down/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).concat([{ op: "r42OppDeckToField", gate: "ifYouDo", n: 2, size: 0, power: 1000, defense: 1000, crit: 1 }]) }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

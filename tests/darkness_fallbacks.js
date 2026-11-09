@@ -43,5 +43,26 @@ const attack = async (pos) => { run(`ABX.fireAttack('plr',[{unit:battle.plr.mons
   ok(J(`!!battle.opp.monsters.center`), "#3703 one world name: opponent's monster stays");
   run(`clear(); battle.plr.monsters.center=mku(3703); battle.plr.monsters.left=mku(${OTHER}); battle.opp.monsters.center=mku(46);`); await enter(3703, "center");
   ok(J(`!battle.opp.monsters.center`), `#3703 two world names (with #${OTHER}): opponent's monster destroyed`);
+  // #3639 Vidanouve: calling a Black Dragon from hand costs 1 gauge less (#669 Damocles Dragon: Pay 3)
+  const cost = () => J(`parseCardCost(CARD_MAP.get(669).cost, CARD_MAP.get(669).skill, battle.plr, CARD_MAP.get(669)).gauge`);
+  run(`clear();`); const base = cost();
+  run(`clear(); battle.plr.monsters.left=mku(3639);`);
+  ok(base === 3 && cost() === 2, `#3639 Black Dragon call cost ${base} -> ${cost()} (expected 3 -> 2)`);
+  // #2612 Devos: [Act] pay 1 gauge & 1 life, call a Black Dragon from the drop zone by paying its Call Cost (#788 Pay 1)
+  run(`clear(); battle.plr.monsters.center=mku(2612); battle.plr.drop=[788]; globalThis.__g=battle.plr.gauge.length; globalThis.__l=battle.plr.life;
+       { const ab=ABX.get(CARD_MAP.get(2612)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2612),ab,battle.plr.monsters.center,{event:{name:'act'}}); }`); await settle();
+  ok(J(`battle.plr.life`) === 9 && J(`__g-battle.plr.gauge.length`) === 2 && J(`["left","right"].some(p=>battle.plr.monsters[p]&&battle.plr.monsters[p].card.id===788)||battle.plr.monsters.center2?.card?.id===788`),
+     `#2612 life 9, gauge -2, #788 called (life ${J("battle.plr.life")}, gauge -${J("__g-battle.plr.gauge.length")}, monsters ${J("JSON.stringify(Object.entries(battle.plr.monsters).map(([k,u])=>u&&k+':'+u.card.id))")})`);
+  // #3521 Quenatar: opp has no center -> rest this card, chosen opp drop card becomes a 6000/6000 size 0 monster on opp center
+  run(`clear(); battle.plr.monsters.center=mku(3521); battle.opp.drop=[46]; globalThis.__u=battle.plr.monsters.center;
+       { const ab=ABX.get(CARD_MAP.get(3521)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(3521),ab,__u,{event:{name:'act'}}); }`); await settle();
+  ok(J(`__u.rested`) && J(`!!battle.opp.monsters.center`) && J(`battle.opp.drop.length`) === 0, `#3521 rests, opp center filled from opp drop (rested ${J("__u.rested")}, center ${J("!!battle.opp.monsters.center")}, drop ${J("battle.opp.drop.length")})`);
+  // #6349 Deathgaze Reaper: pay 1 life -> top two opp deck cards become monsters on separate opp open areas
+  run(`clear(); battle.plr.monsters.center=mku(6349); globalThis.__l=battle.plr.life; globalThis.__od=battle.opp.deck.length;
+       { const ab=ABX.get(CARD_MAP.get(6349)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(6349),ab,battle.plr.monsters.center,{event:{name:'act'}}); }`); await settle();
+  ok(J(`__l-battle.plr.life`) === 1 && J(`__od-battle.opp.deck.length`) === 2 && J(`["left","center","right"].filter(p=>battle.opp.monsters[p]).length`) === 2, `#6349 life -1, opp deck -2, two opp monsters (life -${J("__l-battle.plr.life")}, deck -${J("__od-battle.opp.deck.length")}, monsters ${J('["left","center","right"].filter(p=>battle.opp.monsters[p]).length')})`);
+  run(`clear(); battle.plr.monsters.center=mku(3521); battle.opp.monsters.center=mku(46); battle.opp.drop=[46]; globalThis.__u=battle.plr.monsters.center;
+       { const ab=ABX.get(CARD_MAP.get(3521)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(3521),ab,__u,{event:{name:'act'}}); }`); await settle();
+  ok(!J(`__u.rested`) && J(`battle.opp.drop.length`) === 1, "#3521 opponent has a center monster: nothing happens");
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();
