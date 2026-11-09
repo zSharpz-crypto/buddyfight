@@ -42,5 +42,12 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   ok(J(`!battle.opp.monsters.center`) && !J(`battle.plr.hand.includes(3226)`) && J(`battle.plr.gauge.length-__g`) === 0, `#3226 opponent cannot call: monster destroyed, card NOT returned, no gauge paid (returned ${J("battle.plr.hand.includes(3226)")}, gauge ${J("battle.plr.gauge.length-__g")})`);
   await f5([46]);
   ok(J(`battle.opp.hand.length`) === 0 && J(`battle.plr.hand.includes(3226)`) && J(`__g-battle.plr.gauge.length`) === 1, `#3226 opponent calls a monster: you pay 1 gauge and the card returns (opp hand ${J("battle.opp.hand.length")}, returned ${J("battle.plr.hand.includes(3226)")}, gauge -${J("__g-battle.plr.gauge.length")})`);
+  // #2599 Wind Demon, Caymon: hand [Act] only if your buddy is an impact monster
+  const act2599 = async (buddy) => { run(`clear(); battle.plr.buddyZone=[{id:${buddy},rested:false,isFaceDown:false}]; battle.plr.hand=[2599]; globalThis.__h=mku(46); __h.soul=[46,46]; battle.opp.monsters.center=__h; globalThis.__s=__h.soul.length;
+       { const c=CARD_MAP.get(2599); const ab=ABX.get(c).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',c,ab,null,{event:{name:'act'},auto:true,preApproved:true,selfRef:{k:'zone',side:'plr',area:'hand',idx:0,id:2599,card:c}}); }`); await settle(); };
+  await act2599(46);
+  ok(J(`__h.soul.length`) === 2 && J(`battle.plr.hand.includes(2599)`), `#2599 buddy is not an impact monster: nothing happens (soul ${J("__h.soul.length")}, still in hand ${J("battle.plr.hand.includes(2599)")})`);
+  await act2599(2599);
+  ok(J(`__s-__h.soul.length`) === 1 && !J(`battle.plr.hand.includes(2599)`), `#2599 buddy is an impact monster: card discarded, one soul dropped (soul -${J("__s-__h.soul.length")})`);
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();

@@ -6375,6 +6375,14 @@
     return ab.kind === "spell" && ret && des && callStep ? Object.assign({}, ab, { unparsed: [], steps: [des, { op: "r42F5Followup", callStep, retStep: Object.assign({}, ret, { gate: undefined }) }] }) : ab;
   }]);
 
+  /* ---- [r42] #2599 Wind Demon, Caymon: the hand [Act] needs "your buddy is an impact monster" (the condition was dropped, so it worked with any buddy) ---- */
+  XC42.r42BuddyImpact = (c, ctx) => {
+    const f = F(ctx.side);
+    return typeof getFighterBuddyZoneEntries === "function" && getFighterBuddyZoneEntries(f).some(e => { const cd = core.cardOf(e.id); return cd && cd.type === "Impact"; });
+  };
+  ABX.COND_OK.add("r42BuddyImpact");
+  OV42.push([2599, /if your buddy is an impact monster, you may discard this card from hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map((x, k) => k === 0 ? Object.assign({}, x, { cond: { t: "r42BuddyImpact" } }) : x) }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
