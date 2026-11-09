@@ -68,5 +68,9 @@ const attack = async (pos) => { run(`ABX.fireAttack('plr',[{unit:battle.plr.mons
   run(`clear(); globalThis.__l=battle.plr.life;`); await cast(753);
   run(`globalThis.__dealt=ABX.core.applyDamage('plr', 3, {kind:'attack'});`); await settle();
   ok(J(`battle.plr.life-__l`) === 1, `#753 3 damage reduced to 0, +1 life only (life change ${J("battle.plr.life-__l")})`);
+  // #1953 Ability Shift (cast by the defender): the monster in battle gets defense + its own power
+  run(`clear(); battle.opp.hand=[1953]; battle.opp.monsters.center=mku(46); battle.plr.monsters.center=mku(46); globalThis.__dm=battle.opp.monsters.center; globalThis.__d0=getUnitEffectiveCombatStats(battle.opp,__dm).defense;
+       battle.executeAttackResolution=function(){}; battle.applyDefensiveCounterCard("opp",0,"plr",["center"],"center");`); await settle();
+  ok(J(`getUnitEffectiveCombatStats(battle.opp,__dm).defense-__d0`) === J(`__dm.card.power`), `#1953 defense +power (defense +${J("getUnitEffectiveCombatStats(battle.opp,__dm).defense-__d0")}, power ${J("__dm.card.power")})`);
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();

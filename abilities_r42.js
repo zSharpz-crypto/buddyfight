@@ -6301,6 +6301,16 @@
   /* ---- [r42] #753 Black Dragon Shield: "Reduce the damage to 0, and you gain 1 life" = a next-damage shield that also gains life (it used to gain 2 life and reduce nothing) ---- */
   OV42.push([753, /reduce the damage to 0, and you gain 1 life/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "shield", mode: "next", toZero: true, from: "any", gainLife: 1, src: "Reduce the damage to 0, and you gain 1 life" }] }) : ab]);
 
+  /* ---- [r42] #1953 Ability Shift: "for this battle, the defense of that card is increased by its power" (it had no effect) ---- */
+  OPS.r42DefByPower = {
+    run(s, ctx) {
+      const ch = (ctx.bind.chosen || []).filter(r => r && r.unit);
+      ch.forEach(r => { const st = typeof getUnitEffectiveCombatStats === "function" ? getUnitEffectiveCombatStats(F(r.side), r.unit) : null; r.unit.tempDef = (r.unit.tempDef || 0) + ((st && st.power) || r.unit.card.power || 0); });
+      return ch.length > 0;
+    }
+  };
+  OV42.push([1953, /defense of that card is increased by its power/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).slice(0, 1).concat([{ op: "r42DefByPower", gate: "ifYouDo" }]) }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
