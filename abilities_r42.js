@@ -6587,6 +6587,26 @@
     return Object.assign({}, ab, { unparsed: [], steps: [st[0], { op: "r42AunasReturn", gate: "ifYouDo" }] });
   }]);
 
+
+  /* ---- [r42] #4846 -Flame Quartet-: at the start of your main phase, from the drop zone: may drop a hand card; if you do, this card returns to the hand ---- */
+  OPS.r42FlameReturn = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      const di = f.drop.lastIndexOf(4846);
+      if (di < 0 || !f.hand.length) return false;
+      let hi = f.hand.length - 1;
+      if (!(f.isBot || ABX.autoPlay) && ABX.ui && ABX.ui.pickOption) {
+        try { const j = await ABX.ui.pickOption({ title: `${ctx.card.name} \u2014 drop a hand card to return this card to your hand?`, options: f.hand.map(id => (core.cardOf(id) || {}).name || "?").concat(["No"]) }); if (j == null || j >= f.hand.length) return false; hi = j; } catch (e) { return false; }
+      }
+      f.drop.push(f.hand.splice(hi, 1)[0]);
+      f.drop.splice(f.drop.lastIndexOf(4846), 1);
+      f.hand.push(4846);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([4846, /at the start of your main phase, if this card is in your drop zone/i, (ab) => ab.kind === "triggered" ? { kind: "triggered", fromDrop: true, trigger: { event: "phaseStart", phase: "main", who: "you" }, conds: [{ t: "selfIn", area: "drop" }], steps: [{ op: "r42FlameReturn" }] } : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

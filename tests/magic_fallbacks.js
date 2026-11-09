@@ -44,6 +44,16 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   run(`clear(); battle.plr.gauge=[]; battle.plr.drop=[1827];`);
   run(`ABX.fireLeave('plr', CARD_MAP.get(1827), false, false)`); await settle();
   ok(!J(`battle.plr.hand.includes(1827)`), "#1827 cannot pay: stays in the drop zone");
+  // #4846 Flame Quartet: needs a Mystic Knight on your field; top two to the gauge, +2 life; once per turn. Drop-zone start-of-main: may drop a hand card, then return to hand
+  const castSp = async (id) => { run(`{ const c=CARD_MAP.get(${id}); for (const ab of ABX.get(c).abilities.filter(ABX.isSpellBody)) ABX.runAbility('plr',c,ab,null,{preApproved:true,auto:true,event:{name:'counter'}}); }`); await settle(); };
+  run(`clear(); globalThis.__g=battle.plr.gauge.length; globalThis.__lf=battle.plr.life;`); await castSp(4846);
+  ok(J(`battle.plr.gauge.length-__g`) === 0 && J(`battle.plr.life-__lf`) === 0, `#4846 no Mystic Knight: nothing happens (gauge +${J("battle.plr.gauge.length-__g")}, life +${J("battle.plr.life-__lf")})`);
+  run(`clear(); battle.plr.monsters.center=mku(4744); globalThis.__g=battle.plr.gauge.length; globalThis.__lf=battle.plr.life;`); await castSp(4846);
+  ok(J(`battle.plr.gauge.length-__g`) === 2 && J(`battle.plr.life-__lf`) === 2, `#4846 with Mystic Knight: +2 gauge, +2 life (gauge +${J("battle.plr.gauge.length-__g")}, life +${J("battle.plr.life-__lf")})`);
+  run(`clear(); battle.plr.drop=[4846]; battle.plr.hand=[46];`); run(`ABX.fireTurnEvent('phaseStart','main','plr')`); await settle();
+  ok(J(`battle.plr.hand.includes(4846)`) && J(`battle.plr.drop.includes(46)`) && J(`battle.plr.hand.length`) === 1, `#4846 drop zone: hand card dropped, spell returned (hand ${J("JSON.stringify(battle.plr.hand)")}, drop ${J("JSON.stringify(battle.plr.drop)")})`);
+  run(`clear(); battle.plr.drop=[4846]; battle.plr.hand=[];`); run(`ABX.fireTurnEvent('phaseStart','main','plr')`); await settle();
+  ok(!J(`battle.plr.hand.includes(4846)`), "#4846 empty hand: nothing to drop, so the spell stays in the drop zone");
   // #4953: three spells from drop to deck bottom -> all size<=3 opp monsters moved to separate areas
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();
