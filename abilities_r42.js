@@ -3974,6 +3974,16 @@
     }, check: () => true
   };
   OV42.push([2456, /search for up to one .great demonic end dragon, azi dahaka./i, (ab) => (ab.kind === "triggered" && ab.trigger && ab.trigger.event === "enter" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "move" ? { op: "r42SearchName", name: "great demonic end dragon, azi dahaka", gate: "ifYouDo" } : x) }) : ab)]);
+  /* ---- [r42] "Advent" (#5049 #5052): the bonus applies only when the card entered through its own Advent Act ---- */
+  OPS.r42MarkAdvent = { run(s, ctx) { ABX._adventOn = true; return true; }, check: () => true };
+  OPS.r42EndAdvent = { run(s, ctx) { ABX._adventOn = false; return true; }, check: () => true };
+  { const fe = ABX.fireEnter; ABX.fireEnter = function (side, card, unit) { if (ABX._adventOn && unit) unit.abxAdvent = true; return fe.apply(this, arguments); }; }
+  XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
+  ABX.COND_OK.add("r42Advent");
+  [5049, 5052].forEach(id => {
+    OV42.push([id, /\[counter\] \[act\] .advent./i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { steps: [{ op: "r42MarkAdvent" }, ...noFb(ab.steps), { op: "r42EndAdvent" }] }) : ab)]);
+    OV42.push([id, /if it entered by .advent./i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map((x, i) => i === 1 ? Object.assign({}, x, { cond: { t: "r42Advent" } }) : x) }) : ab)]);
+  });
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

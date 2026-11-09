@@ -1,4 +1,4 @@
-// node tests/hero_d.js - Legend World (#357 #2747 #4807 #1964 #2456)
+// node tests/hero_d.js - Legend World (#357 #2747 #4807 #1964 #2456 #5049 #5052)
 const { createEnv } = require("./headless.js");
 const { run, flush } = createEnv();
 const val = (js) => JSON.parse(run(`JSON.stringify((function(){${js}})())`));
@@ -28,5 +28,15 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   run(`globalThis.__azi=ALL_CARDS.find(c=>c.name==='Great Demonic End Dragon, Azi Dahaka').id`);
   run(`{ const me=setup(); me.deck=[1054,__azi,1054]; me.life=10; ABX.fireEnter('plr',CARD_MAP.get(2456),mk(CARD_MAP.get(2456))); }`); await settle();
   ck("2456: paid 2 life and Azi Dahaka in hand", val(`return battle.plr.life===8 && battle.plr.hand.includes(__azi)`), val(`return [battle.plr.life,battle.plr.hand]`));
+  // #5049 / #5052 Advent bonus only when entered by Advent
+  for (const adv of [false, true]) {
+    run(`{ const me=setup(); me.life=10; me.deck=new Array(10).fill(1054); globalThis.__g=me.gauge.length; const u=mk(CARD_MAP.get(5049)); u.abxAdvent=${adv}; me.monsters.center=u; ABX.fireEnter('plr',CARD_MAP.get(5049),u); }`); await settle();
+    ck("5049 "+(adv?"entered by Advent":"normal call")+": life +"+(adv?4:1), val(`return battle.plr.life===${adv?14:11}`), val(`return battle.plr.life`));
+    run(`{ const me=setup(); me.deck=new Array(10).fill(1054); globalThis.__g=me.gauge.length; const u=mk(CARD_MAP.get(5052)); u.abxAdvent=${adv}; me.monsters.center=u; ABX.fireEnter('plr',CARD_MAP.get(5052),u); }`); await settle();
+    ck("5052 "+(adv?"entered by Advent":"normal call")+": gauge +"+(adv?3:1), val(`return battle.plr.gauge.length===__g+${adv?3:1}`), val(`return battle.plr.gauge.length-__g`));
+  }
+  // end-to-end: Advent Act from hand sets the flag before the enter trigger
+  run(`{ const me=setup(); me.life=10; me.hand=[5049]; me.gauge=me.deck.splice(0,9); const ab=ABX.get(CARD_MAP.get(5049)).abilities.find(a=>a.kind==='act'); ABX.runHandUse('plr',0,ab); }`); await settle();
+  ck("5049 via its Advent Act: life +4 and monster on the field", val(`const p=battle.plr; return p.life===14 && ["left","center","right"].some(x=>p.monsters[x]&&p.monsters[x].card.id===5049)`), val(`const p=battle.plr; return [p.life, ["left","center","right"].map(x=>p.monsters[x]&&p.monsters[x].card.id)]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
