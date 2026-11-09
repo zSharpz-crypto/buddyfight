@@ -1,4 +1,4 @@
-// node tests/hero_d.js - Darkness Dragon: opponent-deck mill family (#1860 #1993 #2124 #2281 #2571 #2678)
+// node tests/hero_d.js - Darkness Dragon: opponent-deck mill family + stand/force-attack (#780 #3424 #3711 ...)
 const { createEnv } = require("./headless.js");
 const { run, flush } = createEnv();
 const val = (js) => JSON.parse(run(`JSON.stringify((function(){${js}})())`));
@@ -32,5 +32,14 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #2678 Black Wings: counter-call only if opp's deck was milled this turn
   run(`{ const me=setup(); me.hand=[2678]; globalThis.__r0=ABX.canUseAct?1:0; battle.opp.abxMilledTurn=null; }`);
   ck("2678 cond false before any mill", val(`return !battle.opp.abxMilledTurn`));
+  // #780: opp center monster stands, crit+1, hits its own controller for its critical
+  run(`{ const me=setup(); me.hand=[]; battle.opp.monsters.center=mk(CARD_MAP.get(1054)); battle.opp.monsters.center.rested=true; globalThis.__cr=CARD_MAP.get(1054).crit; globalThis.__l=battle.opp.life; ABX.fireSpell('plr',CARD_MAP.get(780)); }`); await settle();
+  ck("780: opp monster stood and its controller took crit+1", val(`return !battle.opp.monsters.center.rested && battle.opp.life===__l-(__cr+1)`), val(`return [battle.opp.monsters.center.rested, battle.opp.life, __l, __cr]`));
+  // #3424: rest self, stand a chosen opp monster, it hits its controller
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(3424)); battle.opp.monsters.left=mk(CARD_MAP.get(1054)); battle.opp.monsters.left.rested=true; globalThis.__l=battle.opp.life; const ab=ABX.actAbilities(CARD_MAP.get(3424))[0]; ABX.runAbility('plr',CARD_MAP.get(3424),ab,me.monsters.center,{event:{name:'act'}}); }`); await settle();
+  ck("3424: self rested, opp monster stood, opp lost life", val(`return battle.plr.monsters.center.rested && !battle.opp.monsters.left.rested && battle.opp.life<__l`), val(`return [battle.plr.monsters.center.rested, battle.opp.monsters.left.rested, battle.opp.life, __l]`));
+  // #3711: stand own monster, power +3000
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(1054)); me.monsters.center.rested=true; ABX.fireSpell('plr',CARD_MAP.get(3711)); }`); await settle();
+  ck("3711: monster stood with +3000 power", val(`const u=battle.plr.monsters.center; return !u.rested && u.tempPower===3000`), val(`const u=battle.plr.monsters.center; return [u.rested,u.tempPower]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();

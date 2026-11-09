@@ -3447,6 +3447,36 @@
     [/^put the top (one|two|three|four|five) cards? of your opponent.s deck$/i, (m) => ({ op: "r42MillOpp", n: NUMW[m[1].toLowerCase()] }), false]
   );
   OV42.push([2678, /black wings of pursuit/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { conds: [{ t: "r42OppMilled" }], unparsed: [], steps: parseS("call this card from your hand without paying its [call cost]") }) : ab)]);
+  /* ---- [r42] Darkness Dragon "[Stand] <monster>, ... and it attacks your opponent" (the monster hits its own controller): #780 #3424, and #3711 stand+power ---- */
+  OPS.r42StandForceAtk = {
+    async run(s, ctx) {
+      const e = ctx.e, es = ctx.side === "plr" ? "opp" : "plr";
+      const list = ["left", "center", "right"].filter(p => e.monsters[p]).map(p => ({ k: "unit", side: es, pos: p, unit: e.monsters[p], card: e.monsters[p].card, id: e.monsters[p].card.id }));
+      let r = null;
+      if (s.pos === "center") r = list.find(x => x.pos === "center");
+      else if (list.length) { const ch = await core.pick(list, { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", min: 1, title: `${ctx.card.name} - choose a monster on your opponent's field` }); r = ch && ch[0]; }
+      if (!r || !r.unit) return false;
+      if (s.restSelf) { if (!ctx.unit || ctx.unit.rested) return false; ctx.unit.rested = true; }
+      const u = r.unit; u.rested = false;
+      if (s.crit) u.tempCrit = (u.tempCrit || 0) + s.crit;
+      const eff = getUnitEffectiveCombatStats(e, u), dmg = Math.max(0, Number(eff.crit) || 0);
+      if (dmg) core.applyDamage(es, dmg, { kind: "attack", sourceCard: u.card });
+      fresh(); return true;
+    }, check: () => true
+  };
+  OPS.r42StandBoost = {
+    async run(s, ctx) {
+      const f = ctx.f, list = ["left", "center", "right"].filter(p => f.monsters[p]).map(p => ({ k: "unit", side: ctx.side, pos: p, unit: f.monsters[p], card: f.monsters[p].card, id: f.monsters[p].card.id }));
+      if (!list.length) return false;
+      const ch = await core.pick(list, { qty: { n: 1, upTo: false } }, ctx, { intent: "help", min: 1, title: `${ctx.card.name} - [Stand] a monster` });
+      const r = ch && ch[0]; if (!r) return false;
+      r.unit.rested = false; r.unit.tempPower = (r.unit.tempPower || 0) + (s.power || 0);
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([780, /the monster in your opponent.s center becomes \[stand\]/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42StandForceAtk", pos: "center", crit: 1 }] }) : ab)]);
+  OV42.push([3424, /\[stand\] the chosen monster, and that monster attacks your opponent/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42StandForceAtk", pos: "choose", restSelf: true }] })]);
+  OV42.push([3711, /\[stand\] a monster on your field, and for this turn/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42StandBoost", power: 3000 }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
