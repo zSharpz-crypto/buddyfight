@@ -4379,6 +4379,14 @@
     f.hand.push(f.drop.splice(i, 1)[0]); fresh(); return true;
   }, check: () => true };
   OV42.push([3287, /if a .computer. monster on your field was destroyed, put a .computer. monster from your drop zone/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "nullifyAttack" }, { op: "r42ComputerBack" }] }) : ab]);
+  /* ---- Hero World #4471: the Mobile Aerial Team you are Ride on has 2+ souls -> 2 gauge + 2 life ---- */
+  OPS.r42AerialSoulBonus = { run(s, ctx) {
+    const f = ctx.f, it = [f.item, f.item2].find(x => x && (x.card.attrs || []).some(a => core.lc(a) === "mobileaerialteam") && (x.soul || []).length >= 2);
+    if (!it) return false;
+    for (let i = 0; i < 2 && f.deck.length; i++) f.gauge.push(f.deck.shift());
+    f.life += 2; fresh(); return true;
+  }, check: () => true };
+  OV42.push([4471, /if the .mobile aerial team. you are \[ride\] on has two or more souls/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "nullifyAttack" }, { op: "r42AerialSoulBonus" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

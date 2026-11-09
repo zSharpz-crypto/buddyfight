@@ -63,5 +63,10 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     run(`{ const me=setup(); me.hand=[]; me.drop=[__comp]; ${hit ? "me.abxDestroyedTurn={[__comp]:battle.turnCount};" : ""} ABX.fireSpell('plr',CARD_MAP.get(3287),{free:true}); }`); await settle();
     ck("3287 " + (hit ? "Computer destroyed: returned" : "none destroyed: stays"), val(hit ? `return battle.plr.hand.includes(__comp) && battle.plr.drop.length===0` : `return battle.plr.hand.length===0 && battle.plr.drop.length===1`), val(`return [battle.plr.hand,battle.plr.drop]`));
   }
+  // #4471 ridden Mobile Aerial Team needs 2+ souls
+  for (const souls of [1, 2]) {
+    run(`{ const me=setup(); me.gauge=[]; me.life=10; me.deck=[1,2,3]; me.item=mk(CARD_MAP.get(4433)); me.item.soul=new Array(${souls}).fill(1054); ABX.fireSpell('plr',CARD_MAP.get(4471),{free:true}); }`); await settle();
+    ck("4471 ridden unit with " + souls + " souls", val(souls < 2 ? `return battle.plr.gauge.length===0 && battle.plr.life===10` : `return battle.plr.gauge.length===2 && battle.plr.life===12`), val(`return [battle.plr.gauge.length,battle.plr.life]`));
+  }
   console.log(`\npass ${pass} fail ${fail}`);
 })();
