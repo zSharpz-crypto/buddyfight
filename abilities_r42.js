@@ -4282,6 +4282,17 @@
     f.life += 5; fresh(); return true;
   }, check: () => true };
   OV42.push([2790, /you may discard two size 3 or greater monsters from your hand and pay 2 gauge/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42TwoBigGainLife" }] }) : ab]);
+  /* ---- Generic #741 Complete Dominance: pay 3 gauge, Fool from hand + Fool from drop to deck bottom -> extra turn ---- */
+  OPS.r42CompleteDominance = { run(s, ctx) {
+    const f = ctx.f, nm = (id) => core.lc((core.cardOf(id) || {}).name || "") === "actor knights the fool";
+    const hi = f.hand.findIndex(nm), di = f.drop.findIndex(nm);
+    if (f.gauge.length < 3 || hi < 0 || di < 0) return false;
+    for (let i = 0; i < 3; i++) f.drop.push(f.gauge.pop());
+    const h = f.hand.splice(hi, 1)[0], d = f.drop.splice(f.drop.findIndex(nm), 1)[0];
+    f.deck.push(h, d);
+    return OPS.extraPhase.run({ what: "turn" }, ctx);
+  }, check: () => true };
+  OV42.push([741, /you may pay 3 gauge, and choose an .actor knights the fool. from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42CompleteDominance" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

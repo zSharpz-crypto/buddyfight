@@ -32,5 +32,11 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   run(`globalThis.__big=ALL_CARDS.find(c=>c.type==='Monster'&&Number(c.size)>=3).id`);
   run(`{ const me=setup(); me.hand=[__big,__big]; me.life=10; const u=mk(CARD_MAP.get(2790)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(2790)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2790),ab,u,{event:{name:'act'}}); }`); await settle();
   ck("2790: two big monsters + 2 gauge -> +5 life", val(`const p=battle.plr; return p.life===15 && p.hand.length===0 && p.gauge.length===5`), val(`const p=battle.plr; return [p.life,p.hand.length,p.gauge.length]`));
+  // #741 Complete Dominance
+  run(`globalThis.__fool=ALL_CARDS.find(c=>c.name==='Actor Knights the Fool').id`);
+  for (const ok of [true, false]) {
+    run(`{ const me=setup(); me.hand=[__fool]; me.drop=${ok ? "[__fool]" : "[]"}; me.abxExtraTurn=0; const u=mk(CARD_MAP.get(741)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(741)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(741),ab,u,{event:{name:'act'}}); }`); await settle();
+    ck("741 " + (ok ? "Fool in hand and drop: extra turn" : "no Fool in drop: nothing"), val(ok ? `const p=battle.plr; return p.abxExtraTurn===1 && p.hand.length===0 && p.drop.filter(x=>x===__fool).length===0 && p.deck.slice(-2).every(x=>x===__fool) && p.gauge.length===4` : `return !battle.plr.abxExtraTurn && battle.plr.hand.length===1`), val(`const p=battle.plr; return [p.abxExtraTurn,p.hand.length,p.gauge.length,p.deck.slice(-2)]`));
+  }
   console.log("\npass " + pass + " fail " + fail);
 })();

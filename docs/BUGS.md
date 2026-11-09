@@ -424,3 +424,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Generic: #695 look at top card, keep on top or send to bottom (human: select = keep, cancel = bottom; auto keeps); #6206 return hand/gauge/drop to deck, shuffle, draw 6, 2 to gauge, life 10 (its "four Reversals" cast rule and once-per-fight not re-verified). Open Generic: #694 #699 #741 #1086 #1886 #1887 #2790 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
 
 - Generic: #1886 discard Battle Deity Robo or pay 2 life then 2 gauge; #1086 discard then next damage -2 (-4 if BDR); #2790 Act discards two size 3+ monsters + pays 2 gauge for +5 life. #1086 test checks reduceBy via a JSON scan of the fighter, not an actual damage event. Open Generic: #694 #699 #741 #1887 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
+
+- Generic: #741 Complete Dominance (pay 3 gauge, Fool from hand + drop to deck bottom, extra turn). Open Generic: #694 #699 #1887 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
