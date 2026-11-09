@@ -4122,6 +4122,9 @@
   /* ---- Ancient World: #2115 fallback re-ran the discard; #2234 lacked the Wild Dragon discard ---- */
   OV42.push([2115, /discard a .dragon chief emperor. from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps) }) : ab]);
   OV42.push([2234, /discard a .wild dragon. and pay 1 life/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "discard", n: 1, cost: true, optional: true, np: { raw: "«Wild Dragon»", qty: { n: 1 }, ref: null, self: false, filter: { tribes: ["Wild Dragon"] }, zone: null } }, ...noFb(ab.steps).map(x => x.op === "pay" ? Object.assign({}, x, { gate: "ifYouDo" }) : x)] }) : ab]);
+  /* ---- #6013: monsters on your field cannot be destroyed by attacks this turn (the fallback also re-ran the hand drop) ---- */
+  OPS.r42AllNoAttackDestroy = { run(s, ctx) { let n = 0; Object.values(ctx.f.monsters).forEach(u => { if (u) { u.abxNoAttackDestroy = B.turnCount; n++; } }); return n > 0; }, check: () => true };
+  OV42.push([6013, /drop all of your hand cards, and for this turn, all monsters on your field cannot be destroyed by attacks/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op !== "static"), { op: "r42AllNoAttackDestroy", gate: "ifYouDo" }, ...noFb(ab.steps).filter(x => x.op === "static")] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

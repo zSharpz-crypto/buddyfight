@@ -406,3 +406,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Ancient World: #2785 top card to drop, Dragon monster to hand else +1 life; #4891 no longer always draws a 3rd card (only if the Cast Cost card is size 4+; tracked via f.abxCostDropped in a payExtras wrapper). Test: tests/ancient_a.js.
 
 - Ancient World: #2115 discards only one Dragon Chief Emperor (fallback re-ran it); #2234 now requires discarding a Wild Dragon before paying 1 life. Save-once/Counterattack part of #2234 not asserted in test. Test: tests/ancient_a.js.
+
+- Ancient World: #6013 monsters on your field cannot be destroyed by attacks this turn (was missing; fallback re-ran hand drop). Test slot-independent since the call may land on any slot. Test: tests/ancient_a.js.

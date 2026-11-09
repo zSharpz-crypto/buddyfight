@@ -46,5 +46,8 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   run(`globalThis.__wd=420`);
   run(`{ const me=setup(); const u=mk(CARD_MAP.get(2234)); me.monsters.center=u; me.hand=[__wd]; me.life=10; const ab=ABX.get(CARD_MAP.get(2234)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2234),ab,u,{event:{name:'act'}}); }`); await settle();
   ck("2234: Wild Dragon discarded and 1 life paid", val(`const p=battle.plr; return p.hand.length===0 && p.life===9`), val(`const p=battle.plr; return [p.hand.length,p.life,typeof __wd]`));
+  // #6013 Advent-style call: hand dropped, field monsters cannot be destroyed by attacks this turn
+  run(`{ const me=setup(); me.hand=[6013,1054,1054]; me.gauge=me.deck.splice(0,5); me.monsters.left=mk(CARD_MAP.get(1054)); const ab=ABX.get(CARD_MAP.get(6013)).abilities.find(a=>a.kind==='act'); battle.turn='opp'; battle.activeSide='opp'; ABX.runHandUse('plr',0,ab); }`); await settle();
+  ck("6013: called, hand dropped, monsters protected from attack destruction", val(`const p=battle.plr; return p.hand.length===0 && !!Object.values(p.monsters).find(u=>u&&u.card.id===6013) && Object.values(p.monsters).filter(u=>u).every(u=>u.abxNoAttackDestroy===battle.turnCount)`), val(`const p=battle.plr; return [p.hand.length,Object.values(p.monsters).map(u=>u&&u.card.id),Object.values(p.monsters).map(u=>u&&u.abxNoAttackDestroy),battle.turnCount]`));
   console.log("\npass " + pass + " fail " + fail);
 })();
