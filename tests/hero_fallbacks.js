@@ -6,7 +6,7 @@ run(`battle.start("hotseat", generateFlagDeck(3337,"T",3338,false), generateFlag
  globalThis.mku=(id)=>({card:CARD_MAP.get(id),rested:false,attacksLeft:1,soul:[],tempPower:0,tempDef:0,tempCrit:0});
  globalThis.clear=()=>{ for (const f of [battle.plr,battle.opp]) { ["left","center","center2","right"].forEach(p=>f.monsters[p]=null); f.item=null; f.hand=[]; f.drop=[]; f.life=10; f.setSpells=[]; f.gauge=Array(8).fill(46); f.deck=Array(30).fill(46); } battle.matchOver=false; battle.activeSide="plr"; battle.phase="main"; battle.turnCount=100+(globalThis.__t=(globalThis.__t||0)+1); };`);
 const settle = async () => { for (let i = 0; i < 40; i++) { env.flush(); await new Promise(r => setTimeout(r, 2)); } };
-const cast = async (id) => { run(`{ const c=CARD_MAP.get(${id}); for (const ab of ABX.get(c).abilities.filter(ABX.isSpellBody)) ABX.runAbility('plr',c,ab,null,{preApproved:true,auto:true,event:{name:'counter'}}); }`); await settle(); };
+const cast = async (id, inDrop) => { run(`{ const c=CARD_MAP.get(${id}); ${inDrop ? `battle.plr.drop.push(${id});` : ''} for (const ab of ABX.get(c).abilities.filter(ABX.isSpellBody)) ABX.runAbility('plr',c,ab,null,{preApproved:true,auto:true,event:{name:'counter'}${inDrop ? `,selfRef:{k:'zone',side:'plr',area:'drop',idx:battle.plr.drop.length-1,id:${id},card:c}` : ''}}); }`); await settle(); };
 const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id}), battle.plr.monsters.${pos})`); await settle(); };
 (async () => {
   // #1057 Reckless Bravery: power+5000 and [Penetrate] this turn, then the monster goes to the gauge at end of turn
@@ -36,5 +36,11 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   ok(J(`__u.tempDA`) === true && J(`!battle.opp.monsters.left&&!battle.opp.monsters.center`), "#3230 both are monsters: Double Attack and the opponent's field is destroyed");
   run(`clear(); battle.plr.monsters.center=mku(3230); battle.opp.monsters.left=mku(46); battle.plr.deck[0]=1045; battle.opp.deck[0]=1045; globalThis.__u=battle.plr.monsters.center;`); await act3230();
   ok(!J(`!!__u.tempDA`) && J(`!!battle.opp.monsters.left`), "#3230 neither is a monster: nothing happens");
+  // #3226 F5 Attack: destroy; opponent may call from hand; only then may you pay 1 gauge to return this card
+  const f5 = async (oppHand) => { run(`clear(); battle.plr.monsters.left=mku(46); battle.plr.hand=[]; battle.opp.monsters.center=mku(46); battle.opp.hand=${JSON.stringify(oppHand)}; battle.opp.gauge=Array(8).fill(46); globalThis.__g=battle.plr.gauge.length;`); await cast(3226, true); };
+  await f5([]);
+  ok(J(`!battle.opp.monsters.center`) && !J(`battle.plr.hand.includes(3226)`) && J(`battle.plr.gauge.length-__g`) === 0, `#3226 opponent cannot call: monster destroyed, card NOT returned, no gauge paid (returned ${J("battle.plr.hand.includes(3226)")}, gauge ${J("battle.plr.gauge.length-__g")})`);
+  await f5([46]);
+  ok(J(`battle.opp.hand.length`) === 0 && J(`battle.plr.hand.includes(3226)`) && J(`__g-battle.plr.gauge.length`) === 1, `#3226 opponent calls a monster: you pay 1 gauge and the card returns (opp hand ${J("battle.opp.hand.length")}, returned ${J("battle.plr.hand.includes(3226)")}, gauge -${J("__g-battle.plr.gauge.length")})`);
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();

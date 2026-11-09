@@ -6354,6 +6354,27 @@
   };
   OV42.push([3230, /declare monster or spell/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: parseS("pay 1 gauge").map(x => x).concat([{ op: "r42CaptainAnswer", gate: "ifYouDo" }]) }) : ab]);
 
+  /* ---- [r42] #3226 F5 Attack: destroy a monster; THEN the opponent may call a monster from their hand by paying its Call Cost; ONLY IF they do, you may pay 1 gauge to return this card to hand
+   *      (it used to pay 1 gauge and return itself to your hand every single time) ---- */
+  OPS.r42F5Followup = {
+    async run(s, ctx) {
+      const es = otherSide(ctx.side), of = F(es), before = of.hand.length;
+      const ctx2 = Object.assign({}, ctx, { side: es, f: of, e: ctx.f, bind: { chosen: [], revealed: [], looked: [] } });
+      await OPS.call.run(s.callStep, ctx2);
+      if (of.hand.length >= before || ctx.f.gauge.length < 1) return true;
+      let pay = true;
+      if (!(ctx.f.isBot || ABX.autoPlay || ctx.auto) && ABX.ui && ABX.ui.pickOption) pay = (await ABX.ui.pickOption({ title: `${ctx.card.name} - pay 1 gauge to return it to your hand?`, options: [{ label: "Pay 1 gauge" }, { label: "No" }] })) === 0;
+      if (pay && OPS.pay.run({ gauge: 1 }, ctx)) await OPS.moveSelf.run(s.retStep, ctx);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([3226, /your opponent may call a monster from hand by paying its \[call cost\]/i, (ab) => {
+    const ret = (ab.steps || []).find(x => x.op === "moveSelf"), des = (ab.steps || []).find(x => x.op === "destroy");
+    const callStep = parseS("call up to one monster from your hand by paying its [Call Cost]")[0];
+    return ab.kind === "spell" && ret && des && callStep ? Object.assign({}, ab, { unparsed: [], steps: [des, { op: "r42F5Followup", callStep, retStep: Object.assign({}, ret, { gate: undefined }) }] }) : ab;
+  }]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
