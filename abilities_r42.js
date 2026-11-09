@@ -6311,6 +6311,28 @@
   };
   OV42.push([1953, /defense of that card is increased by its power/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).slice(0, 1).concat([{ op: "r42DefByPower", gate: "ifYouDo" }]) }) : ab]);
 
+  /* ---- [r42] Hero World fallback fixes (tests/hero_fallbacks.js) ----
+   *   #1057 Reckless Bravery: the monster goes to the gauge AT THE END OF THE TURN (it went there at once).
+   *   #5942 Time Soldier, Spigar: the cards not taken are DROPPED (into the gauge instead if your flags [Reversal] two times or more this fight). */
+  OPS.r42EotToGauge = {
+    run(s, ctx) {
+      const ch = (ctx.bind.chosen || []).filter(r => r && r.unit);
+      ch.forEach(r => { r.unit.abxEndToGauge = B.turnCount; });   // moved to the gauge by the turnEnd hook in abilities_r33.js
+      return ch.length > 0;
+    }
+  };
+  OV42.push([1057, /at the end of the turn, put that monster into your gauge/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).filter(x => x.op !== "move").concat([{ op: "r42EotToGauge" }]) }) : ab]);
+  OPS.r42LookPickSpigar = {
+    async run(s, ctx) {
+      const toGauge = typeof getFighterReversalCount === "function" && getFighterReversalCount(ctx.f) >= 2;
+      return OPS.lookPick.run(Object.assign({}, s, { op: "lookPick", rest: { area: toGauge ? "gauge" : "drop zone" } }), ctx);
+    }
+  };
+  OV42.push([5942, /look at the top three cards of your deck/i, (ab) => {
+    const lp = (ab.steps || []).find(x => x.op === "lookPick");
+    return ab.kind === "triggered" && lp ? Object.assign({}, ab, { unparsed: [], steps: [Object.assign({}, lp, { op: "r42LookPickSpigar" })] }) : ab;
+  }]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
