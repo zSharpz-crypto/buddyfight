@@ -3892,6 +3892,41 @@
     }, check: () => true
   };
   OV42.push([272, /nullify the attack if it is not a link attack/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullifyNotLinkKill" }] }) : ab)]);
+  /* ---- [r42] Katana Skull Warrior / search fixes: #329 #1181 #2066 ---- */
+  OV42.push([329, /search your deck for a demon way spell card with set/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: (ab.steps || []).filter(x => x.op !== "r40StructuredExec").map(x => x.op === "discard" ? Object.assign({}, x, { optional: true }) : x.op === "search" ? { op: "r42SearchSetSpell", tribe: "Demon Way", gate: "ifYouDo" } : x.op === "shuffle" ? Object.assign({}, x, { gate: "ifYouDo" }) : x) }) : ab)]);
+  OPS.r42SearchSetSpell = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const cands = f.deck.map((id, idx) => ({ k: "zone", side, area: "deck", idx, id, card: core.cardOf(id) })).filter(c => c.card && c.card.type === "Spell" && /\[set\]/i.test(c.card.skill || "") && core.matchFilter(c.card, { tribes: [s.tribe] }, null, ctx));
+      if (!cands.length) return false;
+      const ch = (ABX.autoPlay || f.isBot) ? [cands[0]] : await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - search your deck for a [Set] ${s.tribe} spell` });
+      const r = ch && ch[0]; if (!r) return false;
+      const i = f.deck.indexOf(r.id); if (i < 0) return false;
+      f.deck.splice(i, 1); f.hand.push(r.id); fresh(); return true;
+    }, check: () => true
+  };
+  OPS.r42FieldToDropDraw = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const list = ["left", "center", "right"].filter(p => f.monsters[p] && core.matchFilter(f.monsters[p].card, s.filter, null, ctx)).map(p => ({ k: "unit", side, pos: p, unit: f.monsters[p], card: f.monsters[p].card, id: f.monsters[p].card.id }));
+      if (!list.length) return false;
+      const ch = (ABX.autoPlay || f.isBot) ? list : await core.pick(list, { qty: { n: 99, upTo: true } }, ctx, { intent: "cost", min: 0, title: `${ctx.card.name} - put monsters from your field into the drop zone` });
+      if (!ch || !ch.length) return false;
+      ch.forEach(r => { (r.unit.soul || []).forEach(x => f.drop.push(x && x.id ? x.id : x)); f.monsters[r.pos] = null; f.drop.push(r.card.id); });
+      for (let i = 0; i < ch.length && f.deck.length; i++) f.hand.push(f.deck.shift());
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([1181, /put as many skull warrior monsters as you like from your field into your drop zone/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42FieldToDropDraw", filter: { tribes: ["Skull Warrior"] } }] }) : ab)]);
+  OPS.r42MillCountDamage = {
+    run(s, ctx) {
+      const f = ctx.f, ids = f.deck.splice(0, s.n); let k = 0;
+      ids.forEach(id => { f.drop.push(id); const c = core.cardOf(id); if (c && core.matchFilter(c, s.filter, null, ctx)) k++; });
+      if (k) core.applyDamage(otherSide(ctx.side), k, { kind: "effect", sourceCard: ctx.card });
+      fresh(); return ids.length > 0;
+    }, check: () => true
+  };
+  OV42.push([2066, /for each skull warrior among them, deal 1 damage/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42MillCountDamage", n: 4, filter: { tribes: ["Skull Warrior"] } }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

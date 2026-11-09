@@ -1,4 +1,4 @@
-// node tests/hero_d.js - Katana end-of-turn / attack spells (#338 #3700 #272)
+// node tests/hero_d.js - Katana end-of-turn / attack spells (#338 #3700 #272 #329 #1181 #2066)
 const { createEnv } = require("./headless.js");
 const { run, flush } = createEnv();
 const val = (js) => JSON.parse(run(`JSON.stringify((function(){${js}})())`));
@@ -26,5 +26,16 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     ck("272 "+(link?"link":"single")+" attack: "+(link?"not nullified":"nullified + small attacker destroyed"), val(`return ABX.battleCtx.nullified===${!link} && (!battle.opp.monsters.center)===${!link}`), val(`return [ABX.battleCtx.nullified,!!battle.opp.monsters.center]`));
     run(`ABX.battleCtx=null`);
   }
+  // #1181 / #2066 / #329
+  run(`globalThis.__sw=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('SkullWarrior')).id; globalThis.__dw=ALL_CARDS.find(c=>c.type==='Spell'&&c.set&&/demon way/i.test(c.name+(c.attrs||[]).join(' '))); `);
+  run(`{ const me=setup(); me.monsters.left=mk(CARD_MAP.get(__sw)); me.monsters.right=mk(CARD_MAP.get(__sw)); me.monsters.center=mk(CARD_MAP.get(1054)); globalThis.__h=me.hand.length; ABX.fireSpell('plr',CARD_MAP.get(1181)); }`); await settle();
+  ck("1181: both Skull Warriors dropped, 2 cards drawn, others stay", val(`const p=battle.plr; return !p.monsters.left && !p.monsters.right && !!p.monsters.center && p.hand.length===__h+2`), val(`const p=battle.plr; return [p.hand.length-__h, !!p.monsters.center]`));
+  run(`{ const me=setup(); me.deck=[__sw,1054,__sw,1054,1054,1054]; battle.opp.life=10; ABX.fireEv&&0; const ab=ABX.get(CARD_MAP.get(2066)).abilities.find(a=>a.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(2066),ab,mk(CARD_MAP.get(2066)),{event:{name:'attack'}}); }`); await settle();
+  ck("2066: 4 cards milled, 2 Skull Warriors -> 2 damage", val(`return battle.opp.life===8 && battle.plr.drop.length>=4`), val(`return [battle.opp.life,battle.plr.drop.length]`));
+  run(`globalThis.__dws=ALL_CARDS.find(c=>c.type==='Spell'&&(c.attrs||[]).includes('DemonWay')&&/\\[set\\]/i.test(c.skill||'')).id;`);
+  run(`{ const me=setup(); me.hand=[1054]; me.deck=[1054,__dws,1054]; me.life=10; ABX.fireEnter('plr',CARD_MAP.get(329),mk(CARD_MAP.get(329))); }`); await settle();
+  ck("329: discards a card, then adds the Set Demon Way spell to hand", val(`const p=battle.plr; return p.hand.includes(__dws) && p.drop.includes(1054)`), val(`return [battle.plr.hand,battle.plr.drop]`));
+  run(`{ const me=setup(); me.hand=[]; me.deck=[1054,__dws,1054]; ABX.fireEnter('plr',CARD_MAP.get(329),mk(CARD_MAP.get(329))); }`); await settle();
+  ck("329 with nothing to discard: no search", val(`return !battle.plr.hand.includes(__dws)`), val(`return battle.plr.hand`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
