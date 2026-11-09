@@ -6383,6 +6383,19 @@
   ABX.COND_OK.add("r42BuddyImpact");
   OV42.push([2599, /if your buddy is an impact monster, you may discard this card from hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map((x, k) => k === 0 ? Object.assign({}, x, { cond: { t: "r42BuddyImpact" } }) : x) }) : ab]);
 
+  /* ---- [r42] Star Dragon World fallback fixes (tests/star_dragon_fallbacks.js) ----
+   *   #4868 Victory Equation: [Stand] all Astrodragon; draw a card ONLY if you stood three or more (it drew 2 cards every time). */
+  OPS.r42VictoryEquation = {
+    async run(s, ctx) {
+      let n = 0;
+      ["left", "center", "center2", "right"].forEach(p => { const u = ctx.f.monsters[p]; if (u && u.rested && (u.card.attrs || []).includes("Astrodragon")) { u.rested = false; n++; } });
+      if (n >= 3) await OPS.draw.run(parseS("draw a card")[0], ctx);
+      fresh();
+      return n > 0;
+    }
+  };
+  OV42.push([4868, /\[stand\] all .astrodragon. on your field/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42VictoryEquation" }] }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
