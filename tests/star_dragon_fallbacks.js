@@ -22,5 +22,18 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
      `#2588 revealed spell stays in the deck (deck ${J("battle.plr.deck.length")}/${J("__dk")}, hand +${J("battle.plr.hand.length-__h")}, gauge +${J("battle.plr.gauge.length-__g")}, drop +${J("battle.plr.drop.length-__d")})`);
   run(`clear(); battle.plr.monsters.center=mku(2588); battle.plr.deck[0]=46; globalThis.__dk=battle.plr.deck.length;`); await enter(2588, "center");
   ok(J(`["left","right","center2"].some(p=>battle.plr.monsters[p]&&battle.plr.monsters[p].card.id===46)`) && J(`__dk-battle.plr.deck.length`) === 1, `#2588 revealed monster can be called (deck -${J("__dk-battle.plr.deck.length")}, called ${J(`["left","right","center2"].some(p=>battle.plr.monsters[p]&&battle.plr.monsters[p].card.id===46)`)})`);
+  // #3857 Prismatic Bless: look at as many cards as your opponent attacked this turn; one to gauge, up to two to hand, the rest to the bottom of the deck; +1 life
+  for (const [atk, g, h, bot] of [[4, 1, 2, 1], [1, 1, 0, 0], [0, 0, 0, 0]]) {
+    run(`clear(); ABX.core.turnStats(battle.opp).attacks=${atk}; globalThis.__g=battle.plr.gauge.length; globalThis.__h=battle.plr.hand.length; globalThis.__l=battle.plr.life; globalThis.__dk=battle.plr.deck.length;`); await cast(3857);
+    const r = J(`[battle.plr.gauge.length-__g, battle.plr.hand.length-__h, battle.plr.deck.length-__dk, battle.plr.life-__l]`);
+    ok(r[0] === g && r[1] === h && r[3] === 1 && r[2] === -(g + h), `#3857 opponent attacked ${atk}x: gauge+${g} hand+${h} (got gauge ${r[0]}, hand ${r[1]}, deck ${r[2]}, life ${r[3]})`);
+  }
+  // #3913 Prism Pillar: the gauge card + life only if a card on the opponent's field was [Stand] by a card effect this turn
+  run(`clear(); globalThis.__g=battle.plr.gauge.length; globalThis.__l=battle.plr.life;`); await cast(3913);
+  ok(J(`battle.plr.gauge.length-__g`) === 0 && J(`battle.plr.life-__l`) === 0, `#3913 nothing was stood by an effect: no gauge, no life (gauge +${J("battle.plr.gauge.length-__g")}, life +${J("battle.plr.life-__l")})`);
+  // ... and with a [Stand] effect on an opponent's card this turn it does
+  run(`clear(); globalThis.__u=mku(46); __u.rested=true; battle.opp.monsters.center=__u;
+       ABX.OPS.stand.run({np:{ref:'chosen',qty:{n:1}}},{side:'plr',f:battle.plr,e:battle.opp,card:CARD_MAP.get(46),bind:{chosen:[{k:'unit',side:'opp',unit:__u,card:__u.card}]}}); globalThis.__g=battle.plr.gauge.length; globalThis.__l=battle.plr.life;`); await settle(); await cast(3913);
+  ok(J(`!__u.rested`) && J(`battle.plr.gauge.length-__g`) === 1 && J(`battle.plr.life-__l`) === 1, `#3913 an opponent's card was stood by an effect: +1 gauge, +1 life (stood ${J("!__u.rested")}, gauge +${J("battle.plr.gauge.length-__g")}, life +${J("battle.plr.life-__l")})`);
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();

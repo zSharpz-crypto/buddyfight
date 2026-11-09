@@ -6396,6 +6396,48 @@
   };
   OV42.push([4868, /\[stand\] all .astrodragon. on your field/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42VictoryEquation" }] }) : ab]);
 
+  /* ---- [r42] #3857 Prismatic Bless: look at N cards (N = times your opponent's cards attacked this turn): one into the gauge, up to two into the hand, the rest on the bottom; +1 life.
+   *      (it moved no cards and gained 2 life) ---- */
+  OPS.r42PrismaticBless = {
+    async run(s, ctx) {
+      const f = ctx.f, n = (core.turnStats(F(otherSide(ctx.side))).attacks || 0), ids = f.deck.splice(0, n);
+      const human = !(f.isBot || ABX.autoPlay || ctx.auto) && ABX.ui && ABX.ui.pickCards;
+      const take = async (title, sub, min, max) => {
+        if (!ids.length || max < 1) return [];
+        let idxs = null;
+        if (human) idxs = await ABX.ui.pickCards({ title: `${ctx.card.name} - ${title}`, subtitle: sub, cards: ids.map(id => ({ card: core.cardOf(id), badge: "" })), min, max });
+        if (!Array.isArray(idxs)) idxs = ids.map((_, k) => k).slice(0, max);
+        const chosen = idxs.slice(0, max).filter(k => k >= 0 && k < ids.length);
+        const out = chosen.map(k => ids[k]);
+        chosen.slice().sort((a, b) => b - a).forEach(k => ids.splice(k, 1));
+        return out;
+      };
+      (await take("put 1 into your gauge", "Choose 1 of the looked cards.", 1, 1)).forEach(id => f.gauge.push(id));
+      (await take("put up to 2 into your hand", "The rest go to the bottom of your deck.", 0, 2)).forEach(id => f.hand.push(id));
+      ids.forEach(id => f.deck.push(id));
+      f.life += 1;
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([3857, /look at cards from the top of your deck equal to the number of times your opponent.s cards attacked/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42PrismaticBless" }] }) : ab]);
+  /* ---- [r42] #3913 Prism Pillar: gauge card + 1 life only if a card on the opponent's field was [Stand] by a card effect this turn.
+   *      Tracks every [Stand] effect that actually stands a card (st(side).standByEffectTurn). ---- */
+  const standOrig = OPS.stand.run;
+  OPS.stand.run = async function () {
+    const before = [];
+    ["plr", "opp"].forEach(sd => ["left", "center", "center2", "right"].forEach(p => { const u = F(sd).monsters[p]; if (u && u.rested) before.push([sd, u]); }));
+    const r = await standOrig.apply(this, arguments);
+    before.forEach(([sd, u]) => { if (!u.rested) core.st(F(sd)).standByEffectTurn = B.turnCount; });
+    return r;
+  };
+  XC42.r42OppStoodByEffect = (c, ctx) => core.st(F(otherSide(ctx.side))).standByEffectTurn === B.turnCount;
+  ABX.COND_OK.add("r42OppStoodByEffect");
+  OV42.push([3913, /if a card on your opponent.s field was \[stand\] by card effects during this turn/i, (ab) => {
+    const st = noFb(ab.steps);
+    return ab.kind === "spell" && st.length >= 3 ? Object.assign({}, ab, { unparsed: [], steps: [st[0]].concat(st.slice(1, 3).map(x => Object.assign({}, x, { cond: { t: "r42OppStoodByEffect" } }))) }) : ab;
+  }]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
