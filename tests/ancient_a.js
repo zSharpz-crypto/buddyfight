@@ -38,5 +38,13 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     run(`{ const me=setup(); me.deck=[31,32,33,34,35,36]; me.gauge=me.deck.splice(0,0); me.life=10; me.hand=[]; me.abxCostDropped=${big?'ALL_CARDS.find(c=>Number(c.size)>=4).id':'1054'}; ABX.fireSpell('plr',CARD_MAP.get(4891),{free:true}); }`); await settle();
     ck("4891 cost card " + (big ? "size 4+: draws 3" : "small: draws 2"), val(`return battle.plr.life===11 && battle.plr.hand.length===${big ? 3 : 2}`), val(`return [battle.plr.life,battle.plr.hand.length]`));
   }
+  // #2115 discard Dragon Chief Emperor: defense +10000 (one discard only)
+  run(`globalThis.__dce=2116`);
+  run(`{ const me=setup(); const u=mk(CARD_MAP.get(2115)); me.monsters.center=u; me.hand=[__dce,__dce]; const ab=ABX.get(CARD_MAP.get(2115)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2115),ab,u,{event:{name:'act'}}); }`); await settle();
+  ck("2115: exactly one card discarded and defense +10000", val(`const p=battle.plr; return p.hand.length===1 && p.monsters.center.tempDef===10000`), val(`const p=battle.plr; return [p.hand.length,p.monsters.center.tempDef]`));
+  // #2234 discard Wild Dragon + pay 1 life: save once
+  run(`globalThis.__wd=420`);
+  run(`{ const me=setup(); const u=mk(CARD_MAP.get(2234)); me.monsters.center=u; me.hand=[__wd]; me.life=10; const ab=ABX.get(CARD_MAP.get(2234)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2234),ab,u,{event:{name:'act'}}); }`); await settle();
+  ck("2234: Wild Dragon discarded and 1 life paid", val(`const p=battle.plr; return p.hand.length===0 && p.life===9`), val(`const p=battle.plr; return [p.hand.length,p.life,typeof __wd]`));
   console.log("\npass " + pass + " fail " + fail);
 })();

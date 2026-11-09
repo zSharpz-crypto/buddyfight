@@ -404,3 +404,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Ancient World: #4968 nullifies the cast spell; #2348 nullifies Lifelink of your monsters this turn then returns monsters; #4969 nullify attack then look at center-size cards (one to hand, rest bottom). #4968 nullify and #2348 monster-return not tested end to end. Test: tests/ancient_a.js.
 
 - Ancient World: #2785 top card to drop, Dragon monster to hand else +1 life; #4891 no longer always draws a 3rd card (only if the Cast Cost card is size 4+; tracked via f.abxCostDropped in a payExtras wrapper). Test: tests/ancient_a.js.
+
+- Ancient World: #2115 discards only one Dragon Chief Emperor (fallback re-ran it); #2234 now requires discarding a Wild Dragon before paying 1 life. Save-once/Counterattack part of #2234 not asserted in test. Test: tests/ancient_a.js.

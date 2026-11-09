@@ -4119,6 +4119,9 @@
     f.hand.push(f.deck.shift()); fresh(); return true;
   }, check: () => true };
   OV42.push([4891, /if the card dropped by this card's \[cast cost\] is size 4 or greater/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op !== "draw"), { op: "draw", who: "you", n: 2 }, { op: "r42DrawIfCostBig" }] }) : ab]);
+  /* ---- Ancient World: #2115 fallback re-ran the discard; #2234 lacked the Wild Dragon discard ---- */
+  OV42.push([2115, /discard a .dragon chief emperor. from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps) }) : ab]);
+  OV42.push([2234, /discard a .wild dragon. and pay 1 life/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "discard", n: 1, cost: true, optional: true, np: { raw: "«Wild Dragon»", qty: { n: 1 }, ref: null, self: false, filter: { tribes: ["Wild Dragon"] }, zone: null } }, ...noFb(ab.steps).map(x => x.op === "pay" ? Object.assign({}, x, { gate: "ifYouDo" }) : x)] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
