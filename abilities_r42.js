@@ -3866,6 +3866,32 @@
   OV42.push([6382, /nullify the spell cast by your opponent, and for this turn, your opponent cannot cast spells with the same card name/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullifyAndLock" }] }) : ab)]);
   OPS.r42NullifyLockRev = { run(s, ctx) { const ok = OPS.nullifyCast.run({ what: "spell" }, ctx); if (!ok) return false; if (((ctx.f.godclock && ctx.f.godclock.reversalCount) || 0) >= 4) { const cc = ABX.castCtx; const f = F(cc.side); const L = f.abxSpellLock && f.abxSpellLock.turn === B.turnCount ? f.abxSpellLock : (f.abxSpellLock = { turn: B.turnCount, names: [] }); L.names.push(cc.card.name); } return true; }, check: () => true };
   OV42.push([6162, /nullify the spell cast by your opponent\. then, if your flags/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullifyLockRev" }] }) : ab) ]);
+  /* ---- [r42] Katana "at end of turn destroy this card" and attack-spell fixes: #338 #3700 #272 ---- */
+  OPS.r42DestroyAtEnd = { run(s, ctx) { if (!ctx.unit) return false; ctx.unit.abxDestroyAtEnd = B.turnCount; return true; }, check: () => true };
+  const fte42 = ABX.fireTurnEvent;
+  ABX.fireTurnEvent = function (kind) {
+    const r = fte42.apply(this, arguments);
+    if (kind === "turnEnd") {
+      Promise.resolve(r).then(() => {
+        ["plr", "opp"].forEach(sd => { const f = F(sd); ["left", "center", "right"].forEach(p => { const u = f.monsters[p]; if (u && u.abxDestroyAtEnd === B.turnCount) { u.abxDestroyAtEnd = 0; B.destroyMonster(sd, p); } }); });
+      }).catch(() => {});
+    }
+    return r;
+  };
+  OV42.push([338, /at end of turn, destroy this card/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [...(ab.steps || []).filter(x => x.op !== "destroy" && x.op !== "r40StructuredExec"), { op: "r42DestroyAtEnd" }] }) : ab)]);
+  XC42.r42OtherTribe = (c, ctx) => ["left", "center", "right"].some(p => { const u = ctx.f.monsters[p]; return u && u !== ctx.unit && u.card.id !== ctx.card.id && core.matchFilter(u.card, { tribes: c.tribes }, null, ctx); });
+  ABX.COND_OK.add("r42OtherTribe");
+  OV42.push([3700, /if you have another skull warrior or thunder empire on your field/i, (ab) => (ab.kind === "triggered" && /destroy a monster/i.test(ab.raw || ab.cleaned || "") ? Object.assign({}, ab, { conds: [{ t: "r42OtherTribe", tribes: ["Skull Warrior", "Thunder Empire"] }], unparsed: [], steps: [...parseS("destroy a monster on your opponent's field"), { op: "r42GaugeBySize" }] }) : ab)]);
+  OPS.r42NullifyNotLinkKill = {
+    run(s, ctx) {
+      const bc = ABX.battleCtx; if (!bc || !bc.active || bc.link) return false;
+      bc.nullified = true;
+      const af = F(bc.attSide);
+      (bc.attUnits || []).forEach(u => { const pos = ["left", "center", "right"].find(p => af.monsters[p] === u); if (pos && Number(u.card.size) <= 2) B.destroyMonster(bc.attSide, pos); });
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([272, /nullify the attack if it is not a link attack/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullifyNotLinkKill" }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
