@@ -4061,6 +4061,22 @@
     fresh(); return true;
   }, check: () => true };
   OV42.push([2089, /if you do, look at the top three cards of either player's deck/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardLookReorderDraw" }] }) : ab]);
+  /* ---- Ancient World: #1513 #3502 deck -> drop (<=2 Ancient World monsters), shuffle, top card to gauge; #4141 life bonus at <=5 life */
+  OPS.r42DeckAncientToDrop = { async run(s, ctx) {
+    const f = ctx.f, isAw = (id) => { const c = core.cardOf(id); return c && c.type === "Monster" && (c.world === "Ancient World" || (c.worlds || []).includes("Ancient World")); };
+    const cands = f.deck.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) })).filter(r => isAw(r.id));
+    let picked = [];
+    if (cands.length) picked = (ABX.autoPlay || f.isBot) ? cands.slice(0, 2) : await core.pick(cands, { qty: { n: 2 } }, ctx, { intent: "help", min: 0, max: 2, title: `${ctx.card.name} - drop up to two Ancient World monsters` });
+    picked.slice(0, 2).forEach(r => { const i = f.deck.indexOf(r.id); if (i >= 0) f.drop.push(f.deck.splice(i, 1)[0]); });
+    if (OPS.shuffle && OPS.shuffle.run) await OPS.shuffle.run({ who: "you" }, ctx);
+    if (f.deck.length) f.gauge.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([1513, /drop up to two <ancient world> monsters from your deck/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DeckAncientToDrop" }] }) : ab]);
+  OV42.push([3502, /search for up to two .{1,3}ancient world.{1,3} monsters from your deck/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DeckAncientToDrop" }] }) : ab]);
+  XC42.r42LifeLE5 = (c, ctx) => ctx.f.life <= 5;
+  ABX.COND_OK.add("r42LifeLE5");
+  OV42.push([4141, /if you call while you have 5 life or less/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "life" ? Object.assign({}, x, { cond: { t: "r42LifeLE5" }, gate: undefined }) : x) }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
