@@ -38,5 +38,17 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // end-to-end: Advent Act from hand sets the flag before the enter trigger
   run(`{ const me=setup(); me.life=10; me.hand=[5049]; me.gauge=me.deck.splice(0,9); const ab=ABX.get(CARD_MAP.get(5049)).abilities.find(a=>a.kind==='act'); ABX.runHandUse('plr',0,ab); }`); await settle();
   ck("5049 via its Advent Act: life +4 and monster on the field", val(`const p=battle.plr; return p.life===14 && ["left","center","right"].some(x=>p.monsters[x]&&p.monsters[x].card.id===5049)`), val(`const p=battle.plr; return [p.life, ["left","center","right"].map(x=>p.monsters[x]&&p.monsters[x].card.id)]`));
+  // #3548 free call only on a turn a card was discarded
+  for (const disc of [false, true]) {
+    run(`{ const me=setup(); me.hand=[3548]; me.gauge=[]; ${disc?'ABX.fireDiscarded("plr",CARD_MAP.get(1054));':''} const ab=ABX.get(CARD_MAP.get(3548)).abilities.find(a=>a.kind==='act'); globalThis.__r=ABX.canUseHandAct('plr',0,ab).ok; if(__r) ABX.runHandUse('plr',0,ab); }`); await settle();
+    ck("3548 "+(disc?"after a discard: callable for free":"no discard: blocked"), val(disc?`return __r===true && !!Object.values(battle.plr.monsters).find(u=>u&&u.card.id===3548)`:`return __r===false`), val(`return [__r]`));
+  }
+  // #6139 drops Dragon-attribute cards with their souls
+  run(`globalThis.__dr=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).some(a=>/dragon/i.test(a))&&c.size<=1).id`);
+  run(`{ const me=setup(), op=battle.opp; const u=mk(CARD_MAP.get(__dr)); u.soul=[1054]; op.monsters.left=u; op.monsters.right=mk(CARD_MAP.get(1054)); globalThis.__od=op.drop.length; ABX.fireAttack&&0; const ab=ABX.get(CARD_MAP.get(6139)).abilities.find(a=>a.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(6139),ab,null,{event:{name:'attack'}}); }`); await settle();
+  ck("6139: Dragon monster and its soul dropped, non-Dragon stays", val(`const o=battle.opp; return !o.monsters.left && !!o.monsters.right && o.drop.length===__od+2`), val(`const o=battle.opp; return [!!o.monsters.left,!!o.monsters.right,o.drop.length-__od]`));
+  // #6026 grants Dragon for the turn, then 6139 can drop it
+  run(`{ const me=setup(), op=battle.opp; op.monsters.left=mk(CARD_MAP.get(1054)); const ab=ABX.get(CARD_MAP.get(6026)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(6026),ab,null,{event:{name:'act'}}); }`); await settle();
+  ck("6026: chosen card gets Dragon this turn", val(`return battle.opp.monsters.left.abxAttrAdd==='Dragon'`), val(`return [battle.opp.monsters.left&&battle.opp.monsters.left.abxAttrAdd]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();

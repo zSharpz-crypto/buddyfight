@@ -3978,6 +3978,32 @@
   OPS.r42MarkAdvent = { run(s, ctx) { ABX._adventOn = true; return true; }, check: () => true };
   OPS.r42EndAdvent = { run(s, ctx) { ABX._adventOn = false; return true; }, check: () => true };
   { const fe = ABX.fireEnter; ABX.fireEnter = function (side, card, unit) { if (ABX._adventOn && unit) unit.abxAdvent = true; return fe.apply(this, arguments); }; }
+  /* ---- Legend leftovers: #3548 discard-triggered free call, #6139 Dragon-attribute drop, #6026 grant Dragon */
+  { const prevD = ABX.fireDiscarded; ABX.fireDiscarded = function (side, card) { F(side).abxDiscTurn = B.turnCount; return prevD ? prevD.apply(this, arguments) : undefined; }; }
+  XC42.r42DiscardedTurn = (c, ctx) => ctx.f.abxDiscTurn === B.turnCount;
+  ABX.COND_OK.add("r42DiscardedTurn");
+  const hasDragon = (u) => u && u.card && ((u.card.attrs || []).some(a => /dragon/i.test(a)) || (u.abxAttrTurn === B.turnCount && u.abxAttrAdd === "Dragon"));
+  OPS.r42DropDragons = { async run(s, ctx) {
+    const e = ctx.e; const cands = [];
+    ["left", "center", "right"].forEach(pos => { const u = e.monsters[pos]; if (hasDragon(u)) cands.push({ k: "zone", side: otherSide(ctx.side), area: "monster", pos, card: u.card, id: u.card.id }); });
+    ["item", "item2"].forEach(k => { const u = e[k]; if (hasDragon(u)) cands.push({ k: "zone", side: otherSide(ctx.side), area: k, card: u.card, id: u.card.id }); });
+    if (!cands.length) return false;
+    const ch = await core.pick(cands, { qty: { n: 2 } }, ctx, { intent: "destroy", min: 0, max: 2, title: "Choose up to two Dragon cards" });
+    ch.forEach(r => { const u = r.area === "monster" ? e.monsters[r.pos] : e[r.area]; if (!u) return; (u.soul || []).splice(0).forEach(id => e.drop.push(id)); if (r.area === "monster") e.monsters[r.pos] = null; else e[r.area] = null; e.drop.push(u.card.id); });
+    fresh(); return ch.length > 0;
+  }, check: () => true };
+  OPS.r42GrantDragon = { async run(s, ctx) {
+    const e = ctx.e; const cands = [];
+    ["left", "center", "right"].forEach(pos => { const u = e.monsters[pos]; if (u) cands.push({ k: "zone", side: otherSide(ctx.side), area: "monster", pos, card: u.card, id: u.card.id }); });
+    ["item", "item2"].forEach(k => { const u = e[k]; if (u) cands.push({ k: "zone", side: otherSide(ctx.side), area: k, card: u.card, id: u.card.id }); });
+    if (!cands.length) return false;
+    const ch = await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "target", min: 1, max: 1, title: "Choose a card to get «Dragon»" });
+    ch.forEach(r => { const u = r.area === "monster" ? e.monsters[r.pos] : e[r.area]; if (u) { u.abxAttrAdd = "Dragon"; u.abxAttrTurn = B.turnCount; } });
+    return ch.length > 0;
+  }, check: () => true };
+  OV42.push([3548, /to those who are evil/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { conds: [{ t: "r42DiscardedTurn" }], steps: noFb(ab.steps) }) : ab]);
+  OV42.push([6139, /choose up to two cards on your opponent's field with .dragon./i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DropDragons" }] }) : ab]);
+  OV42.push([6026, /\[counter\] \[act\] choose a card on your opponent's field/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42GrantDragon" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

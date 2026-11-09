@@ -392,3 +392,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - FIXED: Legend World: #357 / #2740 (wipe: both hands discarded, all abilities nullified, all cards destroyed, as one op), #2747 (draw + life only with Star on left AND right), #4807 (attack-phase boost only with 3+ Wydar Sarkal / Fairy), #1964 (monster from deck to drop, shuffle), #2456 (pay 2 life, search Azi Dahaka). Open: #2648 (search hand/deck, call to center). Test: tests/legend_a.js (note: battle.start fires its own main-phase event, so phase-trigger tests can run twice).
 
 - Legend Advent (#5049 #5052): bonus (+3 life / +2 gauge) now only when the card entered via its own Advent Counter Act (flag set around the Act, read by fireEnter). Test: tests/legend_a.js.
+
+- Legend leftovers: #3548 free call only on a turn a card was discarded; #6139 drops up to two Dragon-attribute opp cards plus souls; #6026 grants Dragon for the turn (abxAttrAdd, honored by #6139 only). Test: tests/legend_a.js.
