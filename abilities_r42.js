@@ -6333,6 +6333,27 @@
     return ab.kind === "triggered" && lp ? Object.assign({}, ab, { unparsed: [], steps: [Object.assign({}, lp, { op: "r42LookPickSpigar" })] }) : ab;
   }]);
 
+  /* ---- [r42] #3230 Captain Answer: pay 1 gauge; declare monster or spell; the top card of each deck is dropped; one of the declared type -> [Double Attack] this turn,
+   *      both of the declared type -> destroy ALL cards on the opponent's field (it used to give Double Attack and wipe the field every time) ---- */
+  OPS.r42CaptainAnswer = {
+    async run(s, ctx) {
+      const f = ctx.f, es = otherSide(ctx.side), of = F(es);
+      let declared = "monster";
+      if (!(f.isBot || ABX.autoPlay || ctx.auto) && ABX.ui && ABX.ui.pickOption) {
+        const i = await ABX.ui.pickOption({ title: `${ctx.card.name} - declare a card type`, options: [{ label: "Monster" }, { label: "Spell" }] });
+        declared = i === 1 ? "spell" : "monster";
+      }
+      const ids = [f.deck.shift(), of.deck.shift()];
+      const hits = ids.map(id => id != null && String((core.cardOf(id) || {}).type || "").toLowerCase() === declared);
+      ids.forEach((id, k) => { if (id != null) (k === 0 ? f : of).drop.push(id); });
+      if (hits.some(Boolean) && ctx.unit) ctx.unit.tempDA = true;
+      if (hits.length === 2 && hits.every(Boolean)) await OPS.destroy.run(parseS("destroy all cards on your opponent's field")[0], ctx);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([3230, /declare monster or spell/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: parseS("pay 1 gauge").map(x => x).concat([{ op: "r42CaptainAnswer", gate: "ifYouDo" }]) }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

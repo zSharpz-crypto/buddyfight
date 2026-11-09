@@ -27,5 +27,14 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   // #3268 Quinq Lada: chosen Battleship gets [Penetrate]; crit+1 only if this card did NOT enter from the hand
   run(`clear(); battle.plr.monsters.left=mku(3233); battle.plr.monsters.center=mku(3268); globalThis.__b=battle.plr.monsters.left;`); await enter(3268, "center");
   ok(J(`getUnitEffectiveCombatStats(battle.plr,__b).pen`) === true, "#3268 chosen Battleship gets Penetrate");
+  // #3230 Captain Answer: declares "monster" when automatic. One match -> Double Attack only; both -> destroy all opponent cards
+  const act3230 = async () => { run(`{ const ab=ABX.get(CARD_MAP.get(3230)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(3230),ab,battle.plr.monsters.center,{event:{name:'act'},auto:true,preApproved:true}); }`); await settle(); };
+  const MON = J(`[...CARD_MAP.values()].find(c=>c.type==='Monster'&&c.id!==3230).id`);
+  run(`clear(); battle.plr.monsters.center=mku(3230); battle.opp.monsters.left=mku(46); battle.opp.monsters.center=mku(46); battle.plr.deck[0]=${MON}; battle.opp.deck[0]=1045; globalThis.__u=battle.plr.monsters.center; globalThis.__g=battle.plr.gauge.length;`); await act3230();
+  ok(J(`__u.tempDA`) === true && J(`!!battle.opp.monsters.left&&!!battle.opp.monsters.center`) && J(`__g-battle.plr.gauge.length`) === 1, `#3230 only one of the two is a monster: Double Attack, opponent field kept (DA ${J("__u.tempDA")}, opp field kept ${J("!!battle.opp.monsters.left&&!!battle.opp.monsters.center")})`);
+  run(`clear(); battle.plr.monsters.center=mku(3230); battle.opp.monsters.left=mku(46); battle.opp.monsters.center=mku(46); battle.plr.deck[0]=${MON}; battle.opp.deck[0]=${MON}; globalThis.__u=battle.plr.monsters.center;`); await act3230();
+  ok(J(`__u.tempDA`) === true && J(`!battle.opp.monsters.left&&!battle.opp.monsters.center`), "#3230 both are monsters: Double Attack and the opponent's field is destroyed");
+  run(`clear(); battle.plr.monsters.center=mku(3230); battle.opp.monsters.left=mku(46); battle.plr.deck[0]=1045; battle.opp.deck[0]=1045; globalThis.__u=battle.plr.monsters.center;`); await act3230();
+  ok(!J(`!!__u.tempDA`) && J(`!!battle.opp.monsters.left`), "#3230 neither is a monster: nothing happens");
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();
