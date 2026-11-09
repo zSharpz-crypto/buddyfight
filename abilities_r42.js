@@ -4176,6 +4176,38 @@
   }, check: () => true };
   OV42.push([2610, /when this card enters the field during your final phase/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], conds: [...(ab.conds || []), { t: "phase", phase: "final", who: "you" }], steps: [{ op: "r42StandWeapons" }] }) : ab]);
   OV42.push([2571, /if you destroyed a monster, put cards from the top of your opponent's deck equal to the size/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "r42MillBySize" ? Object.assign({}, x, { gauge: true }) : x) }) : ab]);
+  /* ---- Danger World: #3660 #2386 #1708 #5351 ---- */
+  OPS.r42DrawGaugeGolems = { run(s, ctx) {
+    const f = ctx.f; if (f.deck.length) f.hand.push(f.deck.shift());
+    const n = Object.values(f.monsters).filter(u => u && (u.card.attrs || []).some(a => core.lc(a) === "duelgolem")).length;
+    for (let i = 0; i < n && f.deck.length; i++) f.gauge.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([3660, /draw a card, and put the number of cards from the top of your deck into your gauge/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DrawGaugeGolems" }] }) : ab]);
+  OPS.r42SearchDeckOrDrop = { run(s, ctx) {
+    const f = ctx.f, nm = (id) => core.lc((core.cardOf(id) || {}).name || "") === s.name;
+    let i = f.deck.findIndex(nm);
+    if (i >= 0) { f.hand.push(f.deck.splice(i, 1)[0]); if (OPS.shuffle && OPS.shuffle.run) OPS.shuffle.run({ who: "you" }, ctx); fresh(); return true; }
+    i = f.drop.findIndex(nm);
+    if (i >= 0) { f.hand.push(f.drop.splice(i, 1)[0]); fresh(); return true; }
+    if (OPS.shuffle && OPS.shuffle.run) OPS.shuffle.run({ who: "you" }, ctx);
+    return false;
+  }, check: () => true };
+  OV42.push([2386, /search your deck or drop zone for up to one .gate of verdict/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SearchDeckOrDrop", name: "gate of verdict, -judgment-" }] }) : ab]);
+  OPS.r42TopGaugeRevealThree = { async run(s, ctx) {
+    const f = ctx.f; if (f.deck.length) f.gauge.push(f.deck.shift());
+    const ids = f.deck.splice(0, 3); if (!ids.length) { fresh(); return true; }
+    const isDS = (id) => hasAttr(id, "DemonSlay");
+    const cands = ids.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) })).filter(r => isDS(r.id));
+    let pickId = null;
+    if (cands.length) { const ch = (ABX.autoPlay || f.isBot) ? [cands[0]] : await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 0, max: 1, title: `${ctx.card.name} - put up to one Demon Slay into your hand` }); if (ch[0]) pickId = ch[0].id; }
+    if (pickId != null) { ids.splice(ids.indexOf(pickId), 1); f.hand.push(pickId); }
+    f.drop.push(...ids); fresh(); return true;
+  }, check: () => true };
+  OV42.push([1708, /reveal three cards from the top of your deck, put up to one demon slay/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42TopGaugeRevealThree" }] }) : ab]);
+  XC42.r42ThreeWorlds = (c, ctx) => { const w = new Set(); ctx.f.drop.forEach(id => { const cd = core.cardOf(id); if (cd) (cd.worlds && cd.worlds.length ? cd.worlds : [cd.world]).forEach(x => x && w.add(x)); }); return w.size >= 3; };
+  ABX.COND_OK.add("r42ThreeWorlds");
+  OV42.push([5351, /three or more different world names in your drop zone/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => Object.assign({}, x, { cond: { t: "r42ThreeWorlds" } })) }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

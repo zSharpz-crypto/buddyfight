@@ -414,3 +414,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Dungeon World: #3320 random reveal from opp hand (monster 2 damage, spell +2 life); #2610 stands up to two Weapon cards in final phase (the "can attack during the final phase" permission is only a flag abxFinalAtk, not enforced by the engine). Test: tests/dungeon_a.js.
 
 - Dungeon World: #2571 now also puts cards into your gauge equal to the milled count (the gauge half was silently skipped). Open in Dungeon: #199 #214 #1168 #2588 #2780 #3871 #4506(partial). Test: tests/dungeon_a.js.
+
+- Danger World: #3660 draw + gauge per Duel Golem; #2386 search deck or drop for Gate of Verdict (card name is "Judgment", skill text says "Judgement"); #1708 top to gauge, reveal 3, one Demon Slay to hand, rest drop; #5351 power+8000/Double Attack only with 3+ different world names in drop. Open: #115 #119 #129 #135 #1076 #2428 #3962 #4204 #4783. Test: tests/danger_a.js.
