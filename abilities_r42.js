@@ -3564,6 +3564,70 @@
     }, check: () => true
   };
   OV42.push([3563, /put the number of cards from your gauge into the drop zone equal to the number of monsters/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Mill", n: 4 }, { op: "r42GaugeToDropByOppMons" }] }) : ab)]);
+  /* ---- [r42] Darkness Dragon board effects: #2646 #2754 #2359 #1723 #847 ---- */
+  XC42.r42DropOnlySmall = (c, ctx) => ctx.f.drop.every(id => { const x = core.cardOf(id); return x && x.type === "Monster" && Number(x.size) <= 1; });
+  XC42.r42EitherDrop = (c, ctx) => ctx.f.drop.length >= c.n || (ctx.e && ctx.e.drop.length >= c.n);
+  XC42.r42OppCenterEmpty = (c, ctx) => !!ctx.e && !ctx.e.monsters.center;
+  ["r42DropOnlySmall", "r42EitherDrop", "r42OppCenterEmpty"].forEach(t => ABX.COND_OK.add(t));
+  OV42.push([2754, /if there are no cards in your drop zone other than size 1 or less monsters/i, (ab) => Object.assign({}, ab, { conds: [{ t: "r42DropOnlySmall" }], unparsed: [], steps: parseS("call up to one size 1 monster from your drop zone other than \"Retainer of the Demonic Dragon, Agaroku\" without paying its [call cost]") })]);
+  OV42.push([2359, /when this card enters the field, if there are twenty or more cards in either player/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { conds: [{ t: "r42EitherDrop", n: 20 }], unparsed: [], steps: parseS("destroy all monsters on your opponent's field") }) : ab)]);
+  const nc2359 = ABX.noCounterThisBattle;
+  ABX.noCounterThisBattle = function (attSide, units) {
+    if (nc2359 && nc2359.apply(this, arguments)) return true;
+    try {
+      const us = (units || []).map(x => (x && x.unit) || x).filter(Boolean), f = F(attSide), e = F(otherSide(attSide));
+      return us.length === 1 && us[0].card && us[0].card.id === 2359 && us[0].abxNullified !== B.turnCount && (f.drop.length >= 30 || e.drop.length >= 30);
+    } catch (err) { return false; }
+  };
+  OPS.r42ReturnOrDestroy = {
+    async run(s, ctx) {
+      const list = [];
+      [["plr", F("plr")], ["opp", F("opp")]].forEach(([sd, fx]) => {
+        ["left", "center", "right"].forEach(p => { const u = fx.monsters[p]; if (u) list.push({ k: "unit", side: sd, pos: p, unit: u, card: u.card, id: u.card.id }); });
+        if (fx.item && !fx.item.isEndrulerFlag) list.push({ k: "unit", side: sd, pos: "item", unit: fx.item, card: fx.item.card, id: fx.item.card.id });
+      });
+      const ok = list.filter(r => !core.isProtected || !core.isProtected(r.unit, r.side, "destroyed", ctx) || true);
+      if (!ok.length) return false;
+      const ch = await core.pick(ok, { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", min: 1, title: `${ctx.card.name} - choose a card on the field` });
+      const r = ch && ch[0]; if (!r) return false;
+      let mode = 1;
+      if (!(ABX.autoPlay || ctx.f.isBot) && ABX.ui && ABX.ui.pickOption) { const i = await ABX.ui.pickOption({ title: ctx.card.name, subtitle: `"${r.card.name}"`, options: ["Return to owner's hand", "Destroy"] }); mode = i === 0 ? 0 : 1; }
+      const fx = F(r.side);
+      if (mode === 1 && r.pos !== "item") { B.destroyMonster(r.side, r.pos); fresh(); return true; }
+      (r.unit.soul || []).forEach(x => fx.drop.push(x && x.id ? x.id : x));
+      if (r.pos === "item") fx.item = null; else fx.monsters[r.pos] = null;
+      (mode === 0 ? fx.hand : fx.drop).push(r.card.id);
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([2646, /return a card to its owner.s hand from the field or destroy a card on the field/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("discard a card from your hand"), { op: "r42ReturnOrDestroy" }] }) : ab)]);
+  OPS.r42ScatterOpp = {
+    async run(s, ctx) {
+      const e = ctx.e, ps = ["left", "center", "right"], us = ps.map(p => e.monsters[p]).filter(Boolean);
+      if (us.length < 2 || ABX.autoPlay || ctx.f.isBot || !ABX.ui || !ABX.ui.pickOption) return us.length > 0;
+      const placed = {}, free = ps.slice();
+      ps.forEach(p => { e.monsters[p] = null; });
+      for (const u of us) {
+        let pos = free[0];
+        if (free.length > 1) { const i = await ABX.ui.pickOption({ title: ctx.card.name, subtitle: `Place "${u.card.name}" in which area of your opponent's field?`, options: free.map(x => x.toUpperCase()) }); pos = free[i >= 0 ? i : 0]; }
+        placed[pos] = u; free.splice(free.indexOf(pos), 1); e.monsters[pos] = u;
+      }
+      fresh(); return true;
+    }, check: () => true
+  };
+  ABX.ACTION_RULES.unshift([/^(?:if you do,? )?you put all monsters from your opponent.s field into any separate area of your opponent.s field as you like$/i, () => ({ op: "r42ScatterOpp" }), false]);
+  OPS.r42PullToCenter = {
+    async run(s, ctx) {
+      const e = ctx.e, es = ctx.side === "plr" ? "opp" : "plr";
+      if (e.monsters.center) return false;
+      const list = ["left", "right"].filter(p => e.monsters[p] && Number(e.monsters[p].card.size) <= 2).map(p => ({ k: "unit", side: es, pos: p, unit: e.monsters[p], card: e.monsters[p].card, id: e.monsters[p].card.id }));
+      if (!list.length) return false;
+      const ch = await core.pick(list, { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", min: 1, title: `${ctx.card.name} - move a monster to your opponent's center` });
+      const r = ch && ch[0]; if (!r) return false;
+      e.monsters.center = r.unit; e.monsters[r.pos] = null; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([847, /move it to your opponent.s center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42PullToCenter" }] })]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
