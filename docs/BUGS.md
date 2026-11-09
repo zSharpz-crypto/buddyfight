@@ -438,3 +438,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Hero World: #4471 gauge+life only when the ridden Mobile Aerial Team (item) has 2+ souls. Skipped #3226 (opponent optional call + return-to-hand) and #1042 (declare card name). Test: tests/hero_e.js.
 
 - Magic World: #2719 and #4187 now require discarding two 72 Pillars / two Wizard before their effect (the fallback skipped the cost). #99 already had an earlier override (a duplicate I wrote was removed). Test: tests/magic_b.js.
+
+- Cinderella Girls: #5655 Chiyo Shirayuki bonus (drop opp gauge, top card to gauge) only when she is on your field; #5640 Act stands only if a soul was dropped. #5445 #5446 #5643 verified working via the r40 fallback (face-down buddy zone). Test: tests/cinderella_a.js.

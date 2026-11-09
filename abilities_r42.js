@@ -4395,6 +4395,17 @@
   }, check: () => true };
   OV42.push([2719, /discard two .72 pillars. from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardTwoOfAttr", attr: "pillars" }, ...noFb(ab.steps)] }) : ab]);
   OV42.push([4187, /you may discard two wizard from your hand/i, (ab) => ab.kind === "act" && !(ab.tags || []).includes("counter") ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardTwoOfAttr", attr: "wizard" }, ...noFb(ab.steps)] }) : ab]);
+  /* ---- Cinderella Girls: #5655 Chiyo Shirayuki bonus is conditional; #5640 stand only if a soul was dropped ---- */
+  OPS.r42ChiyoBonus = { run(s, ctx) {
+    const f = ctx.f, e = ctx.e;
+    const has = Object.values(f.monsters).some(u => u && core.lc(u.card.name || "").includes("chiyo shirayuki"));
+    if (!has) return false;
+    if (e.gauge.length) e.drop.push(e.gauge.pop());
+    if (f.deck.length) f.gauge.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([5655, /after that, if there is .chiyo shirayuki. on your field/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op === "damage" || x.op === "life"), { op: "r42ChiyoBonus" }] }) : ab]);
+  OV42.push([5640, /you may drop a soul from this card\. if your do, .stand. this card/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "stand" ? Object.assign({}, x, { gate: "ifYouDo" }) : x) }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
