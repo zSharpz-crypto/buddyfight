@@ -3932,6 +3932,48 @@
   OPS.castSelfFromSoul.run = async function () { ABX._castFromSoul = true; try { return await csfs42.apply(this, arguments); } finally { ABX._castFromSoul = false; } };
   OPS.r42SoulCastBonus = { run(s, ctx) { if (!ABX._castFromSoul) return false; for (let i = 0; i < s.n && ctx.f.deck.length; i++) ctx.f.gauge.push(ctx.f.deck.shift()); fresh(); return true; }, check: () => true };
   OV42.push([3960, /then, if this card was cast from the soul of/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("deal 2 damage to your opponent"), ...parseS("[stand] a card on your field"), { op: "r42SoulCastBonus", n: 3 }] }) : ab)]);
+  /* ---- [r42] Legend World: #357 #2740 (wipe), #2747 #4807 (field-count conds), #1964, #2456 ---- */
+  OPS.r42Fimbulwinter = {
+    run(s, ctx) {
+      ["plr", "opp"].forEach(sd => { const fx = F(sd); while (fx.hand.length) fx.drop.push(fx.hand.pop()); });
+      ["plr", "opp"].forEach(sd => { const fx = F(sd); ["left", "center", "right"].forEach(p => { if (fx.monsters[p]) fx.monsters[p].abxNullified = B.turnCount; }); });
+      ["plr", "opp"].forEach(sd => {
+        const fx = F(sd);
+        ["left", "center", "right"].forEach(p => { if (fx.monsters[p]) B.destroyMonster(sd, p); });
+        if (fx.item && !fx.item.isEndrulerFlag) { (fx.item.soul || []).forEach(x => fx.drop.push(x && x.id ? x.id : x)); fx.drop.push(fx.item.card.id); fx.item = null; }
+        (fx.setSpells || []).splice(0).forEach(c => { (c.soul || []).forEach(x => fx.drop.push(x && x.id ? x.id : x)); fx.drop.push(c.id); });
+      });
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([357, /discard all cards from your hand and your opponent.s hand, nullify all abilities/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Fimbulwinter" }] }) : ab)]);
+  OV42.push([2740, /if you do, discard all cards from your hand and your opponent.s hand/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [...(ab.steps || []).filter(x => x.op === "pay" || x.op === "moveSelf").map((x, i) => i === 0 ? x : Object.assign({}, x)), Object.assign({ op: "r42Fimbulwinter" }, { gate: "ifYouDo" })] }) : ab)]);
+  XC42.r42StarLR = (c, ctx) => ["left", "right"].every(p => ctx.f.monsters[p] && core.matchFilter(ctx.f.monsters[p].card, { tribes: ["Star"] }, null, ctx));
+  XC42.r42CountNames = (c, ctx) => ["left", "center", "right"].filter(p => ctx.f.monsters[p] && c.tribes.some(t => core.matchFilter(ctx.f.monsters[p].card, { tribes: [t] }, null, ctx))).length >= c.n;
+  ["r42StarLR", "r42CountNames"].forEach(t => ABX.COND_OK.add(t));
+  OV42.push([2747, /if you have .star. on your left and right, draw a card/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { conds: [{ t: "r42StarLR" }], unparsed: [], steps: noFb(ab.steps) }) : ab)]);
+  OV42.push([4807, /if you have a total of three or more .wydar sarkal. and .fairy. on your field/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { conds: [{ t: "r42CountNames", tribes: ["Wydar Sarkal", "Fairy"], n: 3 }], unparsed: [], steps: noFb(ab.steps) }) : ab)]);
+  OPS.r42DeckMonsterToDrop = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const cands = f.deck.map((id, idx) => ({ k: "zone", side, area: "deck", idx, id, card: core.cardOf(id) })).filter(c => c.card && c.card.type === "Monster");
+      if (cands.length) {
+        const ch = (ABX.autoPlay || f.isBot) ? [cands[0]] : await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, title: `${ctx.card.name} - place a monster from your deck into the drop zone` });
+        const r = ch && ch[0]; if (r) { const i = f.deck.indexOf(r.id); if (i >= 0) { f.deck.splice(i, 1); f.drop.push(r.id); } }
+      }
+      for (let i = f.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [f.deck[i], f.deck[j]] = [f.deck[j], f.deck[i]]; }
+      fresh(); return cands.length > 0;
+    }, check: () => true
+  };
+  OV42.push([1964, /place a monster from your deck into the drop zone/i, (ab) => (ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DeckMonsterToDrop" }] }) : ab)]);
+  OPS.r42SearchName = {
+    async run(s, ctx) {
+      const f = ctx.f, i = f.deck.findIndex(id => core.lc((core.cardOf(id) || {}).name || "") === s.name);
+      if (i >= 0) { f.hand.push(f.deck.splice(i, 1)[0]); fresh(); return true; }
+      return false;
+    }, check: () => true
+  };
+  OV42.push([2456, /search for up to one .great demonic end dragon, azi dahaka./i, (ab) => (ab.kind === "triggered" && ab.trigger && ab.trigger.event === "enter" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "move" ? { op: "r42SearchName", name: "great demonic end dragon, azi dahaka", gate: "ifYouDo" } : x) }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
