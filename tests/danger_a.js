@@ -34,5 +34,14 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     run(`{ const me=setup(); me.hand=[4204]; me.gauge=me.deck.splice(0,6); ${hit ? "me.abxDestroyedTurn={3594:battle.turnCount};" : ""} globalThis.__r=ABX.canUseHandAct('plr',0,ABX.get(CARD_MAP.get(4204)).abilities.find(a=>a.kind==='act')).ok; if(__r) ABX.runHandUse('plr',0,ABX.get(CARD_MAP.get(4204)).abilities.find(a=>a.kind==='act')); }`); await settle();
     ck("4204 " + (hit ? "Golem destroyed: called" : "no Golem destroyed: blocked"), val(hit ? `return __r===true && !!Object.values(battle.plr.monsters).find(u=>u&&u.card.id===4204)` : `return __r===false`), val(`return [__r,Object.values(battle.plr.monsters).map(u=>u&&u.card.id)]`));
   }
+  // #129 gain 4, minus Invigorating Breath in drop
+  run(`globalThis.__ib=ALL_CARDS.find(c=>c.name==='Invigorating Breath').id`);
+  for (const k of [0, 1]) {
+    run(`{ const me=setup(); me.life=5; me.drop=${k ? "[__ib]" : "[]"}; ABX.fireSpell('plr',CARD_MAP.get(129),{free:true}); }`); await settle();
+    ck("129 with " + k + " Invigorating Breath in drop: +" + (4 - k), val(`return battle.plr.life===${9 - k}`), val(`return [battle.plr.life]`));
+  }
+  // #115 monster gets a Weapon's power and Counterattack
+  run(`{ const me=setup(); me.item=mk(CARD_MAP.get(199)); me.monsters.center=mk(CARD_MAP.get(1054)); ABX.fireSpell('plr',CARD_MAP.get(115),{free:true}); }`); await settle();
+  ck("115: power +Weapon power and Counterattack", val(`const u=battle.plr.monsters.center, w=Number(CARD_MAP.get(199).power)||0; return w>0 && u.tempPower===w && u.tempCA===true`), val(`const u=battle.plr.monsters.center; return [u.tempPower,u.tempCA,CARD_MAP.get(199).power]`));
   console.log("\npass " + pass + " fail " + fail);
 })();

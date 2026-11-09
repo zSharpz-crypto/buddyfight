@@ -418,3 +418,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Danger World: #3660 draw + gauge per Duel Golem; #2386 search deck or drop for Gate of Verdict (card name is "Judgment", skill text says "Judgement"); #1708 top to gauge, reveal 3, one Demon Slay to hand, rest drop; #5351 power+8000/Double Attack only with 3+ different world names in drop. Open: #115 #119 #129 #135 #1076 #2428 #3962 #4204 #4783. Test: tests/danger_a.js.
 
 - Danger World: #4204 Counter Act now requires a Duel Golem destroyed this turn (fallback removed); #3962 same condition added to its drop-zone call but NOT tested (drop-zone act availability unverified). Open: #115 #119 #129 #135 #1076 #2428 #4783. Test: tests/danger_a.js.
+
+- Danger World: #129 life gain 4 minus Invigorating Breath in drop; #115 chosen monster gets a Weapon power bonus + Counterattack (power only, the "or defense" choice is not offered). Open: #119 #135 #1076 #2428 #4783. Test: tests/danger_a.js.

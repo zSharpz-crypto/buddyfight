@@ -4213,6 +4213,23 @@
   ABX.COND_OK.add("r42GolemDestroyed");
   OV42.push([4204, /if your .duel golem. was destroyed during this turn/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: [...(ab.conds || []), { t: "r42GolemDestroyed" }], steps: noFb(ab.steps) }) : ab]);
   OV42.push([3962, /if this card is in your drop zone when a .duel golem. monster on your field is destroyed/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: [...(ab.conds || []), { t: "r42GolemDestroyed" }], steps: noFb(ab.steps) }) : ab]);
+  /* ---- Danger World: #129 life gain reduced per "Invigorating Breath" in drop; #115 monster gets a Weapon's power ---- */
+  OPS.r42GainLifeMinusDrop = { run(s, ctx) {
+    const f = ctx.f, k = f.drop.filter(id => core.lc((core.cardOf(id) || {}).name || "") === "invigorating breath").length, n = Math.max(0, s.n - k);
+    f.life += n; fresh(); return n > 0;
+  }, check: () => true };
+  OV42.push([129, /the amount of life you gain is reduced by the number of .invigorating breath./i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42GainLifeMinusDrop", n: 4 }] }) : ab]);
+  OPS.r42WeaponPowerBoost = { async run(s, ctx) {
+    const f = ctx.f, ws = [f.item, f.item2].filter(it => it && (it.card.attrs || []).some(a => /^weapon$/i.test(a)));
+    const cands = Object.keys(f.monsters).filter(p => f.monsters[p]).map(pos => ({ k: "zone", side: ctx.side, area: "monster", pos, card: f.monsters[pos].card, id: f.monsters[pos].card.id }));
+    if (!cands.length || !ws.length) return false;
+    const ch = (ABX.autoPlay || f.isBot) ? [cands[0]] : await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, max: 1, title: `${ctx.card.name} - choose a monster` });
+    const u = ch[0] && f.monsters[ch[0].pos]; if (!u) return false;
+    const w = Math.max(...ws.map(it => Number(it.card.power) || 0));
+    u.tempPower = (u.tempPower || 0) + w; u.tempCA = true;   // power only; the "or defense" choice is not offered
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([115, /choose a monster on your field, and for this turn, increase its power or defense by the power of a weapon/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42WeaponPowerBoost" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
