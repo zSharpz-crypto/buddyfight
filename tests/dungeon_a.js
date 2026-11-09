@@ -26,5 +26,13 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #4065: gauge = number of equipped items
   run(`{ const me=setup(); me.gauge=[]; me.deck=[51,52,53,54]; me.item=mk(CARD_MAP.get(199)); ABX.fireSpell('plr',CARD_MAP.get(4065),{free:true}); }`); await settle();
   ck("4065: one equipped item -> +1 gauge", val(`return battle.plr.gauge.length===1`), val(`return [battle.plr.gauge.length]`));
+  // #3320 random reveal: monster -> 2 damage, spell -> +2 life
+  for (const kind of ["monster", "spell"]) {
+    run(`{ const me=setup(), op=battle.opp; op.hand=[${kind === "monster" ? 105 : 207}]; me.life=10; op.life=10; const u=mk(CARD_MAP.get(3320)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(3320)).abilities.find(a=>a.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(3320),ab,u,{event:{name:'link'}}); }`); await settle();
+    ck("3320 revealed " + kind, val(kind === "monster" ? `return battle.opp.life===8 && battle.plr.life===10` : `return battle.plr.life===12 && battle.opp.life===10`), val(`return [battle.plr.life,battle.opp.life]`));
+  }
+  // #2610 final phase: stand up to two Weapon cards
+  run(`{ const me=setup(); battle.phase='final'; me.item=mk(CARD_MAP.get(199)); me.item.rested=true; const u=mk(CARD_MAP.get(2610)); me.monsters.center=u; ABX.fireEnter('plr',CARD_MAP.get(2610),u); }`); await settle();
+  ck("2610: rested Weapon item stood", val(`return battle.plr.item.rested===false`), val(`return [battle.plr.item.rested]`));
   console.log("\npass " + pass + " fail " + fail);
 })();

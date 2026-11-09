@@ -410,3 +410,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Ancient World: #6013 monsters on your field cannot be destroyed by attacks this turn (was missing; fallback re-ran hand drop). Test slot-independent since the call may land on any slot. Test: tests/ancient_a.js.
 
 - Dungeon World: #235 top card of each deck to drop (monster = 1 damage, else +1 life); #256 #1134 discard two Dungeon Enemy then destroy; #248 Adventurer+Dungeon Enemy from drop to deck bottom (fixed order) then gauge+draw; #4065 gauge per equipped item. Open: #199 #214 #1168 #2571 #2588 #2610 #2780 #3320 #3871 #4506 #5687 #5688 #5712. Test: tests/dungeon_a.js.
+
+- Dungeon World: #3320 random reveal from opp hand (monster 2 damage, spell +2 life); #2610 stands up to two Weapon cards in final phase (the "can attack during the final phase" permission is only a flag abxFinalAtk, not enforced by the engine). Test: tests/dungeon_a.js.

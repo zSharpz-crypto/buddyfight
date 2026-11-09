@@ -4158,6 +4158,23 @@
     fresh(); return k > 0;
   }, check: () => true };
   OV42.push([4065, /put cards from the top of your deck into your gauge equal to the number of items you have equipped/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps), { op: "r42GaugeByItems" }] }) : ab]);
+  /* ---- Dungeon World: #3320 random reveal from opponent's hand, #2610 stand Weapon cards ---- */
+  OPS.r42RandRevealHand = { run(s, ctx) {
+    const e = ctx.e, f = ctx.f; if (!e.hand.length) return false;
+    const id = e.hand[Math.floor(Math.random() * e.hand.length)], c = core.cardOf(id);
+    if (typeof say === "function") say(`🔎 Revealed "${c ? c.name : id}" from the opponent's hand.`);
+    if (c && c.type === "Monster") core.applyDamage(otherSide(ctx.side), 2, { kind: "effect", sourceCard: ctx.card });
+    else if (c && c.type === "Spell") f.life += 2;
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([3320, /choose a card from your opponent's hand at random, and reveal/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42RandRevealHand" }] }) : ab]);
+  OPS.r42StandWeapons = { run(s, ctx) {
+    const f = ctx.f; let n = 0;
+    [f.item, f.item2].forEach(it => { if (it && n < 2 && it.rested && (it.card.attrs || []).some(a => /^weapon$/i.test(a))) { it.rested = false; it.abxFinalAtk = B.turnCount; n++; } });
+    Object.values(f.monsters).forEach(u => { if (u && n < 2 && u.rested && (u.card.attrs || []).some(a => /^weapon$/i.test(a))) { u.rested = false; u.abxFinalAtk = B.turnCount; n++; } });
+    fresh(); return n > 0;
+  }, check: () => true };
+  OV42.push([2610, /when this card enters the field during your final phase/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], conds: [...(ab.conds || []), { t: "phase", phase: "final", who: "you" }], steps: [{ op: "r42StandWeapons" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
