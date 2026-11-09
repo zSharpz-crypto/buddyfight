@@ -6438,6 +6438,27 @@
     return ab.kind === "spell" && st.length >= 3 ? Object.assign({}, ab, { unparsed: [], steps: [st[0]].concat(st.slice(1, 3).map(x => Object.assign({}, x, { cond: { t: "r42OppStoodByEffect" } }))) }) : ab;
   }]);
 
+  /* ---- [r42] #2331 Lua Nova: the effect depends on the WORLD of the card discarded for the [Cast Cost] (it always gained 2 life, drew 2 and ignored the world).
+   *      The discarded card is the last card in the drop zone when the spell resolves (the spell itself is dropped after). ---- */
+  OPS.r42LuaNova = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      let id = f.drop[f.drop.length - 1];
+      if (id === ctx.card.id && f.drop.length > 1) id = f.drop[f.drop.length - 2];
+      const dc = id != null && id !== ctx.card.id ? core.cardOf(id) : null;
+      if (!dc) return false;
+      const worlds = (dc.worlds && dc.worlds.length ? dc.worlds : [dc.world]).map(w => String(w || "").toLowerCase());
+      if (worlds.includes("legend world")) { await OPS.life.run({ op: "life", who: "you", n: 1 }, ctx); await OPS.draw.run({ op: "draw", who: "you", n: 1 }, ctx); }
+      if (worlds.includes("star dragon world")) {
+        if (f.deck.length) f.gauge.push(f.deck.shift());
+        await OPS.destroy.run(parseS("destroy a size 2 or less monster on your opponent's field")[0], ctx);
+      }
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([2331, /if the card discarded from your hand by this card.s \[cast cost\]/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42LuaNova" }] }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only

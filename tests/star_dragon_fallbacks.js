@@ -35,5 +35,14 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   run(`clear(); globalThis.__u=mku(46); __u.rested=true; battle.opp.monsters.center=__u;
        ABX.OPS.stand.run({np:{ref:'chosen',qty:{n:1}}},{side:'plr',f:battle.plr,e:battle.opp,card:CARD_MAP.get(46),bind:{chosen:[{k:'unit',side:'opp',unit:__u,card:__u.card}]}}); globalThis.__g=battle.plr.gauge.length; globalThis.__l=battle.plr.life;`); await settle(); await cast(3913);
   ok(J(`!__u.rested`) && J(`battle.plr.gauge.length-__g`) === 1 && J(`battle.plr.life-__l`) === 1, `#3913 an opponent's card was stood by an effect: +1 gauge, +1 life (stood ${J("!__u.rested")}, gauge +${J("battle.plr.gauge.length-__g")}, life +${J("battle.plr.life-__l")})`);
+  // #2331 Lua Nova (real cast from hand): the effect depends on the world of the card discarded for its Cast Cost
+  const lua = async (disc) => { run(`clear(); battle.plr.hand=[2331,${disc}]; battle.opp.monsters.center=mku(46); globalThis.__g=battle.plr.gauge.length; globalThis.__l=battle.plr.life; globalThis.__dk=battle.plr.deck.length; battle.castSpellFromHand('plr',0);`); await settle(); };
+  const eff = () => J(`[battle.plr.life-__l, __dk-battle.plr.deck.length, battle.plr.gauge.length-__g, !!battle.opp.monsters.center]`);
+  await lua(350);   // Legend World: +1 life and draw a card
+  let r = eff(); ok(r[0] === 1 && r[1] === 1 && r[3] === true, `#2331 Legend World card discarded: +1 life, draw 1, nothing destroyed (life +${r[0]}, deck -${r[1]}, opp monster kept ${r[3]})`);
+  await lua(1096);  // Star Dragon World: top card to gauge, destroy a size 2 or less monster (cast cost gauge is 0)
+  r = eff(); ok(r[0] === 0 && r[2] === 1 && r[3] === false, `#2331 Star Dragon World card discarded: +1 gauge, opponent's monster destroyed, no life (life +${r[0]}, gauge +${r[2]}, opp monster kept ${r[3]})`);
+  await lua(446);   // neither world: nothing
+  r = eff(); ok(r[0] === 0 && r[1] === 0 && r[3] === true, `#2331 other world discarded: nothing happens (life +${r[0]}, deck -${r[1]}, opp monster kept ${r[3]})`);
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();
