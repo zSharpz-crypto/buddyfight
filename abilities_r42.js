@@ -6467,6 +6467,66 @@
     return ab.kind === "act" && st.length >= 3 ? Object.assign({}, ab, { unparsed: [], steps: st.slice(0, 2).concat([Object.assign({}, st[2], { cond: { t: "r42FourFragments" }, gate: undefined })]) }) : ab;
   }]);
 
+  /* ---- [r42] Katana World fallback fixes (tests/katana_fallbacks.js) ----
+   *   #1615 Hidden Secret Sword "Cloud Billow": you MAY return a "Secret Sword" / "Lethal Formation" card from the drop zone to the deck, then shuffle (the return never happened).
+   *   #330 Cyber Onmyoji, Seimei: a hand card goes face down onto YOUR field as a size 1 / 6000 / 6000 / crit 2 monster.
+   *   #1266 One-Eyed Ninja, Refu: the chosen opponent hand card goes to the bottom of THEIR deck (it was copied, not moved) and they draw two cards. */
+  const isHumanSide = (ctx) => !(ctx.f.isBot || ABX.autoPlay || ctx.auto) && ABX.ui && ABX.ui.pickCards;
+  const shuffleDeck = (f) => { for (let k = f.deck.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [f.deck[k], f.deck[j]] = [f.deck[j], f.deck[k]]; } };
+  OPS.r42ReturnSecretSword = {
+    async run(s, ctx) {
+      const f = ctx.f, cands = f.drop.map((id, idx) => ({ id, idx, card: core.cardOf(id) })).filter(x => x.card && /secret sword|lethal formation/i.test(x.card.name));
+      if (!cands.length) return false;
+      let pickIdx = 0;
+      if (isHumanSide(ctx)) {
+        const r = await ABX.ui.pickCards({ title: `${ctx.card.name} - return a card to your deck?`, subtitle: "Pick up to 1 (a Secret Sword or a card with \"Lethal Formation\" in its name).", cards: cands.map(x => ({ card: x.card, badge: "Drop" })), min: 0, max: 1 });
+        if (!Array.isArray(r) || !r.length) return false;
+        pickIdx = r[0];
+      }
+      const c = cands[pickIdx]; if (!c) return false;
+      f.drop.splice(c.idx, 1); f.deck.push(c.id); shuffleDeck(f);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([1615, /return a secret sword or a card with .lethal formation. in its card name/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).slice(0, 1).concat([{ op: "r42ReturnSecretSword" }]) }) : ab]);
+  OPS.r42HandFaceDownOwn = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      if (!f.hand.length) return false;
+      const pos = ["left", "right", "center", "center2"].find(p => !f.monsters[p] && (p !== "center2" || f.hasCenter2 !== false));
+      if (!pos || (typeof B.getCurrentSizeUsed === "function" && B.getCurrentSizeUsed(f) + 1 > (f.maxSize || 3))) return false;
+      let k = 0;
+      if (isHumanSide(ctx)) {
+        const r = await ABX.ui.pickCards({ title: `${ctx.card.name} - put a hand card face down onto your field`, subtitle: "It becomes a size 1 / 6000 / 6000 / critical 2 monster.", cards: f.hand.map(id => ({ card: core.cardOf(id), badge: "Hand" })), min: 1, max: 1 });
+        if (!Array.isArray(r) || !r.length) return false;
+        k = r[0];
+      }
+      const id = f.hand.splice(k, 1)[0];
+      f.monsters[pos] = faceDownUnit(faceDownCard(id, { size: 1, power: 6000, defense: 6000, crit: 2 }));
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([330, /put a card from your hand face down onto the field as a monster/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).slice(0, 1).concat([{ op: "r42HandFaceDownOwn", gate: "ifYouDo" }]) }) : ab]);
+  OPS.r42RefuReveal = {
+    async run(s, ctx) {
+      const es = otherSide(ctx.side), of = F(es);
+      if (!of.hand.length) return false;
+      let k = 0;
+      if (isHumanSide(ctx)) {
+        const r = await ABX.ui.pickCards({ title: `${ctx.card.name} - your opponent's hand: choose a card`, subtitle: "It goes to the bottom of their deck; then they draw two cards.", cards: of.hand.map(id => ({ card: core.cardOf(id), badge: "Opp hand" })), min: 1, max: 1 });
+        if (!Array.isArray(r) || !r.length) return false;
+        k = r[0];
+      }
+      of.deck.push(of.hand.splice(k, 1)[0]);
+      await OPS.draw.run({ op: "draw", who: "you", n: 2 }, Object.assign({}, ctx, { side: es, f: of, e: ctx.f, bind: { chosen: [], revealed: [], looked: [] } }));
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([1266, /your opponent reveals (?:his or her|their) hand/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42RefuReveal" }] }) : ab]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
