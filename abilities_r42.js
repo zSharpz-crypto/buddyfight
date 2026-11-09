@@ -6295,7 +6295,7 @@
     const call = (ab.steps || []).find(x => x.op === "call");
     return call ? Object.assign({}, ab, { unparsed: [], steps: parseS("pay 1 gauge").concat(parseS("pay 1 life"), [Object.assign({}, call, { gate: "ifYouDo" })]) }) : ab;
   }]);
-  OV42.push([3521, /put the chosen card face down on your opponent.s center/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: (ab.conds || []).concat([{ t: "r42OppCenterEmpty" }]), steps: noFb(ab.steps).map(x => Object.assign({}, x, { cond: undefined })).concat([{ op: "r42FaceDownMonster", gate: "ifYouDo", size: 0, power: 6000, defense: 6000, crit: 2 }]) }) : ab]);   // the parsed step conds also counted MY center monster
+  OV42.push([3521, /put the chosen card face down on your opponent.s center/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: (ab.conds || []).concat([{ t: "r42OppCenterEmpty" }]), steps: noFb(ab.steps).map(x => Object.assign({}, x, { cond: { t: "r42OppCenterEmpty" } })).concat([{ op: "r42FaceDownMonster", gate: "ifYouDo", size: 0, power: 6000, defense: 6000, crit: 2 }]) }) : ab]);   // the parsed step conds also counted MY center monster
   OV42.push([6349, /top two cards of your opponent.s deck face down/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).concat([{ op: "r42OppDeckToField", gate: "ifYouDo", n: 2, size: 0, power: 1000, defense: 1000, crit: 1 }]) }) : ab]);
 
 })(typeof window !== "undefined" ? window : globalThis);
