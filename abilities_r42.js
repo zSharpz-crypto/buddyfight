@@ -4302,6 +4302,27 @@
     fresh(); return true;
   }, check: () => true };
   OV42.push([699, /reveal five cards from the top of your deck\. for each monster with .actor knights./i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42RevealFiveActorDamage" }] }) : ab]);
+  /* ---- Hero World: #4525 Battle Building search/drop, #1628 gauge then keep-or-drop top card ---- */
+  OPS.r42BattleBuildingSearch = { async run(s, ctx) {
+    const f = ctx.f, auto = ABX.autoPlay || f.isBot;
+    const bb = (id) => { const c = core.cardOf(id); return c && (c.attrs || []).some(a => core.lc(a) === "battlebuilding"); };
+    const mons = f.deck.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) })).filter(r => bb(r.id) && r.card.type === "Monster");
+    if (mons.length) { const ch = auto ? [mons[0]] : await core.pick(mons, { qty: { n: 1 } }, ctx, { intent: "cost", min: 0, max: 1, title: `${ctx.card.name} - drop up to one Battle Building monster` }); if (ch[0]) { const i = f.deck.indexOf(ch[0].id); if (i >= 0) f.drop.push(f.deck.splice(i, 1)[0]); } }
+    const sps = f.deck.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) })).filter(r => bb(r.id) && r.card.type === "Spell" && /\[set\]/i.test(r.card.skill || ""));
+    if (sps.length) { const ch = auto ? [sps[0]] : await core.pick(sps, { qty: { n: 1 } }, ctx, { intent: "help", min: 0, max: 1, title: `${ctx.card.name} - add up to one Battle Building [Set] spell to your hand` }); if (ch[0]) { const i = f.deck.indexOf(ch[0].id); if (i >= 0) f.hand.push(f.deck.splice(i, 1)[0]); } }
+    if (OPS.shuffle && OPS.shuffle.run) await OPS.shuffle.run({ who: "you" }, ctx);
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([4525, /drop up to one .battle building. monster from your deck/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42BattleBuildingSearch" }] }) : ab]);
+  OPS.r42GaugeLookKeepOrDrop = { async run(s, ctx) {
+    const f = ctx.f; if (f.deck.length) f.gauge.push(f.deck.shift());
+    if (f.deck.length && !(ABX.autoPlay || f.isBot)) {
+      const id = f.deck[0], ch = await core.pick([{ k: "zone", side: ctx.side, area: "deck", idx: 0, id, card: core.cardOf(id) }], { qty: { n: 1 } }, ctx, { intent: "help", min: 0, max: 1, title: `${ctx.card.name} - select to KEEP on top (cancel = drop it)` });
+      if (!ch.length) f.drop.push(f.deck.shift());
+    }
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([1628, /look at the top card of your deck, and either put it on the top of your deck, or into your drop zone/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42GaugeLookKeepOrDrop" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

@@ -35,5 +35,12 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("2642 with Gaigrander transform: draws", val(`return battle.plr.hand.length===__h+1`), val(`return [battle.plr.hand.length,__h]`));
   run(`{ const me=setup(); globalThis.__h=me.hand.length; ABX.fireEnter&&ABX.fireEnter('plr',CARD_MAP.get(2642),mk(CARD_MAP.get(2642))); }`); await settle();
   ck("2642 without transform: no draw", val(`return battle.plr.hand.length===__h`));
+  // #4525 drop a Battle Building monster, add a Battle Building [Set] spell, shuffle
+  run(`globalThis.__bbm=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).includes('BattleBuilding')).id`);
+  run(`{ const me=setup(); me.deck=[1054,__bbm,4432,1054]; me.hand=[]; me.drop=[]; ABX.fireSpell('plr',CARD_MAP.get(4525),{free:true}); }`); await settle();
+  ck("4525: BB monster dropped, BB Set spell in hand", val(`const p=battle.plr; return p.drop.includes(__bbm) && p.hand.includes(4432) && p.deck.length===2`), val(`const p=battle.plr; return [p.drop,p.hand,p.deck.length]`));
+  // #1628 top card to gauge (auto-play keeps the next card on top)
+  run(`{ const me=setup(); me.gauge=[]; me.deck=[1,2,3]; ABX.fireSpell('plr',CARD_MAP.get(1628),{free:true}); }`); await settle();
+  ck("1628: one card to gauge, next stays on top", val(`const p=battle.plr; return p.gauge.length===1 && p.deck.join()==='2,3'`), val(`const p=battle.plr; return [p.gauge,p.deck]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
