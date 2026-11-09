@@ -3795,6 +3795,58 @@
   XC42.r42DropNamed = (c, ctx) => ctx.f.drop.some(id => { const x = core.cardOf(id); return x && core.lc(x.name) === c.name; });
   ABX.COND_OK.add("r42DropNamed");
   OV42.push([23, /key of solomon, first volume. in your drop zone, draw a card/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...parseS("you gain 1 life"), ...parseS("draw a card").map(x => Object.assign({}, x, { cond: { t: "r42DropNamed", name: "key of solomon, first volume" } }))] }) : ab)]);
+  /* ---- [r42] Magic World: #15 #4934 #846 #1871 ---- */
+  OPS.r42AttackerAway = {
+    run(s, ctx) {
+      const bc = ABX.battleCtx; if (!bc || !bc.active) return false;
+      const f = ctx.f, af = F(bc.attSide), u = (bc.attUnits || [])[0]; if (!u) return false;
+      const pos = ["left", "center", "right"].find(p => af.monsters[p] === u); if (!pos) return false;
+      const hasWiz = ["left", "center", "right"].some(p => f.monsters[p] && /dragowizard/i.test(f.monsters[p].card.name));
+      (u.soul || []).forEach(x => af.drop.push(x && x.id ? x.id : x));
+      af.monsters[pos] = null; (hasWiz ? af.gauge : af.hand).push(u.card.id);
+      bc.nullified = true; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([15, /return that attacking monster to your opponent.s hand/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42AttackerAway" }] }) : ab)]);
+  OPS.r42HolyMagic = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side, seen = new Set(), cands = [];
+      f.drop.forEach((id, idx) => { const c = core.cardOf(id); if (c && c.type === "Spell" && !seen.has(c.name)) { seen.add(c.name); cands.push({ k: "zone", side, area: "drop", idx, id, card: c }); } });
+      if (cands.length < 3) return false;
+      const ch = (ABX.autoPlay || f.isBot) ? cands : await core.pick(cands, { qty: { n: 99, upTo: true } }, ctx, { intent: "help", min: 3, title: `${ctx.card.name} - return different spells from your drop zone to your deck (3+)` });
+      if (!ch || ch.length < 3) return false;
+      ch.forEach(r => { const i = f.drop.indexOf(r.id); if (i >= 0) { f.drop.splice(i, 1); f.deck.push(r.id); } });
+      for (let i = f.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [f.deck[i], f.deck[j]] = [f.deck[j], f.deck[i]]; }
+      for (let i = 0; i < 2 && f.deck.length; i++) f.gauge.push(f.deck.shift());
+      f.life += 2;
+      if (ch.length >= 6) for (let i = 0; i < 2 && f.deck.length; i++) f.hand.push(f.deck.shift());
+      if (ch.length >= 9) core.applyDamage(otherSide(side), 3, { kind: "effect", sourceCard: ctx.card });
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([4934, /return three or more different spells from your drop zone to your deck/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42HolyMagic" }] }) : ab)]);
+  OPS.r42DropToDeckNamed = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const cands = f.drop.map((id, idx) => ({ k: "zone", side, area: "drop", idx, id, card: core.cardOf(id) })).filter(c => c.card && core.lc(c.card.name).includes(s.name));
+      if (!cands.length) return false;
+      const ch = (ABX.autoPlay || f.isBot) ? cands : await core.pick(cands, { qty: { n: 99, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - return cards to your deck` });
+      if (!ch || !ch.length) return false;
+      ch.forEach(r => { const i = f.drop.indexOf(r.id); if (i >= 0) { f.drop.splice(i, 1); f.deck.push(r.id); } });
+      for (let i = f.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [f.deck[i], f.deck[j]] = [f.deck[j], f.deck[i]]; }
+      fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([846, /as many cards with .asmodai. in its card name as you like from your drop zone/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DropToDeckNamed", name: "asmodai" }] })]);
+  OPS.r42SelfSize = {
+    async run(s, ctx) {
+      const f = ctx.f, u = ctx.unit; if (!u || f.life <= 1) return false;
+      let size = 1;
+      if (!(ABX.autoPlay || f.isBot) && ABX.ui && ABX.ui.pickOption) { const i = await ABX.ui.pickOption({ title: ctx.card.name, subtitle: "Choose this card's size", options: ["0", "1", "2", "3"], allowNone: true }); if (i == null || i < 0) return false; size = i; }
+      f.life -= 1; u.abxSizeSet = size; fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([1871, /change the size of this card to the size of your choice/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SelfSize" }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

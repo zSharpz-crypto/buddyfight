@@ -69,5 +69,20 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   ck("23 with Key in drop: +1 life and draw", val(`return battle.plr.life===11 && battle.plr.hand.length===__h+1`));
   run(`{ const me=setup(); me.drop=[]; me.life=10; globalThis.__h=me.hand.length; ABX.fireSpell('plr',CARD_MAP.get(23)); }`); await settle();
   ck("23 without Key: +1 life, no draw", val(`return battle.plr.life===11 && battle.plr.hand.length===__h`));
+  // Magic World: #15 #4934 #846 #1871
+  run(`globalThis.__sp=[...new Map(ALL_CARDS.filter(c=>c.type==='Spell').map(c=>[c.name,c.id])).values()].slice(0,12); globalThis.__asm=ALL_CARDS.find(c=>/asmodai/i.test(c.name)&&c.type==='Monster'); globalThis.__wiz=ALL_CARDS.find(c=>c.type==='Monster'&&/dragowizard/i.test(c.name)).id;`);
+  for (const [wiz, dest] of [[true, 'gauge'], [false, 'hand']]) {
+    run(`{ const me=setup(); ${wiz?'me.monsters.center=mk(CARD_MAP.get(__wiz));':''} battle.opp.monsters.center=mk(CARD_MAP.get(1054)); globalThis.__og=battle.opp.gauge.length; globalThis.__oh=battle.opp.hand.length; ABX.battleCtx={active:true,attSide:'opp',defSide:'plr',redirectTo:null,nullified:false,attUnits:[battle.opp.monsters.center]}; ABX.fireSpell('plr',CARD_MAP.get(15)); }`); await settle();
+    ck("15 "+(wiz?"with":"without")+" Dragowizard: attacker to opp "+dest, val(`return !battle.opp.monsters.center && (battle.opp.${dest}.length===${dest==='gauge'?'__og':'__oh'}+1)`), val(`return [battle.opp.gauge.length,__og,battle.opp.hand.length,__oh]`));
+    run(`ABX.battleCtx=null`);
+  }
+  for (const [n, life, draw, dmg] of [[3, 12, 0, 0], [6, 12, 2, 0], [9, 12, 2, 3], [2, 10, 0, 0]]) {
+    run(`{ const me=setup(); me.drop=__sp.slice(0,${n}); me.life=10; battle.opp.life=10; me.deck=new Array(20).fill(1054); globalThis.__h=me.hand.length; globalThis.__g=me.gauge.length; ABX.fireSpell('plr',CARD_MAP.get(4934)); }`); await settle();
+    ck("4934 returning "+n+" spells", val(`const p=battle.plr; return p.life===${life} && p.hand.length===__h+${draw} && battle.opp.life===${10-dmg} && p.gauge.length===__g+${n>=3?2:0}`), val(`const p=battle.plr; return [p.life,p.hand.length-__h,battle.opp.life,p.gauge.length-__g]`));
+  }
+  run(`{ const me=setup(); me.drop=[__asm.id,__asm.id,1054]; globalThis.__d=me.deck.length; ABX.fireEnter('plr',CARD_MAP.get(846),mk(CARD_MAP.get(846))); }`); await settle();
+  ck("846: both Asmodai back in the deck, 1054 stays", val(`const p=battle.plr; return p.deck.length===__d+2 && p.drop.length===1`), val(`return [battle.plr.deck.length,__d,battle.plr.drop]`));
+  run(`{ const me=setup(); me.life=10; me.monsters.center=mk(CARD_MAP.get(1871)); const ab=ABX.actAbilities(CARD_MAP.get(1871))[0]; ABX.runAbility('plr',CARD_MAP.get(1871),ab,me.monsters.center,{event:{name:'act'}}); }`); await settle();
+  ck("1871: pays 1 life and sets its size", val(`const u=battle.plr.monsters.center; return battle.plr.life===9 && getEffectiveCardSize(battle.plr,u.card,u)===1`), val(`const u=battle.plr.monsters.center; return [battle.plr.life, getEffectiveCardSize(battle.plr,u.card,u)]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
