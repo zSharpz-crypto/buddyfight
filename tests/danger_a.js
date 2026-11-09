@@ -29,5 +29,10 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     run(`{ const me=setup(); const ws=[...new Set(ALL_CARDS.map(c=>c.world).filter(Boolean))]; const pick=(w)=>ALL_CARDS.find(c=>c.world===w).id; me.drop=${ok ? "[pick(ws[0]),pick(ws[1]),pick(ws[2])]" : "[pick(ws[0]),pick(ws[0])]"}; const u=mk(CARD_MAP.get(5351)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(5351)).abilities.find(a=>a.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(5351),ab,u,{event:{name:'attack'}}); }`); await settle();
     ck("5351 " + (ok ? "3 worlds: +8000 power" : "1 world: nothing"), val(`return battle.plr.monsters.center.tempPower===${ok ? 8000 : 0}`), val(`return [battle.plr.monsters.center.tempPower]`));
   }
+  // #4204 Counter Act: only after a Duel Golem was destroyed this turn
+  for (const hit of [false, true]) {
+    run(`{ const me=setup(); me.hand=[4204]; me.gauge=me.deck.splice(0,6); ${hit ? "me.abxDestroyedTurn={3594:battle.turnCount};" : ""} globalThis.__r=ABX.canUseHandAct('plr',0,ABX.get(CARD_MAP.get(4204)).abilities.find(a=>a.kind==='act')).ok; if(__r) ABX.runHandUse('plr',0,ABX.get(CARD_MAP.get(4204)).abilities.find(a=>a.kind==='act')); }`); await settle();
+    ck("4204 " + (hit ? "Golem destroyed: called" : "no Golem destroyed: blocked"), val(hit ? `return __r===true && !!Object.values(battle.plr.monsters).find(u=>u&&u.card.id===4204)` : `return __r===false`), val(`return [__r,Object.values(battle.plr.monsters).map(u=>u&&u.card.id)]`));
+  }
   console.log("\npass " + pass + " fail " + fail);
 })();

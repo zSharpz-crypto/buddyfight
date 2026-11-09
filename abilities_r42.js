@@ -4208,6 +4208,11 @@
   XC42.r42ThreeWorlds = (c, ctx) => { const w = new Set(); ctx.f.drop.forEach(id => { const cd = core.cardOf(id); if (cd) (cd.worlds && cd.worlds.length ? cd.worlds : [cd.world]).forEach(x => x && w.add(x)); }); return w.size >= 3; };
   ABX.COND_OK.add("r42ThreeWorlds");
   OV42.push([5351, /three or more different world names in your drop zone/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => Object.assign({}, x, { cond: { t: "r42ThreeWorlds" } })) }) : ab]);
+  /* ---- Danger World: Duel Golem calls (#4204 from hand, #3962 from drop zone) need "a Duel Golem was destroyed this turn" ---- */
+  XC42.r42GolemDestroyed = (c, ctx) => { const dt = ctx.f.abxDestroyedTurn || {}; return Object.keys(dt).some(id => dt[id] === B.turnCount && (((core.cardOf(+id) || {}).attrs) || []).some(a => core.lc(a) === "duelgolem")); };
+  ABX.COND_OK.add("r42GolemDestroyed");
+  OV42.push([4204, /if your .duel golem. was destroyed during this turn/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: [...(ab.conds || []), { t: "r42GolemDestroyed" }], steps: noFb(ab.steps) }) : ab]);
+  OV42.push([3962, /if this card is in your drop zone when a .duel golem. monster on your field is destroyed/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], conds: [...(ab.conds || []), { t: "r42GolemDestroyed" }], steps: noFb(ab.steps) }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
