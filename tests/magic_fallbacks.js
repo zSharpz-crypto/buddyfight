@@ -29,6 +29,21 @@ const enter = async (id, pos) => { run(`ABX.fireEnter('plr', CARD_MAP.get(${id})
   // #5018 on enter: bounce 1 opp card; by G.EVO bounce all + gain life
   run(`clear(); battle.plr.monsters.center=mku(5018); battle.opp.monsters.left=mku(46); battle.opp.monsters.right=mku(46); battle.opp.hand=[];`); await enter(5018, "center");
   ok(J(`battle.opp.hand.length`) === 1, `#5018 normal entry returns exactly one opp card (${J("battle.opp.hand.length")})`);
+  // #2780 Suzuha: when you cast a spell, mill the top card; draw ONLY if it was a spell; once per turn
+  const castTrig = async () => { run(`ABX.fireCast('plr', CARD_MAP.get(4846))`); await settle(); };
+  run(`clear(); battle.plr.monsters.center=mku(2780); battle.plr.deck=[46,4846,46,46]; battle.plr.hand=[];`); await castTrig();
+  ok(J(`battle.plr.drop.length`) === 1 && J(`battle.plr.hand.length`) === 0, `#2780 milled a non-spell: no draw (drop ${J("battle.plr.drop.length")}, hand ${J("battle.plr.hand.length")})`);
+  run(`clear(); battle.plr.monsters.center=mku(2780); battle.plr.deck=[4846,46,46,46]; battle.plr.hand=[];`); await castTrig();
+  ok(J(`battle.plr.drop.length`) === 1 && J(`battle.plr.hand.length`) === 1, `#2780 milled a spell: draw one (drop ${J("battle.plr.drop.length")}, hand ${J("battle.plr.hand.length")})`);
+  await castTrig();
+  ok(J(`battle.plr.drop.length`) === 1, `#2780 only once per turn (drop ${J("battle.plr.drop.length")})`);
+  // #1827 Aunas: when destroyed, may pay 1 gauge; then return to hand OR into the soul of another monster
+  run(`clear(); battle.plr.drop=[1827]; globalThis.__g=battle.plr.gauge.length;`);
+  run(`ABX.fireLeave('plr', CARD_MAP.get(1827), false, false)`); await settle();
+  ok(J(`__g-battle.plr.gauge.length`) === 1 && (J(`battle.plr.hand.includes(1827)`) || J(`!!battle.plr.monsters.left`)), `#1827 pays 1 gauge and returns to hand (gauge -${J("__g-battle.plr.gauge.length")}, hand ${J("battle.plr.hand.includes(1827)")})`);
+  run(`clear(); battle.plr.gauge=[]; battle.plr.drop=[1827];`);
+  run(`ABX.fireLeave('plr', CARD_MAP.get(1827), false, false)`); await settle();
+  ok(!J(`battle.plr.hand.includes(1827)`), "#1827 cannot pay: stays in the drop zone");
   // #4953: three spells from drop to deck bottom -> all size<=3 opp monsters moved to separate areas
   console.log("fail", fail); process.exit(fail ? 1 : 0);
 })();

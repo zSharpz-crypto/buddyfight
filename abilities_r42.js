@@ -6559,6 +6559,34 @@
   };
   OV42.push([39, /reveal the five cards from the top of your deck/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42BackDropImpact" }] }) : ab]);
 
+
+  /* ---- [r42] #1827 Betrayal Expert, Aunas: after paying 1 gauge, return this card (from the drop zone) to the hand OR into the soul of another monster ---- */
+  OPS.r42AunasReturn = {
+    async run(s, ctx) {
+      const f = ctx.f;
+      const idx = f.drop.lastIndexOf(1827);
+      if (idx < 0) return false;
+      const hosts = ["left", "center", "right", "center2"].map(p => f.monsters[p]).filter(u => u && u.card.name !== "Betrayal Expert, Aunas");
+      let toSoul = false;
+      if (hosts.length && !(f.isBot || ABX.autoPlay) && ABX.ui && ABX.ui.pickOption) {
+        try { toSoul = (await ABX.ui.pickOption({ title: `${ctx.card.name} \u2014 return`, options: ["Return to hand", "Put into a monster's soul"] })) === 1; } catch (e) { toSoul = false; }
+      }
+      f.drop.splice(idx, 1);
+      if (toSoul) {
+        let host = hosts[0];
+        if (hosts.length > 1 && ABX.ui.pickOption) { try { host = hosts[await ABX.ui.pickOption({ title: "Which monster?", options: hosts.map(u => u.card.name) })] || hosts[0]; } catch (e) {} }
+        host.soul = host.soul || []; host.soul.push(core.cardOf(1827));
+      } else f.hand.push(1827);
+      fresh();
+      return true;
+    }
+  };
+  OV42.push([1827, /return this card to your hand, or put this card into the soul/i, (ab) => {
+    if (ab.kind !== "triggered") return ab;
+    const st = noFb(ab.steps);
+    return Object.assign({}, ab, { unparsed: [], steps: [st[0], { op: "r42AunasReturn", gate: "ifYouDo" }] });
+  }]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
