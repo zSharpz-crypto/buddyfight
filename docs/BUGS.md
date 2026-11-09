@@ -412,3 +412,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Dungeon World: #235 top card of each deck to drop (monster = 1 damage, else +1 life); #256 #1134 discard two Dungeon Enemy then destroy; #248 Adventurer+Dungeon Enemy from drop to deck bottom (fixed order) then gauge+draw; #4065 gauge per equipped item. Open: #199 #214 #1168 #2571 #2588 #2610 #2780 #3320 #3871 #4506 #5687 #5688 #5712. Test: tests/dungeon_a.js.
 
 - Dungeon World: #3320 random reveal from opp hand (monster 2 damage, spell +2 life); #2610 stands up to two Weapon cards in final phase (the "can attack during the final phase" permission is only a flag abxFinalAtk, not enforced by the engine). Test: tests/dungeon_a.js.
+
+- Dungeon World: #2571 now also puts cards into your gauge equal to the milled count (the gauge half was silently skipped). Open in Dungeon: #199 #214 #1168 #2588 #2780 #3871 #4506(partial). Test: tests/dungeon_a.js.

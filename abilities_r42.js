@@ -4175,6 +4175,7 @@
     fresh(); return n > 0;
   }, check: () => true };
   OV42.push([2610, /when this card enters the field during your final phase/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], conds: [...(ab.conds || []), { t: "phase", phase: "final", who: "you" }], steps: [{ op: "r42StandWeapons" }] }) : ab]);
+  OV42.push([2571, /if you destroyed a monster, put cards from the top of your opponent's deck equal to the size/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "r42MillBySize" ? Object.assign({}, x, { gauge: true }) : x) }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

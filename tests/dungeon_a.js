@@ -34,5 +34,9 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #2610 final phase: stand up to two Weapon cards
   run(`{ const me=setup(); battle.phase='final'; me.item=mk(CARD_MAP.get(199)); me.item.rested=true; const u=mk(CARD_MAP.get(2610)); me.monsters.center=u; ABX.fireEnter('plr',CARD_MAP.get(2610),u); }`); await settle();
   ck("2610: rested Weapon item stood", val(`return battle.plr.item.rested===false`), val(`return [battle.plr.item.rested]`));
+  // #2571 destroyed monster's size = cards milled from opp deck, same number into my gauge (exactly once)
+  run(`globalThis.__s2=ALL_CARDS.find(c=>c.type==='Monster'&&Number(c.size)===2).id`);
+  run(`{ const me=setup(), op=battle.opp; op.deck=[61,62,63,64,65]; op.drop=[]; me.gauge=[]; me.deck=[71,72,73,74,75]; op.monsters.center=mk(CARD_MAP.get(__s2)); const u=mk(CARD_MAP.get(2571)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(2571)).abilities.find(a=>a.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(2571),ab,u,{event:{name:'attack'}}); }`); await settle();
+  ck("2571: size-2 monster destroyed -> 2 milled, +2 gauge (once)", val(`return !battle.opp.monsters.center && battle.opp.deck.length===3 && battle.plr.gauge.length===2`), val(`return [!!battle.opp.monsters.center,battle.opp.deck.length,battle.plr.gauge.length,battle.opp.drop.length]`));
   console.log("\npass " + pass + " fail " + fail);
 })();
