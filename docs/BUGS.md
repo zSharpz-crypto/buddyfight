@@ -400,3 +400,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Legend: #2068 discard two Legend World cards (final phase) then stand; #2089 discard, look/reorder top 3 of either deck, draw (reorder/choice only for human players, auto keeps order). #3340 #2788 #5519 #1004 still open. Test: tests/legend_a.js.
 
 - Ancient World: #1513 #3502 drop up to two Ancient World monsters from deck, shuffle, top card to gauge; #4141 +3 life only if called at 5 life or less. Test: tests/ancient_a.js.
+
+- Ancient World: #4968 nullifies the cast spell; #2348 nullifies Lifelink of your monsters this turn then returns monsters; #4969 nullify attack then look at center-size cards (one to hand, rest bottom). #4968 nullify and #2348 monster-return not tested end to end. Test: tests/ancient_a.js.

@@ -21,5 +21,11 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     run(`{ const me=setup(); me.life=${life}; me.hand=[4141]; me.gauge=me.deck.splice(0,5); const ab=ABX.get(CARD_MAP.get(4141)).abilities.find(a=>a.kind==='act'); battle.turn='opp'; battle.activeSide='opp'; ABX.runHandUse('plr',0,ab); }`); await settle();
     ck("4141 called at life " + life + ": " + (life <= 5 ? "+3 life" : "no life"), val(`const p=battle.plr; return !!Object.values(p.monsters).find(u=>u&&u.card.id===4141) && p.life===${life <= 5 ? life + 3 : life}`), val(`const p=battle.plr; return [p.life,Object.values(p.monsters).map(u=>u&&u.card.id)]`));
   }
+  // #4969 look at center-size cards, one to hand, rest to bottom
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(__aw)); globalThis.__sz=Number(CARD_MAP.get(__aw).size)||0; me.deck=[21,22,23,24,25,26,27,28]; me.hand=[]; globalThis.__dl=me.deck.length; ABX.fireSpell('plr',CARD_MAP.get(4969),{free:true}); }`); await settle();
+  ck("4969: one card to hand, rest of the looked cards to the bottom", val(`const p=battle.plr; return __sz>0 && p.hand.length===1 && p.deck.length===__dl-1 && p.deck[0]===(p.hand[0]===21?22:21)`), val(`const p=battle.plr; return [__sz,p.hand,p.deck]`));
+  // #2348 Lifelink nullified for the turn
+  run(`{ const me=setup(); ABX.fireSpell('plr',CARD_MAP.get(2348),{free:true}); }`); await settle();
+  ck("2348: Lifelink of your monsters nullified this turn", val(`return ABX.lifelinkOff('plr',CARD_MAP.get(__aw))===true`));
   console.log("\npass " + pass + " fail " + fail);
 })();

@@ -4077,6 +4077,28 @@
   XC42.r42LifeLE5 = (c, ctx) => ctx.f.life <= 5;
   ABX.COND_OK.add("r42LifeLE5");
   OV42.push([4141, /if you call while you have 5 life or less/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).map(x => x.op === "life" ? Object.assign({}, x, { cond: { t: "r42LifeLE5" }, gate: undefined }) : x) }) : ab]);
+  /* ---- Ancient World: #4968 nullify tail, #2348 nullify Lifelink then return monsters, #4969 look at center-size cards */
+  OV42.push([4968, /nullify the spell your opponent cast/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps), { op: "nullifyCast", what: "spell", gate: "ifYouDo" }] }) : ab]);
+  OPS.r42NullLL = { run(s, ctx) { ctx.f.abxLLOff = B.turnCount; return true; }, check: () => true };
+  { const prevLL = ABX.lifelinkOff; ABX.lifelinkOff = function (side, card) { const f = F(side); if (f && f.abxLLOff === B.turnCount) return true; return prevLL ? prevLL.apply(this, arguments) : false; }; }
+  OV42.push([2348, /nullify the \[lifelink\] of all monsters on your field/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42NullLL" }, ...noFb(ab.steps)] }) : ab]);
+  OPS.r42LookCenterSize = { async run(s, ctx) {
+    const f = ctx.f, c = f.monsters.center, n = Math.min(c ? Number(c.card.size) || 0 : 0, f.deck.length);
+    if (n <= 0) return false;
+    const ids = f.deck.splice(0, n), auto = ABX.autoPlay || f.isBot;
+    const cands = ids.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) }));
+    const ch = auto ? [cands[0]] : await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, max: 1, title: `${ctx.card.name} - put one into your hand` });
+    const r = ch[0] || cands[0]; ids.splice(ids.indexOf(r.id), 1); f.hand.push(r.id);
+    const rest = [];
+    while (ids.length) {
+      if (auto || ids.length === 1) { rest.push(ids.shift()); continue; }
+      const cs = ids.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) }));
+      const q = (await core.pick(cs, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, max: 1, title: "Pick the next card for the bottom of your deck" }))[0] || cs[0];
+      ids.splice(ids.indexOf(q.id), 1); rest.push(q.id);
+    }
+    f.deck.push(...rest); fresh(); return true;
+  }, check: () => true };
+  OV42.push([4969, /look at the number of cards from the top of your deck equal to your center monster/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "nullifyAttack" }, { op: "r42LookCenterSize" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
