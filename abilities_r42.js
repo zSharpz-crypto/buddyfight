@@ -3380,6 +3380,32 @@
     }, check: () => true
   };
   OV42.push([1985, /if you are not \[transform\] into this card/i, () => ({ kind: "act", tags: ["counter"], steps: [{ op: "r42TransformFromField" }] })]);
+  /* ---- [r42] generic "[Transform] into / [Ride] on a card with [Transform] or [Ride] from hand / drop zone" (#2129 #4972 #6413) ---- */
+  // s: {areas:["hand","drop"], free, modes:["transform","ride"], filter?}
+  OPS.r42ModeFrom = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side, modes = s.modes || ["transform", "ride"], cands = [];
+      (s.areas || ["hand"]).forEach(area => (area === "drop" ? f.drop : f.hand).forEach((id, idx) => {
+        const c = core.cardOf(id), mc = c && c.type === "Monster" ? ABX.modeCost(c) : null;
+        if (!c || !mc || !modes.includes(mc.mode)) return;
+        if (s.filter && !core.matchFilter(c, s.filter, null, ctx)) return;
+        if (!s.free && !ABX.canModeEquip(side, c, true).ok) return;
+        cands.push({ k: "zone", side, area: area, idx, id, card: c, mode: mc.mode });
+      }));
+      if (!cands.length) return false;
+      const ch = await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - [Transform] / [Ride]` });
+      const r = ch && ch[0]; if (!r) return false;
+      if (r.area === "drop") { const i = f.drop.indexOf(r.id); if (i < 0) return false; f.drop.splice(i, 1); f.hand.push(r.id); }
+      ABX._modeByEffect = true; ABX._modeFree = !!s.free;
+      let ok = false; try { ok = battle.equipCardFromHand(side, f.hand.lastIndexOf(r.id), r.mode === "ride" ? "Ride" : "Transform") !== false; } finally { ABX._modeByEffect = false; ABX._modeFree = false; }
+      if (r.area === "drop" && !(f.item && f.item.card.id === r.id)) { const i = f.hand.lastIndexOf(r.id); if (i >= 0) { f.hand.splice(i, 1); f.drop.push(r.id); } ok = false; }
+      fresh(); return ok;
+    }, check: () => true
+  };
+  OV42.push([2129, /when this card is destroyed, you may \[transform\] into, or \[ride\]/i, () => ({ kind: "triggered", trigger: { event: "leave", self: true, destroyedOnly: true }, conds: [], steps: [{ op: "r42ModeFrom", areas: ["hand"], free: true }] })]);
+  OV42.push([4972, /cosmo change|galaxy exalt/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Mill", n: 2 }, { op: "r42ModeFrom", areas: ["drop"], free: false, modes: ["transform"], filter: { tribes: ["Galaxy Exalt"] } }] }) : ab)]);
+  OPS.r42Mill = { run(s, ctx) { const f = ctx.f; for (let i = 0; i < s.n && f.deck.length; i++) f.gauge.push(f.deck.shift()); fresh(); return true; }, check: () => true };
+  OV42.push([6413, /when this card enters the field by \[g\.evo\], choose up to one card with/i, () => ({ kind: "triggered", trigger: { event: "enter", self: true }, conds: [{ t: "gevoEntered" }], steps: [{ op: "r42ModeFrom", areas: ["hand", "drop"], free: true }] })]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
