@@ -4125,6 +4125,39 @@
   /* ---- #6013: monsters on your field cannot be destroyed by attacks this turn (the fallback also re-ran the hand drop) ---- */
   OPS.r42AllNoAttackDestroy = { run(s, ctx) { let n = 0; Object.values(ctx.f.monsters).forEach(u => { if (u) { u.abxNoAttackDestroy = B.turnCount; n++; } }); return n > 0; }, check: () => true };
   OV42.push([6013, /drop all of your hand cards, and for this turn, all monsters on your field cannot be destroyed by attacks/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op !== "static"), { op: "r42AllNoAttackDestroy", gate: "ifYouDo" }, ...noFb(ab.steps).filter(x => x.op === "static")] }) : ab]);
+  /* ---- Dungeon World: #235 #256 #1134 #248 #4065 ---- */
+  const hasAttr = (id, a) => { const c = core.cardOf(id); return !!c && (c.attrs || []).some(x => core.lc(x) === core.lc(a)); };
+  OPS.r42EachTopDrop = { run(s, ctx) {
+    ["plr", "opp"].forEach(side => {
+      const f = F(side); if (!f.deck.length) return;
+      const id = f.deck.shift(), c = core.cardOf(id); f.drop.push(id);
+      if (c && c.type === "Monster") core.applyDamage(side, 1, { kind: "effect", sourceCard: ctx.card }); else f.life += 1;
+    });
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([235, /put the top card of each player's deck into the drop zone/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42EachTopDrop" }] }) : ab]);
+  OPS.r42DiscardTwoAttr = { async run(s, ctx) {
+    const f = ctx.f, cands = f.hand.map((id, idx) => ({ k: "zone", side: ctx.side, area: "hand", idx, id, card: core.cardOf(id) })).filter(r => hasAttr(r.id, s.attr));
+    if (cands.length < 2) return false;
+    const ch = (ABX.autoPlay || f.isBot) ? cands.slice(0, 2) : await core.pick(cands, { qty: { n: 2 } }, ctx, { intent: "cost", min: 2, max: 2, title: `${ctx.card.name} - discard two` });
+    if (ch.length < 2) return false;
+    ch.forEach(r => { const i = f.hand.indexOf(r.id); if (i >= 0) { f.hand.splice(i, 1); f.drop.push(r.id); ABX.fireDiscarded && ABX.fireDiscarded(ctx.side, core.cardOf(r.id)); } });
+    fresh(); return true;
+  }, check: () => true };
+  [256, 1134].forEach(id => OV42.push([id, /you may discard two dungeon enemy from your hand/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DiscardTwoAttr", attr: "DungeonEnemy" }, ...noFb(ab.steps)] }) : ab]));
+  OPS.r42DropPairToDeckBottom = { run(s, ctx) {
+    const f = ctx.f, ai = f.drop.findIndex(id => hasAttr(id, "Adventurer")); if (ai < 0) return false;
+    const di = f.drop.findIndex((id, i) => i !== ai && hasAttr(id, "DungeonEnemy")); if (di < 0) return false;
+    const a = f.drop[ai], d = f.drop[di]; f.drop = f.drop.filter((_, i) => i !== ai && i !== di); f.deck.push(a, d);
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([248, /put an adventurer and a dungeon enemy from your drop zone/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DropPairToDeckBottom" }, ...noFb(ab.steps)] }) : ab]);
+  OPS.r42GaugeByItems = { run(s, ctx) {
+    const f = ctx.f, n = [f.item, f.item2].filter(Boolean).length; let k = 0;
+    for (; k < n && f.deck.length; k++) f.gauge.push(f.deck.shift());
+    fresh(); return k > 0;
+  }, check: () => true };
+  OV42.push([4065, /put cards from the top of your deck into your gauge equal to the number of items you have equipped/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps), { op: "r42GaugeByItems" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
