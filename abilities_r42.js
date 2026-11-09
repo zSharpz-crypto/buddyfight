@@ -3416,6 +3416,37 @@
   OV42.push([6300, /\[counter\] nullify the attack\. then, if you are \[impact transform\]/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: parseS("nullify the attack").concat(gate(parseS("put the top card of your deck into your gauge, you gain 1 life, and draw a card"), { t: "r42ImpactTf" })) })]);
   OV42.push([6302, /\[counter\] nullify the attack\. then, if your opponent.s cards attacked three times/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: parseS("nullify the attack").concat(gate(parseS("end this phase"), { t: "and", list: [{ t: "r42OppAtk3" }, { t: "r42ImpactTf" }] })) })]);
   OV42.push([2642, /the third guy/i, (ab) => Object.assign({}, ab, { conds: [{ t: "r42TfName", name: "gaigrander" }], unparsed: [], steps: parseS("draw a card") })]);
+  /* ---- [r42] Darkness Dragon "put cards from the top of the deck into the drop zone" family (#1860 #1993 #2124 #2281 #2571 #2678) ---- */
+  const NUMW = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+  const millTo = (f, n) => { const ids = f.deck.splice(0, n); ids.forEach(id => f.drop.push(id)); return ids.length; };
+  OPS.r42MillBySize = {
+    run(s, ctx) {
+      const r = (ctx.bind.lastDestroyed || []).find(x => x && x.card);
+      if (!r) return false;
+      const n = Math.max(0, Number(r.card.size) || 0), e = ctx.e;
+      const got = millTo(e, n); e.abxMilledTurn = B.turnCount;
+      if (s.gauge) for (let i = 0; i < got && ctx.f.deck.length; i++) ctx.f.gauge.push(ctx.f.deck.shift());
+      fresh(); return got > 0;
+    }, check: () => true
+  };
+  OPS.r42MillBoth = {
+    run(s, ctx) {
+      millTo(ctx.f, s.n); const g = millTo(ctx.e, s.n); if (g) ctx.e.abxMilledTurn = B.turnCount;
+      if (s.life && ctx.f.life != null) ctx.f.life += s.life;
+      fresh(); return true;
+    }, check: () => true
+  };
+  OPS.r42MillOpp = { run(s, ctx) { const g = millTo(ctx.e, s.n); if (g) ctx.e.abxMilledTurn = B.turnCount; fresh(); return g > 0; }, check: () => true };
+  const mill0 = OPS.mill.run;
+  OPS.mill.run = function (s, ctx) { const r = mill0.apply(this, arguments); try { if (s.who && s.who !== "you" && s.who !== "self" && (s.to === "drop zone" || s.to === "drop") && r) ctx.e.abxMilledTurn = B.turnCount; } catch (e) { /* ignore */ } return r; };
+  XC42.r42OppMilled = (c, ctx) => !!(ctx.e && ctx.e.abxMilledTurn === B.turnCount);
+  ABX.COND_OK.add("r42OppMilled");
+  ABX.ACTION_RULES.unshift(
+    [/^(?:if you destroyed a monster, )?put cards from the top of your opponent.s deck (?:into (?:his or her|their) drop zone )?equal to the size of that card(?: into (?:his or her|their) drop zone)?( and put cards from the top of your deck into your gauge equal to the number of cards put into the drop zone this way)?[.!]*$/i, (m) => ({ op: "r42MillBySize", gauge: !!m[1] }), false],
+    [/^(?:both players put|put) the top (one|two|three|four|five) cards? of (?:his or her|each fighter.s|their) deck into (?:the|their owners.) drop zone(?:,? and you gain (\d+) life)?$/i, (m) => ({ op: "r42MillBoth", n: NUMW[m[1].toLowerCase()], life: m[2] ? Number(m[2]) : 0 }), false],
+    [/^put the top (one|two|three|four|five) cards? of your opponent.s deck$/i, (m) => ({ op: "r42MillOpp", n: NUMW[m[1].toLowerCase()] }), false]
+  );
+  OV42.push([2678, /black wings of pursuit/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { conds: [{ t: "r42OppMilled" }], unparsed: [], steps: parseS("call this card from your hand without paying its [call cost]") }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);
