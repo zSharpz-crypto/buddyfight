@@ -3508,6 +3508,46 @@
     }, check: () => true
   };
   OV42.push([6361, /change the chosen card.s size to 3/i, (ab) => (ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SetSize", size: 3 }] }) : ab)]);
+  /* ---- [r42] Darkness Dragon Swamp family: #5002 #6425 (drop top N, take the Swamps), #5008 (crit down per Venom Swamp), #6345 (gauge -> hand) ---- */
+  OPS.r42DropTopTake = {
+    run(s, ctx) {
+      const f = ctx.f, ids = f.deck.splice(0, s.n), took = [];
+      ids.forEach(id => {
+        const c = core.cardOf(id);
+        const ok = c && (s.name ? String(c.name || "").toLowerCase().includes(s.name) : (c.type === "Spell" && /swamp/i.test(c.name + " " + (c.attrs || []).join(" ")) && /\[set\]/i.test(c.skill || "")));
+        if (ok) { f.hand.push(id); took.push(id); } else f.drop.push(id);
+      });
+      fresh(); return ids.length > 0;
+    }, check: () => true
+  };
+  OV42.push([5002, /drop up to the top three cards of your deck/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DropTopTake", n: 3, name: "venom swamp" }] })]);
+  OV42.push([6425, /drop up to four cards from the top of your deck/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DropTopTake", n: 4 }] })]);
+  OPS.r42CritDownPerName = {
+    async run(s, ctx) {
+      const e = ctx.e, es = ctx.side === "plr" ? "opp" : "plr", f = ctx.f;
+      const cnt = ["left", "center", "right"].filter(p => f.monsters[p] && String(f.monsters[p].card.name).toLowerCase().includes(s.name)).length + (f.setSpells || []).filter(c => c && String(c.name || (core.cardOf(c.id) || {}).name || "").toLowerCase().includes(s.name)).length;
+      const list = ["left", "center", "right"].filter(p => e.monsters[p]).map(p => ({ k: "unit", side: es, pos: p, unit: e.monsters[p], card: e.monsters[p].card, id: e.monsters[p].card.id }));
+      if (e.item && !e.item.isEndrulerFlag) list.push({ k: "unit", side: es, pos: "item", unit: e.item, card: e.item.card, id: e.item.card.id });
+      if (!list.length) return false;
+      const ch = await core.pick(list, { qty: { n: 1, upTo: false } }, ctx, { intent: "harm", min: 1, title: `${ctx.card.name} - choose a card on your opponent's field` });
+      const r = ch && ch[0]; if (!r) return false;
+      r.unit.tempCrit = (r.unit.tempCrit || 0) - cnt; fresh(); return cnt > 0;
+    }, check: () => true
+  };
+  OV42.push([5008, /critical is reduced by 1 for each .venom swamp/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42CritDownPerName", name: "venom swamp" }] }) : ab)]);
+  OPS.r42GaugeToHand = {
+    async run(s, ctx) {
+      const f = ctx.f, side = ctx.side;
+      const any = (s.anyNames || []).some(n => ["left", "center", "right"].some(p => f.monsters[p] && String(f.monsters[p].card.name).toLowerCase().includes(n)));
+      const cands = f.gauge.map((id, idx) => ({ k: "zone", side, area: "gauge", idx, id, card: core.cardOf(id) })).filter(c => c.card && (any || c.card.type === "Monster"));
+      if (!cands.length) return false;
+      const ch = await core.pick(cands, { qty: { n: 1, upTo: true } }, ctx, { intent: "help", min: 0, title: `${ctx.card.name} - reveal a ${any ? "card" : "monster"} from your gauge` });
+      const r = ch && ch[0]; if (!r) return false;
+      const i = f.gauge.indexOf(r.id); if (i < 0) return false;
+      f.gauge.splice(i, 1); f.hand.push(r.id); fresh(); return true;
+    }, check: () => true
+  };
+  OV42.push([6345, /for the future|look at all of your gauge/i, (ab) => (ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42Mill", n: 2 }, { op: "r42GaugeToHand", anyNames: ["jackknife", "abygale"] }] }) : ab)]);
   /* ---- attack-through family (tests/attack_through.js): #3159 turn grant, #5649 "That Girl" static, #6088 Moonlit Black Cats [Set] spell ---- */
   OPS.r42ThroughTurn = { run(s, ctx) { ctx.f.abxThroughTurn = { turn: B.turnCount, tribe: s.tribe }; return true; }, check: () => true };
   OV42.push([3159, /prism dragon.*can attack your opponent even if there is a monster on his or her center/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ThroughTurn", tribe: "PrismDragon" }] })]);

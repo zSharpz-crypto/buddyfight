@@ -49,5 +49,14 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #6361 Omni Lord act: pay 1 gauge, chosen opp monster becomes size 3
   run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(6361)); battle.opp.monsters.left=mk(CARD_MAP.get(1054)); globalThis.__g=me.gauge.length; const ab=ABX.actAbilities(CARD_MAP.get(6361))[0]; ABX.runAbility('plr',CARD_MAP.get(6361),ab,me.monsters.center,{event:{name:'act'}}); }`); await settle();
   ck("6361: opp monster is size 3 and 1 gauge paid", val(`return getEffectiveCardSize(battle.opp, battle.opp.monsters.left.card, battle.opp.monsters.left)===3 && battle.plr.gauge.length===__g-1`), val(`return [getEffectiveCardSize(battle.opp, battle.opp.monsters.left.card, battle.opp.monsters.left), battle.plr.gauge.length, __g]`));
+  // #5002 / #6425: drop top N, Swamps go to hand; #5008 crit down; #6345 gauge -> hand
+  run(`{ const me=setup(); me.deck=[5001,1054,1054,6423,1054]; me.monsters.center=null; globalThis.__h=me.hand.length; ABX.fireEnter('plr',CARD_MAP.get(5002),mk(CARD_MAP.get(5002))); }`); await settle();
+  ck("5002 enter: Venom Swamp to hand, other 2 dropped", val(`const p=battle.plr; return p.hand.includes(5001) && !p.hand.includes(1054) && p.drop.filter(i=>i===1054).length===2 && p.deck.length===2`), val(`const p=battle.plr; return [p.hand,p.drop,p.deck.length]`));
+  run(`{ const me=setup(); me.deck=[5001,6423,1054,1054,1054]; ABX.fireEnter('plr',CARD_MAP.get(6425),mk(CARD_MAP.get(6425))); }`); await settle();
+  ck("6425 enter: both Set Swamp spells to hand", val(`const p=battle.plr; return p.hand.includes(5001) && p.hand.includes(6423) && p.deck.length===1`), val(`const p=battle.plr; return [p.hand,p.deck.length]`));
+  run(`{ const me=setup(); me.setSpells=[{id:5001,name:'Venom Swamp',soul:[]},{id:5001,name:'Venom Swamp',soul:[]}]; battle.opp.monsters.center=mk(CARD_MAP.get(1054)); globalThis.__c=battle.opp.monsters.center.tempCrit||0; ABX.fireSpell('plr',CARD_MAP.get(5008)); }`); await settle();
+  ck("5008: crit reduced by number of Venom Swamps (2)", val(`return (battle.opp.monsters.center.tempCrit||0)===__c-2`), val(`return battle.opp.monsters.center.tempCrit`));
+  run(`{ const me=setup(); me.gauge=[5001,1054]; me.deck=[1054,1054,1054]; me.life=10; ABX.fireSpell('plr',CARD_MAP.get(6345)); }`); await settle();
+  ck("6345: milled 2 to gauge, then a monster from gauge to hand", val(`const p=battle.plr; return p.hand.includes(1054) && p.gauge.length===3`), val(`const p=battle.plr; return [p.hand,p.gauge]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();
