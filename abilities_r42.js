@@ -6232,6 +6232,32 @@
     } catch (e) { /* ignore */ }
     return adPrev5865.apply(this, arguments);
   };
+  /* ---- [r42] Darkness Dragon fallback fixes (tests/darkness_fallbacks.js) ----
+   * The base parser split these sentences wrongly and the r40 text fallback then ran them a second time.
+   *   #1952 Deadly Boost: the gauge is dropped AT THE END OF THE TURN, not right after the cards are added.
+   *   #3498 Growl: only if no card was put into your gauge earlier this turn.
+   *   #3703 Dirtiele: the destroy needs two or more world names on your field (+1 life is unconditional, and only once). */
+  const trackGauge = (sd) => {
+    const f = F(sd);
+    if (!f || !Array.isArray(f.gauge) || f.gauge.abxTracked) return;
+    const push = f.gauge.push;
+    Object.defineProperty(f.gauge, "abxTracked", { value: true });
+    f.gauge.push = function () { core.st(f).gaugeInTurn = B.turnCount; return push.apply(this, arguments); };
+  };
+  XC42.r42NoGaugeThisTurn = (c, ctx) => { trackGauge(ctx.side); return core.st(F(ctx.side)).gaugeInTurn !== B.turnCount; };
+  ABX.COND_OK.add("r42NoGaugeThisTurn");
+  OPS.r42EotGaugeDrop = { run(s, ctx) { core.st(F(ctx.side)).eotGaugeDrop = B.turnCount; return true; } };
+  const fteGauge = ABX.fireTurnEvent;
+  ABX.fireTurnEvent = function (kind) {
+    ["plr", "opp"].forEach(trackGauge);
+    const r = fteGauge.apply(this, arguments);
+    if (kind === "turnEnd") ["plr", "opp"].forEach(sd => { const f = F(sd), S = core.st(f); if (S.eotGaugeDrop === B.turnCount) { S.eotGaugeDrop = null; f.drop.push(...f.gauge.splice(0)); } });
+    return r;
+  };
+  OV42.push([1952, /at the end of the turn, put all cards from your gauge/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps).slice(0, 1).concat([{ op: "r42EotGaugeDrop" }]) })]);
+  OV42.push([3498, /if you did not put any cards in your gauge during this turn/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 0, { t: "r42NoGaugeThisTurn" }).slice(0, 1) })]);
+  OV42.push([3703, /two or more world names on your field/i, (ab) => Object.assign({}, ab, { unparsed: [], steps: gateAll(ab.steps, 1, { t: "xWorldNames", area: "field", n: 2 }).slice(0, 2) })]);
+
 })(typeof window !== "undefined" ? window : globalThis);
 /* ==================== ABX — round 42 (Godpunk review): cast rules with several conditions / a monster-only filter ====================
  * "You may only cast this card if your opponent's life is 5 or less, and you have a «Godpunk» on your field" (#4414) was only
