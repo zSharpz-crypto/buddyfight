@@ -402,3 +402,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Ancient World: #1513 #3502 drop up to two Ancient World monsters from deck, shuffle, top card to gauge; #4141 +3 life only if called at 5 life or less. Test: tests/ancient_a.js.
 
 - Ancient World: #4968 nullifies the cast spell; #2348 nullifies Lifelink of your monsters this turn then returns monsters; #4969 nullify attack then look at center-size cards (one to hand, rest bottom). #4968 nullify and #2348 monster-return not tested end to end. Test: tests/ancient_a.js.
+
+- Ancient World: #2785 top card to drop, Dragon monster to hand else +1 life; #4891 no longer always draws a 3rd card (only if the Cast Cost card is size 4+; tracked via f.abxCostDropped in a payExtras wrapper). Test: tests/ancient_a.js.

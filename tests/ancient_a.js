@@ -27,5 +27,16 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #2348 Lifelink nullified for the turn
   run(`{ const me=setup(); ABX.fireSpell('plr',CARD_MAP.get(2348),{free:true}); }`); await settle();
   ck("2348: Lifelink of your monsters nullified this turn", val(`return ABX.lifelinkOff('plr',CARD_MAP.get(__aw))===true`));
+  // #2785 top card to drop: Dragon monster -> hand, else +1 life
+  run(`globalThis.__dm=ALL_CARDS.find(c=>c.type==='Monster'&&(c.attrs||[]).some(a=>/dragon/i.test(a))).id`);
+  for (const dragon of [true, false]) {
+    run(`{ const me=setup(); me.deck=[${dragon?'__dm':'1054'},1054,1054]; me.life=10; me.hand=[]; ABX.fireEnter('plr',CARD_MAP.get(2785),mk(CARD_MAP.get(2785))); }`); await settle();
+    ck("2785 top is " + (dragon ? "Dragon monster -> hand" : "other -> +1 life"), val(dragon ? `return battle.plr.hand[0]===__dm && battle.plr.life===10 && !battle.plr.drop.includes(__dm)` : `return battle.plr.life===11 && battle.plr.hand.length===0 && battle.plr.drop.length===1`), val(`return [battle.plr.life,battle.plr.hand,battle.plr.drop]`));
+  }
+  // #4891 gauge + life + draw 2 (+1 when the cost card is size 4+)
+  for (const big of [true, false]) {
+    run(`{ const me=setup(); me.deck=[31,32,33,34,35,36]; me.gauge=me.deck.splice(0,0); me.life=10; me.hand=[]; me.abxCostDropped=${big?'ALL_CARDS.find(c=>Number(c.size)>=4).id':'1054'}; ABX.fireSpell('plr',CARD_MAP.get(4891),{free:true}); }`); await settle();
+    ck("4891 cost card " + (big ? "size 4+: draws 3" : "small: draws 2"), val(`return battle.plr.life===11 && battle.plr.hand.length===${big ? 3 : 2}`), val(`return [battle.plr.life,battle.plr.hand.length]`));
+  }
   console.log("\npass " + pass + " fail " + fail);
 })();

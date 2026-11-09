@@ -4099,6 +4099,26 @@
     f.deck.push(...rest); fresh(); return true;
   }, check: () => true };
   OV42.push([4969, /look at the number of cards from the top of your deck equal to your center monster/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "nullifyAttack" }, { op: "r42LookCenterSize" }] }) : ab]);
+  /* ---- Ancient World: #2785 top card to drop (Dragon monster -> hand, else +1 life), #4891 draw by cost-dropped size ---- */
+  OPS.r42TopDropDragon = { run(s, ctx) {
+    const f = ctx.f; if (!f.deck.length) return false;
+    const id = f.deck.shift(), c = core.cardOf(id); f.drop.push(id);
+    if (c && c.type === "Monster" && (c.attrs || []).some(a => /dragon/i.test(a))) { f.drop.pop(); f.hand.push(id); } else f.life += 1;
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([2785, /put the top card of your deck into the drop zone\. if it is a monster/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42TopDropDragon" }] }) : ab]);
+  { const prevPX = ABX.payExtras;
+    ABX.payExtras = function (side, card) {
+      const f = F(side), before = f.drop.length, mark = () => { f.abxCostDropped = f.drop.length > before ? f.drop[f.drop.length - 1] : null; };
+      const r = prevPX.apply(this, arguments);
+      if (r && typeof r.then === "function") return r.then(v => { mark(); return v; });
+      mark(); return r;
+    }; }
+  OPS.r42DrawIfCostBig = { run(s, ctx) {
+    const f = ctx.f, c = core.cardOf(f.abxCostDropped); if (!c || (Number(c.size) || 0) < 4 || !f.deck.length) return false;
+    f.hand.push(f.deck.shift()); fresh(); return true;
+  }, check: () => true };
+  OV42.push([4891, /if the card dropped by this card's \[cast cost\] is size 4 or greater/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op !== "draw"), { op: "draw", who: "you", n: 2 }, { op: "r42DrawIfCostBig" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
