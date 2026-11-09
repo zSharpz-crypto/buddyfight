@@ -1410,12 +1410,12 @@
       body = end > 0 ? body.slice(1, end) : body.slice(1);
     }
     body = stripEnd(body);
-    const parts = body.split(/\s*&\s*|,?\s+and\s+(?=pay|put|discard|drop|destroy|\[rest\])/i).map(p => p.trim()).filter(Boolean);
+    const parts = body.split(/\s*&\s*|\.\s+(?=then,)|,?\s+and\s+(?=pay|put|discard|drop|destroy|\[rest\])/i).map(p => p.trim()).filter(Boolean);
     const parsed = parts.map(p => ABX.parseCostPart(p));
     return { kind: "cost", costKind: kind, raw: line, parts: parsed, steps: [], unparsed: parsed.filter(p => !p.ok).map(p => p.text), parsed: parsed.every(p => p.ok) };
   };
   ABX.parseCostPart = function (p) {
-    const t = stripEnd(p);
+    const t = stripEnd(p).replace(/^then,\s*/i, "");
     let m;
     if ((m = t.match(/^pay (\d+|a|one|two|three|four|five|six|seven) gauge$/i))) return { ok: true, text: t, gauge: toNum(m[1]) };
     if ((m = t.match(/^pay (\d+|a|one|two|three|four|five) life$/i))) return { ok: true, text: t, life: toNum(m[1]) };
