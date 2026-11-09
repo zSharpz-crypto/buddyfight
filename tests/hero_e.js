@@ -42,5 +42,12 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   // #1628 top card to gauge (auto-play keeps the next card on top)
   run(`{ const me=setup(); me.gauge=[]; me.deck=[1,2,3]; ABX.fireSpell('plr',CARD_MAP.get(1628),{free:true}); }`); await settle();
   ck("1628: one card to gauge, next stays on top", val(`const p=battle.plr; return p.gauge.length===1 && p.deck.join()==='2,3'`), val(`const p=battle.plr; return [p.gauge,p.deck]`));
+  // #3216 discard Caardian + 1 gauge -> draw two
+  run(`globalThis.__caar=ALL_CARDS.find(c=>/caardian/i.test(c.name)&&c.id!==3216).id`);
+  run(`{ const me=setup(); me.hand=[__caar]; me.deck=[1,2,3]; me.gauge=[5,6]; const ab=ABX.get(CARD_MAP.get(3216)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(3216),ab,null,{event:{name:'act'}}); }`); await settle();
+  ck("3216: Caardian discarded, gauge paid, drew two", val(`const p=battle.plr; return p.hand.length===2 && p.gauge.length===1 && p.drop.includes(__caar)`), val(`const p=battle.plr; return [p.hand,p.gauge,p.drop]`));
+  // #2001 opp top card: monster -> Double Attack
+  run(`{ const me=setup(), op=battle.opp; op.deck=[105,1054]; op.drop=[]; const u=mk(CARD_MAP.get(2001)); me.monsters.center=u; const ab=ABX.get(CARD_MAP.get(2001)).abilities.find(a=>a.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(2001),ab,u,{event:{name:'act'}}); }`); await settle();
+  ck("2001: opp top monster milled -> Double Attack", val(`return battle.opp.drop.length===1 && battle.plr.monsters.center.tempDA===true`), val(`return [battle.opp.drop.length,battle.plr.monsters.center.tempDA]`));
   console.log(`\npass ${pass} fail ${fail}`);
 })();

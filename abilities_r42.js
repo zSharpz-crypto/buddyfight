@@ -4323,6 +4323,28 @@
     fresh(); return true;
   }, check: () => true };
   OV42.push([1628, /look at the top card of your deck, and either put it on the top of your deck, or into your drop zone/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42GaugeLookKeepOrDrop" }] }) : ab]);
+  /* ---- Hero World: #3216 discard Caardian + 1 gauge -> draw 2; #2001 mill opp top: monster -> Double Attack, spell -> pay 1 gauge to destroy ---- */
+  OPS.r42CaardianDraw = { async run(s, ctx) {
+    const f = ctx.f; if (f.gauge.length < 1) return false;
+    const ch = await pickHand(ctx, (c) => !!c && core.lc(c.name || "").includes("caardian"), 1, `${ctx.card.name} - discard a Caardian card`);
+    if (!ch) return false;
+    discardIds(ctx, [ch[0].id]); f.drop.push(f.gauge.pop());
+    for (let i = 0; i < 2 && f.deck.length; i++) f.hand.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([3216, /you may discard a card with .caardian. in its card name, and pay 1 gauge/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42CaardianDraw" }] }) : ab]);
+  OPS.r42OppTopCheck = { async run(s, ctx) {
+    const e = ctx.e, f = ctx.f; if (!e.deck.length) return false;
+    const id = e.deck.shift(), c = core.cardOf(id); e.drop.push(id); e.abxMilledTurn = B.turnCount;
+    if (c && c.type === "Monster" && ctx.unit) { ctx.unit.tempDA = true; ABX.grantAttacks && ABX.grantAttacks(ctx.unit, 2); }
+    else if (c && c.type === "Spell" && f.gauge.length >= 1) {
+      f.drop.push(f.gauge.pop());
+      const st = parseS("destroy a monster or item on your opponent's field")[0];
+      if (st && OPS[st.op]) await OPS[st.op].run(st, ctx);
+    }
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([2001, /put the top card of your opponent's deck into his or her drop zone\. if that card is a monster/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42OppTopCheck" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

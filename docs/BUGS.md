@@ -430,3 +430,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Generic: #699 reveal five, 1 damage per Actor Knights monster, cards back to bottom (original order, not player-chosen). #1887 deferred: field-Act battle context has defUnit null (abilities_engine.js ~1851), so the attacked monster is unknown. Open Generic: #694 #1887 #5766 #6314 #6441 #6501. Test: tests/generic_a.js.
 
 - Hero World: #4525 drops a Battle Building monster and adds a Battle Building [Set] spell (shuffles); #1628 top card to gauge then keep/drop the next (human prompt: select = keep, cancel = drop; auto keeps). #3498 needs per-turn gauge-put tracking (not available). Test: tests/hero_e.js.
+
+- Hero World: #3216 discard a Caardian + 1 gauge -> draw 2 (discard step was missing); #2001 opp top card milled: monster -> Double Attack, spell + 1 gauge -> destroy (spell branch untested). Skipped #6416 (needs different-name spell counting). Test: tests/hero_e.js.
