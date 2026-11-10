@@ -4466,6 +4466,10 @@
   XC42.r42WizardNames6 = (c, ctx) => new Set(ctx.f.drop.map(id => core.cardOf(id)).filter(x => x && (x.attrs || []).some(a => core.lc(a) === "wizard")).map(x => x.name)).size >= 6;
   ABX.COND_OK.add("r42WizardNames6");
   OV42.push([19, /you may only cast this card if you have six or more different wizard/i, (ab) => ab.kind === "rule" ? Object.assign({}, ab, { action: "cast", steps: [], conds: [{ t: "r42WizardNames6" }] }) : ab]);
+  /* ---- #6402: "After this turn, you get another turn! During your next turn, you do not proceed to main phase." ---- */
+  OPS.r42SkipMainNext = { run(s, ctx) { ctx.f.abxSkipMain = B.turnCount + 1; return true; }, check: () => true };
+  ABX.skipMainPhase = function (side) { const f = F(side); if (f && f.abxSkipMain === B.turnCount) { f.abxSkipMain = null; return true; } return false; };
+  OV42.push([6402, /during your next turn, you do not proceed to main phase/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps), { op: "r42SkipMainNext" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

@@ -5803,6 +5803,8 @@ const battle = {
       if (gen !== this.matchGen || this.matchOver) return;
       if (side === "plr" || !f.isBot) {
         this.setPrompt("Main Phase: Click any card for its Detail Banner, Call, Equip, Cast, Search Deck, [Move] to Center, or Charge & Draw!");
+        // "During your next turn, you do not proceed to main phase" (e.g. #6402): go straight on to the Attack Phase
+        if (this.phase === "main" && window.ABX && ABX.skipMainPhase && ABX.skipMainPhase(side)) { this.advancePhase(); this.setPrompt("⏭️ This turn you do not proceed to the Main Phase - Attack Phase!"); }
       }
       if (f.isBot && side === "opp") {
         setTimeout(() => {

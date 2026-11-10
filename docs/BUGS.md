@@ -450,3 +450,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - SAO: #6080 link attack drops a soul then the opponent discards exactly one card (fallback double-ran the drop); #6088 Set spell lets Moonlit Black Cats items attack past center characters (via ABX.canAttackThrough; item-attack test uses a fallback card if no such item exists). Open SAO: #6095 #6110 (needs per-attack "cannot be countered / damage cannot be reduced"). Test: tests/sao_a.js.
 
 - Magic #19 Great Spell, My Grandfather Clock: the cast rule now needs six different Wizard NAMES in drop (seven copies of one card used to pass); effect (drop to deck, shuffle, extra turn) verified. Test: tests/magic_b.js.
+
+- Extra turn ("after this turn you get another turn"): verified through the real End Turn flow in hotseat and vs-bot (tests/extra_turn.js) - it works. #6402 "during your next turn you do not proceed to main phase" was unimplemented: the extra turn now goes straight to the Attack Phase (game.js startTurn + ABX.skipMainPhase). Human players only; a bot with this effect still gets a normal main phase.
