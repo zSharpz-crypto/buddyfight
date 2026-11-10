@@ -4462,6 +4462,10 @@
       } catch (e) { /* ignore */ }
       return prevCAT ? prevCAT.apply(this, arguments) : false;
     }; }
+  /* ---- Magic #19 My Grandfather Clock: "six or more different Wizard" means six different NAMES (seven copies of one card passed) ---- */
+  XC42.r42WizardNames6 = (c, ctx) => new Set(ctx.f.drop.map(id => core.cardOf(id)).filter(x => x && (x.attrs || []).some(a => core.lc(a) === "wizard")).map(x => x.name)).size >= 6;
+  ABX.COND_OK.add("r42WizardNames6");
+  OV42.push([19, /you may only cast this card if you have six or more different wizard/i, (ab) => ab.kind === "rule" ? Object.assign({}, ab, { action: "cast", steps: [], conds: [{ t: "r42WizardNames6" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

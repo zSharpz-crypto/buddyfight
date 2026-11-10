@@ -448,3 +448,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - SAO: #6085 searches a Pina from deck or drop (shuffle only when from the deck); #6079 The End Of The World (nullify, opp souls to drop, both drops into decks, shuffle, life 10). BanG Dream #5373 #5374 #5388 #5433 are soul-hosted abilities (need engine support for abilities active from a soul; not attempted). Test: tests/sao_a.js.
 
 - SAO: #6080 link attack drops a soul then the opponent discards exactly one card (fallback double-ran the drop); #6088 Set spell lets Moonlit Black Cats items attack past center characters (via ABX.canAttackThrough; item-attack test uses a fallback card if no such item exists). Open SAO: #6095 #6110 (needs per-attack "cannot be countered / damage cannot be reduced"). Test: tests/sao_a.js.
+
+- Magic #19 Great Spell, My Grandfather Clock: the cast rule now needs six different Wizard NAMES in drop (seven copies of one card used to pass); effect (drop to deck, shuffle, extra turn) verified. Test: tests/magic_b.js.
