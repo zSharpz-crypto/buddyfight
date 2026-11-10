@@ -444,3 +444,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - BanG Dream: #5495 cast needs Afterglow total size 3+ on your field (new generic hook: cast-rule conds of type r42* are enforced in evaluateCardConditions). The "opponent card destroyed/returned this turn" half is not tracked yet. NOTE: tests/dead_batch_b.js has 1 failing check (#80 revealed spell cast free) that fails without my change too. Test: tests/bandori_a.js.
 
 - BanG Dream: #5372 Act no longer double-runs; #5452 draws only if five cards actually stood; #5380 redirects the attack to your center Pastel*Palettes (tested with a stubbed battle context, not a full attack). Test: tests/bandori_a.js.
+
+- SAO: #6085 searches a Pina from deck or drop (shuffle only when from the deck); #6079 The End Of The World (nullify, opp souls to drop, both drops into decks, shuffle, life 10). BanG Dream #5373 #5374 #5388 #5433 are soul-hosted abilities (need engine support for abilities active from a soul; not attempted). Test: tests/sao_a.js.

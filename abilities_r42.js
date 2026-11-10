@@ -4185,7 +4185,7 @@
   }, check: () => true };
   OV42.push([3660, /draw a card, and put the number of cards from the top of your deck into your gauge/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DrawGaugeGolems" }] }) : ab]);
   OPS.r42SearchDeckOrDrop = { run(s, ctx) {
-    const f = ctx.f, nm = (id) => core.lc((core.cardOf(id) || {}).name || "") === s.name;
+    const f = ctx.f, nm = (id) => { const n = core.lc((core.cardOf(id) || {}).name || ""); return s.contains ? n.includes(s.name) : n === s.name; };
     let i = f.deck.findIndex(nm);
     if (i >= 0) { f.hand.push(f.deck.splice(i, 1)[0]); if (OPS.shuffle && OPS.shuffle.run) OPS.shuffle.run({ who: "you" }, ctx); fresh(); return true; }
     i = f.drop.findIndex(nm);
@@ -4442,6 +4442,16 @@
     bc.redirectTo = "center"; fresh(); return true;
   }, check: () => true };
   OV42.push([5380, /change the target of the attack to the .pastel\*palettes. on your center/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42RedirectToCenterBand", attr: "pastelpalettes" }] }) : ab]);
+  /* ---- SAO: #6085 search a Pina (shuffle only if searched from the deck), #6079 The End Of The World ---- */
+  OV42.push([6085, /put up to one .pina. from your deck or drop zone into your hand/i, (ab) => ab.kind === "triggered" && ab.trigger && ab.trigger.event === "enter" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42SearchDeckOrDrop", name: "pina", contains: true }] }) : ab]);
+  OPS.r42EndOfTheWorld = { run(s, ctx) {
+    const f = ctx.f, e = ctx.e;
+    Object.values(e.monsters).forEach(u => { if (u && u.soul && u.soul.length) e.drop.push(...u.soul.splice(0)); });
+    [e.item, e.item2].forEach(u => { if (u && u.soul && u.soul.length) e.drop.push(...u.soul.splice(0)); });
+    [f, e].forEach(x => { x.deck.push(...x.drop.splice(0)); for (let i = x.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [x.deck[i], x.deck[j]] = [x.deck[j], x.deck[i]]; } x.life = 10; });
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([6079, /return all cards from each player's drop zone to their decks/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op === "nullifyAbilities"), { op: "r42EndOfTheWorld" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
