@@ -18,5 +18,14 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
   }
   run(`{ const me=setup(), op=battle.opp; me.drop=[1,2,3]; op.drop=[4,5]; me.life=3; op.life=7; me.deck=[8]; op.deck=[9]; const u=mk(CARD_MAP.get(1054)); u.soul=[11,12]; op.monsters.center=u; ABX.fireSpell('plr',CARD_MAP.get(6079),{free:true}); }`); await settle();
   ck("6079: drops emptied into decks, souls included, both life 10", val(`const p=battle.plr,o=battle.opp; return p.drop.length===0 && o.drop.length===0 && p.life===10 && o.life===10 && p.deck.length===4 && o.deck.length===5`), val(`const p=battle.plr,o=battle.opp; return [p.drop.length,o.drop.length,p.life,o.life,p.deck.length,o.deck.length,o.monsters.center&&o.monsters.center.soul.length]`));
+  // #6088 Set spell lets Moonlit Black Cats items attack past a center character
+  run(`globalThis.__mi=ALL_CARDS.find(c=>c.type==='Item'&&(c.attrs||[]).includes('MoonlitBlackCats'))`);
+  for (const set of [false, true]) {
+    run(`{ const me=setup(); me.setSpells=${set ? "[CARD_MAP.get(6088)]" : "[]"}; globalThis.__ca=ABX.canAttackThrough('plr',{card:(__mi||{card:CARD_MAP.get(6076)}).card||__mi},'own'); }`);
+    ck("6088 " + (set ? "Set: item may attack past center" : "not Set: no"), val(`return __ca===${set}`), val(`return [__ca,!!__mi]`));
+  }
+  // #6080 link attack: soul dropped from an opposing card, opponent discards one card (once)
+  run(`{ const me=setup(), op=battle.opp; op.hand=[1054,1054]; const u=mk(CARD_MAP.get(1054)); u.soul=[11]; op.monsters.center=u; const a=mk(CARD_MAP.get(6080)); me.monsters.left=a; const ab=ABX.get(CARD_MAP.get(6080)).abilities.find(x=>x.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(6080),ab,a,{event:{name:'link'}}); }`); await settle();
+  ck("6080: one soul dropped, opponent discards exactly one", val(`const o=battle.opp; return o.monsters.center.soul.length===0 && o.hand.length===1 && o.drop.length===2`), val(`const o=battle.opp; return [o.monsters.center.soul.length,o.hand.length,o.drop.length]`));
   console.log("\npass " + pass + " fail " + fail);
 })();

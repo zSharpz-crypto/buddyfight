@@ -4452,6 +4452,16 @@
     fresh(); return true;
   }, check: () => true };
   OV42.push([6079, /return all cards from each player's drop zone to their decks/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps).filter(x => x.op === "nullifyAbilities"), { op: "r42EndOfTheWorld" }] }) : ab]);
+  /* ---- SAO #6080 (fallback double-ran the drop-soul), #6088 Moonlit Black Cats items attack past center characters ---- */
+  OV42.push([6080, /drop up to one soul from a card on your opponent's field, and your opponent chooses a hand card/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps), { op: "oppDiscard", n: 1 }] }) : ab]);
+  { const prevCAT = ABX.canAttackThrough;
+    ABX.canAttackThrough = function (side, unit, who) {
+      try {
+        const f = F(side);
+        if (unit && (unit.card.attrs || []).some(a => core.lc(a) === "moonlitblackcats") && (f.setSpells || []).some(c => c && (c.id === 6088 || (c.card && c.card.id === 6088)))) return true;
+      } catch (e) { /* ignore */ }
+      return prevCAT ? prevCAT.apply(this, arguments) : false;
+    }; }
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {
