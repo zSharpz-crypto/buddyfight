@@ -4470,6 +4470,49 @@
   OPS.r42SkipMainNext = { run(s, ctx) { ctx.f.abxSkipMain = B.turnCount + 1; return true; }, check: () => true };
   ABX.skipMainPhase = function (side) { const f = F(side); if (f && f.abxSkipMain === B.turnCount) { f.abxSkipMain = null; return true; } return false; };
   OV42.push([6402, /during your next turn, you do not proceed to main phase/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [...noFb(ab.steps), { op: "r42SkipMainNext" }] }) : ab]);
+  /* ---- Conan #5201 reorder opp top 3; Medabots #6259 look six, #6268 return different names ---- */
+  const orderCards = async (ctx, ids, title, auto) => {
+    const out = [], rest = ids.slice();
+    while (rest.length) {
+      if (auto || rest.length === 1) { out.push(rest.shift()); continue; }
+      const cs = rest.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) }));
+      const r = (await core.pick(cs, { qty: { n: 1 } }, ctx, { intent: "help", min: 1, max: 1, title: `${title} (${out.length + 1}/${ids.length})` }))[0] || cs[0];
+      rest.splice(rest.indexOf(r.id), 1); out.push(r.id);
+    }
+    return out;
+  };
+  OPS.r42ReorderOppTop3 = { async run(s, ctx) {
+    const e = ctx.e; if (!e.deck.length) return false;
+    const ids = e.deck.splice(0, 3), auto = ABX.autoPlay || ctx.f.isBot;
+    e.deck.unshift(...await orderCards(ctx, ids, `${ctx.card.name} - next card on top of the opponent's deck`, auto)); fresh(); return true;
+  }, check: () => true };
+  OV42.push([5201, /look at the top three cards of your opponent's deck, and put them back on the top of the deck in any order/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42ReorderOppTop3" }] }) : ab]);
+  OPS.r42LookSixTake = { async run(s, ctx) {
+    const f = ctx.f, auto = ABX.autoPlay || f.isBot, ids = f.deck.splice(0, 6); if (!ids.length) return false;
+    const hit = (id) => s.names.some(n => core.lc((core.cardOf(id) || {}).name || "").includes(n));
+    const cands = ids.map((id, idx) => ({ k: "zone", side: ctx.side, area: "deck", idx, id, card: core.cardOf(id) })).filter(r => hit(r.id));
+    if (cands.length) { const ch = auto ? [cands[0]] : await core.pick(cands, { qty: { n: 1 } }, ctx, { intent: "help", min: 0, max: 1, title: `${ctx.card.name} - put up to one into your hand` }); if (ch[0]) { ids.splice(ids.indexOf(ch[0].id), 1); f.hand.push(ch[0].id); } }
+    f.deck.push(...await orderCards(ctx, ids, `${ctx.card.name} - next card for the bottom of your deck`, auto)); fresh(); return true;
+  }, check: () => true };
+  OV42.push([6259, /look at the top six cards of your deck, put up to one .hardness ten. or .hit seller./i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42LookSixTake", names: ["hardness ten", "hit seller"] }] }) : ab]);
+  OPS.r42DifferentNamesToDeck = { async run(s, ctx) {
+    const f = ctx.f, auto = ABX.autoPlay || f.isBot, seen = new Set(), cands = [];
+    f.drop.forEach((id, idx) => { const n = (core.cardOf(id) || {}).name; if (n && !seen.has(n)) { seen.add(n); cands.push({ k: "zone", side: ctx.side, area: "drop", idx, id, card: core.cardOf(id) }); } });
+    if (!cands.length) return false;
+    let ch = cands.slice(0, 5);
+    if (!auto) {
+      ch = []; const left = cands.slice();
+      while (ch.length < 5 && left.length) {
+        const r = (await core.pick(left, { qty: { n: 1 } }, ctx, { intent: "help", min: 0, max: 1, title: `${ctx.card.name} - return a card with a different name (${ch.length}/5, cancel to stop)` }))[0];
+        if (!r) break; ch.push(r); const nm = r.card.name; for (let i = left.length - 1; i >= 0; i--) if (left[i].card.name === nm) left.splice(i, 1);
+      }
+    }
+    ch.forEach(r => { const i = f.drop.indexOf(r.id); if (i >= 0) f.deck.push(f.drop.splice(i, 1)[0]); });
+    for (let i = f.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [f.deck[i], f.deck[j]] = [f.deck[j], f.deck[i]]; }
+    if (ch.length === 5 && f.deck.length) f.hand.push(f.deck.shift());
+    fresh(); return ch.length > 0;
+  }, check: () => true };
+  OV42.push([6268, /return up to five cards with different card names from your drop zone to your deck/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42DifferentNamesToDeck" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

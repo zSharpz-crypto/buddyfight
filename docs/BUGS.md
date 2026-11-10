@@ -452,3 +452,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Magic #19 Great Spell, My Grandfather Clock: the cast rule now needs six different Wizard NAMES in drop (seven copies of one card used to pass); effect (drop to deck, shuffle, extra turn) verified. Test: tests/magic_b.js.
 
 - Extra turn ("after this turn you get another turn"): verified through the real End Turn flow in hotseat and vs-bot (tests/extra_turn.js) - it works. #6402 "during your next turn you do not proceed to main phase" was unimplemented: the extra turn now goes straight to the Attack Phase (game.js startTurn + ABX.skipMainPhase). Human players only; a bot with this effect still gets a normal main phase.
+
+- Collabs: Conan #5201 reorder the top 3 of the opponent deck; Medabots #6259 look at top six, take a Hardness Ten/Hit Seller, rest to bottom (order chosen by humans); #6268 return up to five different-name cards from drop, shuffle, draw if five. Human prompts untested; auto-play keeps order. Test: tests/collab_b.js.
