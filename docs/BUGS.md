@@ -442,3 +442,5 @@ New events: draw, handUp, enterFromDrop (zone-diff in zoneEvents); `ABX.fire42` 
 - Cinderella Girls: #5655 Chiyo Shirayuki bonus (drop opp gauge, top card to gauge) only when she is on your field; #5640 Act stands only if a soul was dropped. #5445 #5446 #5643 verified working via the r40 fallback (face-down buddy zone). Test: tests/cinderella_a.js.
 
 - BanG Dream: #5495 cast needs Afterglow total size 3+ on your field (new generic hook: cast-rule conds of type r42* are enforced in evaluateCardConditions). The "opponent card destroyed/returned this turn" half is not tracked yet. NOTE: tests/dead_batch_b.js has 1 failing check (#80 revealed spell cast free) that fails without my change too. Test: tests/bandori_a.js.
+
+- BanG Dream: #5372 Act no longer double-runs; #5452 draws only if five cards actually stood; #5380 redirects the attack to your center Pastel*Palettes (tested with a stubbed battle context, not a full attack). Test: tests/bandori_a.js.

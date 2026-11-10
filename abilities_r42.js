@@ -4427,6 +4427,21 @@
       return r;
     };
   }
+  /* ---- BanG Dream: #5372 (fallback re-ran the Act), #5452 draw only if five cards stood, #5380 attack redirected to your center Pastel*Palettes ---- */
+  OV42.push([5372, /if you \[rest\], \[stand\] the chosen card/i, (ab) => ab.kind === "act" ? Object.assign({}, ab, { unparsed: [], steps: noFb(ab.steps) }) : ab]);
+  OPS.r42StandAllCountDraw = { run(s, ctx) {
+    const f = ctx.f, isPP = (u) => u && (u.card.attrs || []).some(a => core.lc(a) === s.attr); let n = 0;
+    [...Object.values(f.monsters), f.item, f.item2].forEach(u => { if (isPP(u) && u.rested) { u.rested = false; n++; } });
+    if (n >= 5 && f.deck.length) f.hand.push(f.deck.shift());
+    fresh(); return true;
+  }, check: () => true };
+  OV42.push([5452, /\[stand\] all .poppin.party. on your field/i, (ab) => ab.kind === "spell" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42StandAllCountDraw", attr: "poppinparty" }] }) : ab]);
+  OPS.r42RedirectToCenterBand = { run(s, ctx) {
+    const bc = ABX.battleCtx, c = ctx.f.monsters.center;
+    if (!bc || !bc.active || !c || !(c.card.attrs || []).some(a => core.lc(a) === s.attr)) return false;
+    bc.redirectTo = "center"; fresh(); return true;
+  }, check: () => true };
+  OV42.push([5380, /change the target of the attack to the .pastel\*palettes. on your center/i, (ab) => ab.kind === "triggered" ? Object.assign({}, ab, { unparsed: [], steps: [{ op: "r42RedirectToCenterBand", attr: "pastelpalettes" }] }) : ab]);
   XC42.r42Advent = (c, ctx) => !!(ctx.unit && ctx.unit.abxAdvent);
   ABX.COND_OK.add("r42Advent");
   [5049, 5052].forEach(id => {

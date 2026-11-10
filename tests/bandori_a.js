@@ -17,5 +17,16 @@ run(`ABX.fast=true; ABX.autoPlay=true; window.alert=function(){};
     const r = val(`return __r`);
     ck("5495 cast gate " + (ok ? "Afterglow total size 3: allowed" : "total size 1: blocked"), ok ? r.met === true : r.met === false, r);
   }
+  // #5452 stand all Poppin'Party; draw only when five cards stood
+  for (const five of [true, false]) {
+    run(`{ const me=setup(); me.hand=[]; me.deck=[1,2,3]; ['left','center','right'].forEach(p=>{ me.monsters[p]=mk(CARD_MAP.get(5383)); me.monsters[p].rested=true; }); me.item=mk(CARD_MAP.get(5389)); me.item.rested=true; ${five ? "me.item2=mk(CARD_MAP.get(5384)); me.item2.rested=true;" : ""} ABX.fireSpell('plr',CARD_MAP.get(5452),{free:true}); }`); await settle();
+    ck("5452 " + (five ? "five stood: draws" : "four stood: no draw"), val(`const p=battle.plr; return p.monsters.left.rested===false && p.hand.length===${five ? 1 : 0}`), val(`const p=battle.plr; return [p.monsters.left.rested,p.hand.length]`));
+  }
+  // #5372 Act: rest self, stand the other copy (once, no double run)
+  run(`{ const me=setup(); const a=mk(CARD_MAP.get(5372)), b=mk(CARD_MAP.get(5372)); b.rested=true; me.monsters.left=a; me.monsters.right=b; const ab=ABX.get(CARD_MAP.get(5372)).abilities.find(x=>x.kind==='act'); ABX.runAbility('plr',CARD_MAP.get(5372),ab,a,{event:{name:'act'}}); }`); await settle();
+  ck("5372: self rested, other stood", val(`const p=battle.plr; return p.monsters.left.rested===true && p.monsters.right.rested===false`), val(`const p=battle.plr; return [p.monsters.left.rested,p.monsters.right.rested]`));
+  // #5380 redirect to center Pastel*Palettes
+  run(`{ const me=setup(); me.monsters.center=mk(CARD_MAP.get(5379)); me.monsters.left=mk(CARD_MAP.get(5380)); ABX.battleCtx={active:true,attSide:'opp',defSide:'plr',redirectTo:null}; const ab=ABX.get(CARD_MAP.get(5380)).abilities.find(a=>a.kind==='triggered'); ABX.runAbility('plr',CARD_MAP.get(5380),ab,me.monsters.left,{event:{name:'oppAttack'}}); globalThis.__rd=ABX.battleCtx.redirectTo; }`); await settle();
+  ck("5380: attack redirected to center", val(`return __rd==='center'`), val(`return [__rd]`));
   console.log("\npass " + pass + " fail " + fail);
 })();
